@@ -101,6 +101,72 @@ var kernel; if (!kernel) kernel = (function(modules, clients) {
   };
 })({}, []);
 
+kernel.add('string', function() {
+  return {
+    toUTF8Buffer: function(string) {
+      var c, len = string.length;
+      for (var i = 0, j = 0; i < len; i++) {
+        c = string.charCodeAt(i);
+        j += c < 0x80 ? 1 : c < 0x800 ? 2 : c < 0x10000 ? 3 : c < 0x200000 ? 4 : c < 0x4000000 ? 5 : 6;
+      }
+      var buffer = new Uint8Array(j);
+      for (var i = 0, k = 0; i < len; i++) {
+        c = string.charCodeAt(i);
+        if (c < 128) {
+          buffer[k++] = c;
+        } else if (c < 0x800) {
+          buffer[k++] = 192 + (c >>> 6);
+          buffer[k++] = 128 + (c & 63);
+        } else if (c < 0x10000) {
+          buffer[k++] = 224 + (c >>> 12);
+          buffer[k++] = 128 + (c >>> 6 & 63);
+          buffer[k++] = 128 + (c & 63);
+        } else if (c < 0x200000) {
+          buffer[k++] = 240 + (c >>> 18);
+          buffer[k++] = 128 + (c >>> 12 & 63);
+          buffer[k++] = 128 + (c >>> 6 & 63);
+          buffer[k++] = 128 + (c & 63);
+        } else if (c < 0x4000000) {
+          buffer[k++] = 248 + (c >>> 24);
+          buffer[k++] = 128 + (c >>> 18 & 63);
+          buffer[k++] = 128 + (c >>> 12 & 63);
+          buffer[k++] = 128 + (c >>> 6 & 63);
+          buffer[k++] = 128 + (c & 63);
+        } else {
+          buffer[k++] = 252 + (c >>> 30);
+          buffer[k++] = 128 + (c >>> 24 & 63);
+          buffer[k++] = 128 + (c >>> 18 & 63);
+          buffer[k++] = 128 + (c >>> 12 & 63);
+          buffer[k++] = 128 + (c >>> 6 & 63);
+          buffer[k++] = 128 + (c & 63);
+        }
+      }
+      return buffer;
+    },
+    fromUTF8Buffer: function(buffer) {
+      var string = '';
+      for (var n, len = buffer.length, i = 0; i < len; i++) {
+        n = buffer[i];
+        string += String.fromCharCode(n > 251 && n < 254 && i + 5 < len
+          ? (n - 252) * 1073741824 + (buffer[++i] - 128 << 24) + (buffer[++i] - 128 << 18) + (buffer[++i] - 128 << 12) + (buffer[++i] - 128 << 6) + buffer[++i] - 128
+          : n > 247 && n < 252 && i + 4 < len
+            ? (n - 248 << 24) + (buffer[++i] - 128 << 18) + (buffer[++i] - 128 << 12) + (buffer[++i] - 128 << 6) + buffer[++i] - 128
+            : n > 239 && n < 248 && i + 3 < len
+              ? (n - 240 << 18) + (buffer[++i] - 128 << 12) + (buffer[++i] - 128 << 6) + buffer[++i] - 128
+              : n > 223 && n < 240 && i + 2 < len
+                ? (n - 224 << 12) + (buffer[++i] - 128 << 6) + buffer[++i] - 128
+                : n > 191 && n < 224 && i + 1 < len
+                  ? (n - 192 << 6) + buffer[++i] - 128
+                  : n);
+      }
+      return string;
+    },
+    fromAsciiBuffer: function(buffer) {
+      return String.fromCharCode.apply(null, new Uint8Array(buffer)); // TODO: limit is 65536 characters; use loop
+    }
+  };
+});
+
 kernel.add('socket', function() {
   var socket = chrome.socket;
   return {
@@ -122,19 +188,13 @@ kernel.add('socket', function() {
                         //console.log('socket.read on socket id', connectionSocket.socketId, 'readInfo resultCode', readInfo && readInfo.resultCode);
                         if (chrome.runtime.lastError || readInfo && readInfo.resultCode < 0)
                           return this.disconnect();
-                        // TODO: handle multibyte characters
-                        callback(String.fromCharCode.apply(null, new Uint8Array(readInfo.data)));
+                        callback(readInfo.data);
                         socket.read(connectionSocket.socketId, null, read);
                       }.bind(this));
                     },
-                    write: function(str, callback) {
+                    write: function(data, callback) {
                       if (disconnected) return console.error('Already disconnected');
-                      // TODO: handle multibyte
-                      var buffer = new ArrayBuffer(str.length*2),
-                          view = new Uint8Array(buffer);
-                      for (var i = 0, len = str.length; i < len; i++)
-                        view[i] = str.charCodeAt(i);
-                      socket.write(connectionSocket.socketId, buffer, callback || function() {});
+                      socket.write(connectionSocket.socketId, data, callback || function() {});
                     },
                     disconnect: function() {
                       if (disconnected) return;
@@ -179,20 +239,22 @@ kernel.add('http', function() {
   
   return {
     serve: function(options, callback) {
-      kernel.use({socket: 0}, function(o) {
+      kernel.use({socket: 0, string: 0}, function(o) {
         o.socket.listen(options, function(socket) {
-          var request = {body: '', headers: {}, query: {}, post: {}, peerAddress: socket.peerAddress},
+          var request = {headers: {}, query: {}, post: {}, peerAddress: socket.peerAddress},
               headers = '',
               split = -1,
               complete;
           //console.log('new socket', socket.socketId);
-          // TODO: support keep-alive, chunked encoding, and ultimately) pipelined requests
-          socket.read(function(str) {
+          // TODO: support keep-alive, chunked encoding, and (ultimately) pipelined requests
+          socket.read(function(buffer) {
             if (complete) return;
             if (split < 0) {
-              headers += str;
+              // headers are ascii
+              var offset = headers.length;
+              headers += o.string.fromAsciiBuffer(buffer);
               if ((split = headers.indexOf('\r\n\r\n')) > -1) {
-                request.body = headers.substr(split+4);
+                request.body = buffer.slice(split+4-offset);
                 headers = headers.substr(0, split).split('\r\n');
                 var line = headers.shift().split(' '),
                     uri = line[1] ? line[1].split('?', 2) : [];
@@ -207,19 +269,23 @@ kernel.add('http', function() {
                 //console.log(request.method, request.uri);
               }
             } else {
-              request.body += str;
+              var tmp = new ArrayBuffer(request.body.length+buffer.length);
+              tmp.set(request.body, 0);
+              tmp.set(buffer, request.body.length);
+              request.body = tmp;
             }
-            if (split > -1 && (!request.headers['Content-Length'] || request.body.length + (encodeURIComponent(request.body).match(/%[89AB]/g) || []).length >= request.headers['Content-Length'])) {
+            if (split > -1 && (!request.headers['Content-Length'] || request.body.length >= request.headers['Content-Length'])) {
               complete = true;
               if (request.headers['Content-Type'] == 'application/x-www-form-urlencoded')
-                request.post = parseQuery(request.body);
+                request.post = parseQuery(o.string.fromAsciiBuffer(request.body));
               callback(request, {
                 end: function(body, headers, status) {
                   headers = headers || {};
-                  headers['Content-Length'] = body.length + (encodeURIComponent(body).match(/%[89AB]/g) || []).length;
+                  headers['Content-Length'] = body.length + (encodeURIComponent(body).match(/%[89AB]/g) || []).length; // TODO: better content length measurement
                   if (!headers['Content-Type']) headers['Content-Type'] = 'text/plain';
                   if (!headers.Connection) headers.Connection = 'close';
-                  socket.write(['HTTP/1.1 '+(status || '200 OK')].concat(Object.keys(headers).map(function(header) { return header+': '+headers[header]; })).join('\r\n')+'\r\n\r\n'+body, socket.disconnect);
+                  var string = ['HTTP/1.1 '+(status || '200 OK')].concat(Object.keys(headers).map(function(header) { return header+': '+headers[header]; })).join('\r\n')+'\r\n\r\n'+body;
+                  socket.write(o.string.toUTF8Buffer(string).buffer, socket.disconnect);
                 }
               });
             }
@@ -454,8 +520,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
                 if (!this.path) return;
                 var method = 'SPLICE';
                 if (this.object(elem)) {
-                  this.path.pop();
-                  this.path.push(elem.parentNode.firstChild.textContent);
+                  this.path.splice(-1, 1, elem.parentNode.firstChild.textContent);
                   method = 'PUT';
                 }
                 var value = elem.textContent;
