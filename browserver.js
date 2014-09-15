@@ -258,30 +258,6 @@ kernel.add('html', function() {
   };
 });
 
-kernel.add('eval', function() {
-  var id = 0,
-      log = {},
-      loaded,
-      dispatch = function(code, id) { iframe.contentWindow.postMessage({code: code, id: id++}, '*'); },
-      iframe = document.createElement('iframe');
-  iframe.src = 'eval.html';
-  iframe.onload = function() {
-    loaded = true;
-    Object.keys(log).forEach(function(k) { dispatch(log[k].code, k); });
-  };
-  document.body.appendChild(iframe);
-  window.addEventListener('message', function(e) {
-    if (!log.hasOwnProperty(e.data.id)) return;
-    log[e.data.id].callback(e.data.result, e.data.error);
-    delete log[e.data.id];
-  });
-  return function(code, callback) {
-    do { id = (id + 1) % Number.MAX_VALUE; } while (log[id]);
-    log[id] = {code: code, callback: callback};
-    if (loaded) dispatch(code, id);
-  };
-});
-
 // PUT assigns a value (from request body) to the global object at the given path
 // - errors if parent object does not exist
 // POST pushes a value (from request body) onto array at given path
