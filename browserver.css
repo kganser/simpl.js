@@ -16,14 +16,14 @@
   content: "";
   display: inline-block;
   border-style: solid;
-  border-width: .6em .4em 0 .4em;
-  border-color: #666 transparent transparent transparent;
-  margin-right: .4em;
+  border-width: .6em .35em 0 .35em;
+  border-color: #5a5a5a transparent transparent transparent;
+  margin-right: .5em;
   cursor: pointer;
 }
 .json-object.closed:before, .json-array.closed:before {
-  border-width: .4em 0 .4em .6em;
-  border-color: transparent transparent transparent #666;
+  border-width: .35em 0 .35em .6em;
+  border-color: transparent transparent transparent #5a5a5a;
   margin-right: .6em;
 }
 .json-object.closed li, .json-array.closed li {
@@ -52,15 +52,17 @@
 }
 .json-key {
   color: #881391;
+  white-space: pre-wrap;
 }
 .json-string {
   color: #C5201C;
+  white-space: pre-wrap;
 }
 .json-number, .json-boolean {
   color: #1C00CF;
 }
 .json-undefined, .json-null {
-  color: #666;
+  color: #808080;
 }
 .json span[contenteditable=true] {
   color: black;
