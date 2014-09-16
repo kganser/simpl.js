@@ -269,29 +269,58 @@ kernel.add('http', function() {
                 //console.log(request.method, request.uri);
               }
             } else {
-              var tmp = new ArrayBuffer(request.body.length+buffer.length);
+              var tmp = new ArrayBuffer(request.body.byteLength+buffer.byteLength);
               tmp.set(request.body, 0);
-              tmp.set(buffer, request.body.length);
+              tmp.set(buffer, request.body.byteLength);
               request.body = tmp;
             }
-            if (split > -1 && (!request.headers['Content-Length'] || request.body.length >= request.headers['Content-Length'])) {
+            if (split > -1 && (!request.headers['Content-Length'] || request.body.byteLength >= request.headers['Content-Length'])) {
               complete = true;
               if (request.headers['Content-Type'] == 'application/x-www-form-urlencoded')
                 request.post = parseQuery(o.string.fromAsciiBuffer(request.body));
               callback(request, {
                 end: function(body, headers, status) {
                   headers = headers || {};
-                  headers['Content-Length'] = body.length + (encodeURIComponent(body).match(/%[89AB]/g) || []).length; // TODO: better content length measurement
+                  if (typeof body == 'string')
+                    body = o.string.toUTF8Buffer(body).buffer;
+                  headers['Content-Length'] = body.byteLength;
                   if (!headers['Content-Type']) headers['Content-Type'] = 'text/plain';
                   if (!headers.Connection) headers.Connection = 'close';
-                  var string = ['HTTP/1.1 '+(status || '200 OK')].concat(Object.keys(headers).map(function(header) { return header+': '+headers[header]; })).join('\r\n')+'\r\n\r\n'+body;
-                  socket.write(o.string.toUTF8Buffer(string).buffer, socket.disconnect);
+                  socket.write(o.string.toUTF8Buffer(['HTTP/1.1 '+(status || '200 OK')].concat(Object.keys(headers).map(function(header) { return header+': '+headers[header]; })).join('\r\n')+'\r\n\r\n').buffer);
+                  socket.write(body, socket.disconnect);
                 }
               });
             }
           });
         });
       });
+    },
+    getMimeType: function(ext) {
+      // partial list from nginx mime_types file
+      return {
+        html: 'text/html',
+        css:  'text/css',
+        xml:  'text/xml',
+        rss:  'text/xml',
+        gif:  'text/gif',
+        jpg:  'image/jpeg',
+        jpeg: 'image/jpeg',
+        js:   'application/x-javascript',
+        json: 'application/json',
+        txt:  'text/plain',
+        png:  'image/png',
+        ico:  'image/x-icon',
+        pdf:  'application/pdf',
+        zip:  'application/zip',
+        exe:  'application/octet-stream',
+        mp3:  'audio/mpeg',
+        mpg:  'video/mpeg',
+        mpeg: 'video/mpeg',
+        mov:  'video/quicktime',
+        flv:  'video/x-flv',
+        avi:  'video/x-msvideo',
+        wmv:  'video/x-ms-wmv'
+      }[ext];
     }
   };
 });
@@ -336,15 +365,11 @@ chrome.app.runtime.onLaunched.addListener(function() {
   kernel.use({http: 0, html: 0}, function(o) {
   
     var data = {
-      string: "hello world",
+      string: 'hello world',
       number: 123,
       null: null,
-      object: {
-        "key": "value"
-      },
-      array: [
-        "element"
-      ]
+      object: {key: 'value'},
+      array: ['element']
     };
     
     o.http.serve({port: 4088}, function(request, response) {
@@ -390,91 +415,25 @@ chrome.app.runtime.onLaunched.addListener(function() {
     });
     
     o.http.serve({port: 8088}, function(request, response) {
+      if (request.path.length > 1) { // proxy request
+        var xhr = new XMLHttpRequest();
+        xhr.responseType = 'arraybuffer';
+        xhr.onload = function() {
+          response.end(xhr.response, {'Content-Type': o.http.getMimeType((request.path.match(/\.([^.]*)$/) || [])[1])});
+        };
+        xhr.onerror = function() {
+          response.end('404 Resource not found', null, 404);
+        };
+        xhr.open('GET', request.path);
+        xhr.send();
+        return;
+      }
       response.end(o.html([
         {'!doctype': {html: null}},
         {head: [
           {title: 'Browserver'},
-          {style: '\n'+[
-            {'.json-object ul, .json-array ol': [
-              'display: inline',
-              'list-style: none',
-              'padding: 0'
-            ]},
-            {'.json li': [
-              'margin-left: 1.2em'
-            ]},
-            {'.json li:after': [
-              'content: ","'
-            ]},
-            {'.json li:last-child:after': [
-              'display: none'
-            ]},
-            {'.json-object:before, .json-array:before': [
-              'content: ""',
-              'display: inline-block',
-              'border-style: solid',
-              'border-width: .6em .4em 0 .4em',
-              'border-color: #666 transparent transparent transparent',
-              'margin-right: .4em',
-              'cursor: pointer'
-            ]},
-            {'.json-object.closed:before, .json-array.closed:before': [
-              'border-width: .4em 0 .4em .6em',
-              'border-color: transparent transparent transparent #666',
-              'margin-right: .6em'
-            ]},
-            {'.json-object.closed li, .json-array.closed li': [
-              'display: none'
-            ]},
-            {'.json-object ul:before': [
-              'content: "{"'
-            ]},
-            {'.json-object ul:after': [
-              'content: "}"'
-            ]},
-            {'.json-object.closed ul:before': [
-              'content: "{\\2026"'
-            ]},
-            {'.json-array ol:before': [
-              'content: "["'
-            ]},
-            {'.json-array ol:after': [
-              'content: "]"'
-            ]},
-            {'.json-array.closed ol:before': [
-              'content: "[\\2026"'
-            ]},
-            {'.json-string:before, .json-string:after': [
-              'content: "\\""'
-            ]},
-            {'.json-key': [
-              'color: #881391'
-            ]},
-            {'.json-string': [
-              'color: #C5201C'
-            ]},
-            {'.json-number, .json-boolean': [
-              'color: #1C00CF'
-            ]},
-            {'.json-undefined, .json-null': [
-              'color: #666'
-            ]},
-            {'.json span[contenteditable=true]': [
-              'color: black',
-              'border: solid 1px #999',
-              'padding: 0 2px',
-              'box-shadow: 3px 3px 3px #999',
-              'outline: none'
-            ]},
-            {'.json-string[contenteditable=true]:before, .json-string[contenteditable=true]:after, .json-key[contenteditable=true]:after': [
-              'content: none'
-            ]}
-          ].map(function(style) {
-            var selector = Object.keys(style)[0];
-            return selector+' {\n'+style[selector].map(function(style) {
-              return '  '+style+';\n';
-            }).join('')+'}\n';
-          }).join('')}
+          {link: {rel: 'stylesheet', href: '/browserver.css'}},
+          {link: {rel: 'shortcut icon', href: '/icon.png'}}
         ]},
         {body: [
           {pre: {id: 'value', 'class': 'json', children: JSON.stringify(data, null, 2)}},
@@ -511,24 +470,29 @@ chrome.app.runtime.onLaunched.addListener(function() {
                   elem.contentEditable = false;
                   elem.className = this.origType;
                   elem.textContent = this.origValue;
-                  this.origType = this.origValue = null;
+                  this.path = this.origType = this.origValue = null;
                 } else { // remove if adding
                   elem.parentNode.parentNode.removeChild(elem.parentNode);
                 }
               },
               submit: function(elem) {
                 if (!this.path) return;
-                var method = 'SPLICE';
-                if (this.object(elem)) {
-                  this.path.splice(-1, 1, elem.parentNode.firstChild.textContent);
-                  method = 'PUT';
+                if (this.origType && elem.textContent == this.origValue) { // value unchanged
+                  elem.contentEditable = false;
+                  this.path = this.origType = this.origValue = null;
+                } else {
+                  var method = 'SPLICE';
+                  if (this.object(elem)) {
+                    this.path.splice(-1, 1, elem.parentNode.firstChild.textContent);
+                    method = 'PUT';
+                  }
+                  var value = elem.textContent;
+                  try { value = JSON.parse(value); } catch (e) {}
+                  console.log(method+' /'+this.path.map(encodeURIComponent).join('/')+'\n'+JSON.stringify(value));
+                  this.path = this.origType = this.origValue = null; // reset must be done before DOM changes (?) to prevent double-submit on keydown and blur
+                  elem.parentNode.firstChild.contentEditable = false;
+                  elem.parentNode.replaceChild(jsml(json(value)), elem);
                 }
-                var value = elem.textContent;
-                try { value = JSON.parse(value); } catch (e) {}
-                console.log(method+' /'+this.path.map(encodeURIComponent).join('/')+'\n'+JSON.stringify(value));
-                this.path = null; // prevent double-submit on keydown and blur
-                elem.parentNode.firstChild.contentEditable = false;
-                elem.parentNode.replaceChild(jsml(json(value)), elem);
               },
               handleEvent: function(e) {
                 var t = e.target,
@@ -575,13 +539,13 @@ chrome.app.runtime.onLaunched.addListener(function() {
                         tab = e.keyCode == 9,
                         enter = e.keyCode == 13,
                         colon = e.keyCode == 186,
-                        key = t.className == 'json-key';
+                        key = c == 'json-key';
                     if (esc || !t.textContent && (tab || enter || key && colon)) { // cancel
                       e.preventDefault();
                       this.cancel(t);
                     } else if (!key && (tab || enter) && !e.shiftKey) { // submit
                       e.preventDefault();
-                      this.submit(t, key);
+                      this.submit(t);
                     } else if (key && t.textContent && (tab || enter || colon)) { // move to value
                       e.preventDefault();
                       t.contentEditable = false;
@@ -602,7 +566,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
                       if (p.firstChild.textContent && t.textContent) {
                         this.submit(t);
                       } else {
-                        this.cancel(t, p.firstChild);
+                        this.cancel(t);
                       }
                     }
                     break;
