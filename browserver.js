@@ -353,6 +353,94 @@ kernel.add('html', function() {
   };
 });
 
+kernel.add('database', function() {
+  var self, db, open = function(callback) {
+    var request = indexedDB.open('browserver');
+    request.onupgradeneeded = function() {
+      db = request.result;
+      db.createObjectStore('data', {keyPath: 'path'})
+        .createIndex('parent', 'parent');
+    };
+    request.onsuccess = function(e) {
+      callback(db = e.target.result);
+      self.set('', {
+        string: 'hello world',
+        number: 123,
+        null: null,
+        object: {key: 'value'},
+        array: ['element']
+      }, function() {});
+    };
+    request.onerror = function(e) {
+      console.log('db error', e);
+    };
+    open = function(callback) { callback(); };
+  };
+  return self = {
+    // TODO: specify length and depth limit
+    get: function(path, callback) { // GET
+      open(function() {
+        var store = db.transaction('data').objectStore('data');
+        store.get(path).onsuccess = function(e) {
+          var result = e.target.result,
+              value = result.value,
+              pending = 0;
+          if (result.type == 'object' || r.type == 'array') {
+            value = result.type == 'object' ? {} : [];
+            (function children(value, path) {
+              pending++;
+              store.index('parent').openCursor(path).onsuccess = function(e) {
+                var cursor = e.target.result;
+                if (cursor) {
+                  var result = cursor.value,
+                      key = result.path.split('/').slice(-1);
+                  if (Array.isArray(value)) key = parseInt(key, 10);
+                  value[key] = result.value;
+                  if (result.type == 'object' || result.type == 'array') {
+                    value[key] = result.type == 'object' ? {} : [];
+                    children(value[key], result.path);
+                  }
+                  cursor.continue();
+                } else if (!--pending) {
+                  callback(value);
+                }
+              };
+            })(value, path);
+          } else {
+            callback(value);
+          }
+        };
+      });
+    },
+    set: function(path, value, callback) { // PUT
+      open(function() {
+        var trans = db.transaction('data', 'readwrite');
+        (function set(path, value) {
+          var type = Array.isArray(value) ? 'array' : typeof value == 'object' ? value ? 'object' : 'null' : typeof value,
+              parent = path ? path.split('/').slice(0, -1).join('/') : null;
+          trans.objectStore('data').put({path: path, parent: parent, type: type, value: typeof value == 'object' ? null : value});
+          if (type == 'array') {
+            value.forEach(function(value, i) {
+              set(path ? path+'/'+i : i, value);
+            });
+          } else if (type == 'object') {
+            Object.keys(value).forEach(function(key) {
+              set(path ? path+'/'+key : key, value[key]);
+            });
+          }
+        })(path, value);
+        trans.oncomplete = callback;
+      });
+    },
+    insert: function(path, value, callback) { // SPLICE
+      
+    },
+    remove: function(path, callback) { // DELETE
+      
+    }
+  };
+});
+
 // PUT assigns a value (from request body) to the global object at the given path
 // - errors if parent object does not exist
 // POST pushes a value (from request body) onto array at given path
@@ -362,7 +450,7 @@ kernel.add('html', function() {
 // - error if it does not exist
 
 chrome.app.runtime.onLaunched.addListener(function() {
-  kernel.use({http: 0, html: 0}, function(o) {
+  kernel.use({http: 0, html: 0, database: 0}, function(o) {
   
     var data = {
       string: 'hello world',
@@ -373,45 +461,40 @@ chrome.app.runtime.onLaunched.addListener(function() {
     };
     
     o.http.serve({port: 4088}, function(request, response) {
-      var key, parent, object = data,
-          path = request.path.split('/');
-      
-      for (var i = 1; i < path.length; i++) {
-        key = path[i];
-        if (!key) continue;
-        if (!object.hasOwnProperty(key))
-          return response.end('404 Resource not found', null, 404);
-        parent = object;
-        object = object[key];
-      }
-      
-      try {
-        switch (request.method.toLowerCase()) {
-          case 'get':
-            return response.end(JSON.stringify(object), {'Content-Type': 'application/json'});
-          case 'put':
-            if (!parent) return response.end('404 Resource not found', null, 404);
-            parent[key] = JSON.parse(request.body);
-            break;
-          case 'post':
-            if (!parent) return response.end('404 Resource not found', null, 404);
-            if (typeof object != 'undefined' && !Array.isArray(object))
-              return response.end('415 Resource is not an array', null, 415);
-            var value = JSON.parse(request.body);
-            if (!object) {
-              parent[key] = [value];
-            } else {
-              object.push(value);
-            }
-            break;
-          case 'delete':
-            delete parent[key];
-            break;
+      var path = request.path.substr(1).split('/'),
+          key = path.length > 1 || path[0] ? path.slice(-1).pop() : false;
+          
+      o.database.get(path.slice(0, -1).join('/'), function(parent) {
+        var object = key === false ? parent : parent[key];
+        if (key === false) parent = false;
+        try {
+          switch (request.method.toLowerCase()) {
+            case 'get':
+              return response.end(JSON.stringify(object), {'Content-Type': 'application/json'});
+            case 'put':
+              if (!parent) return response.end('404 Resource not found', null, 404);
+              parent[key] = JSON.parse(request.body);
+              break;
+            case 'post':
+              if (!parent) return response.end('404 Resource not found', null, 404);
+              if (typeof object != 'undefined' && !Array.isArray(object))
+                return response.end('415 Resource is not an array', null, 415);
+              var value = JSON.parse(request.body);
+              if (!object) {
+                parent[key] = [value];
+              } else {
+                object.push(value);
+              }
+              break;
+            case 'delete':
+              delete parent[key];
+              break;
+          }
+        } catch (e) {
+          return response.end('415 Invalid JSON', null, 415);
         }
-      } catch (e) {
-        return response.end('415 Invalid JSON', null, 415);
-      }
-      return response.end('200 Success');
+        return response.end('200 Success');
+      });
     });
     
     o.http.serve({port: 8088}, function(request, response) {
@@ -432,20 +515,21 @@ chrome.app.runtime.onLaunched.addListener(function() {
         {'!doctype': {html: null}},
         {head: [
           {title: 'Browserver'},
+          {meta: {charset: 'utf-8'}},
           {link: {rel: 'stylesheet', href: '/browserver.css'}},
           {link: {rel: 'shortcut icon', href: '/icon.png'}}
         ]},
         {body: [
           {pre: {id: 'value', 'class': 'json', children: JSON.stringify(data, null, 2)}},
-          {script: {src: 'http://git.kganser.com/jsml/src/jsml.js'}},
+          {script: {src: 'http://rawgit.com/kganser/jsml/master/src/jsml.js'}},
           {script: function(d) {
             if (!d) return JSON.stringify(data);
             var json = function(data) {
               var type = Array.isArray(data) ? 'array' : typeof data == 'object' ? data ? 'object' : 'null' : typeof data;
               return {span: {className: 'json-'+type, children: type == 'array'
-                ? {ol: data.map(function(e) { return {li: [json(e)]}; })}
+                ? {ol: data.map(function(e) { return {li: [{span: {className: 'json-delete', children: '×'}}, json(e)]}; })}
                 : type == 'object'
-                  ? {ul: Object.keys(data).map(function(key) { return {li: [{span: {className: 'json-key', children: key}}, ': ', json(data[key])]}; })}
+                  ? {ul: Object.keys(data).map(function(key) { return {li: [{span: {className: 'json-delete', children: '×'}}, {span: {className: 'json-key', children: key}}, ': ', json(data[key])]}; })}
                   : String(data)}};
             };
             var xhr = function(o, callback) {
@@ -483,14 +567,14 @@ chrome.app.runtime.onLaunched.addListener(function() {
                 } else {
                   var method = 'SPLICE';
                   if (this.object(elem)) {
-                    this.path.splice(-1, 1, elem.parentNode.firstChild.textContent);
+                    this.path.splice(-1, 1, elem.parentNode.children[1].textContent);
                     method = 'PUT';
                   }
                   var value = elem.textContent;
                   try { value = JSON.parse(value); } catch (e) {}
                   console.log(method+' /'+this.path.map(encodeURIComponent).join('/')+'\n'+JSON.stringify(value));
                   this.path = this.origType = this.origValue = null; // reset must be done before DOM changes (?) to prevent double-submit on keydown and blur
-                  elem.parentNode.firstChild.contentEditable = false;
+                  elem.parentNode.children[1].contentEditable = false;
                   elem.parentNode.replaceChild(jsml(json(value)), elem);
                 }
               },
@@ -503,34 +587,43 @@ chrome.app.runtime.onLaunched.addListener(function() {
                       t.className += ' closed';
                     } else if (c == 'json-object closed' || c == 'json-array closed') {
                       t.className = c.split(' ')[0];
-                    } else if (c == 'json-string' || c == 'json-number' || c == 'json-null' || c == 'json-undefined' || t.tagName == 'LI') {
+                    } else if (c == 'json-delete' || c == 'json-string' || c == 'json-number' || c == 'json-boolean' || c == 'json-null' || t.tagName == 'LI') {
                       var item;
                       if (t.tagName == 'LI') {
                         if (t.parentNode.tagName == 'OL') {
                           item = t.parentNode.insertBefore(jsml({li: [
-                            {span: {className: 'json-undefined'}}
+                            {span: {className: 'json-delete', children: '×'}},
+                            {span: {className: 'json-null'}}
                           ]}), t.nextSibling);
                         } else {
                           item = jsml({li: [
+                            {span: {className: 'json-delete', children: '×'}},
                             {span: {className: 'json-key'}}, ': ',
-                            {span: {className: 'json-undefined'}}
+                            {span: {className: 'json-null'}}
                           ]}, t.parentNode);
                         }
-                        t = item.firstChild;
+                        t = item.children[1];
                       } else {
                         item = t.parentNode;
                         this.origType = c;
                         this.origValue = t.textContent;
                       }
-                      t.contentEditable = true;
-                      t.focus();
-                      document.execCommand('selectAll', false, null);
+                      if (c != 'json-delete') {
+                        t.contentEditable = true;
+                        t.focus();
+                        document.execCommand('selectAll', false, null);
+                      }
                       this.path = [];
                       while (item != e.currentTarget) {
-                        this.path.unshift(item.firstChild.className == 'json-key'
-                          ? item.firstChild.textContent
+                        this.path.unshift(item.children[1].className == 'json-key'
+                          ? item.children[1].textContent
                           : Array.prototype.indexOf.call(item.parentNode.children, item));
                         item = item.parentNode.parentNode.parentNode; // li/root > span > ul/ol > li
+                      }
+                      if (c == 'json-delete') {
+                        console.log('DELETE /'+this.path.map(encodeURIComponent).join('/'));
+                        t.parentNode.parentNode.removeChild(t.parentNode);
+                        this.path = this.origType = this.origValue = null;
                       }
                     }
                     break;
@@ -553,17 +646,21 @@ chrome.app.runtime.onLaunched.addListener(function() {
                       t.parentNode.lastChild.focus();
                     } else if (this.object(t) && !key && (tab || enter) && e.shiftKey) { // move to key
                       e.preventDefault();
-                      t.contentEditable = false;
-                      t.parentNode.firstChild.contentEditable = true;
-                      t.parentNode.firstChild.focus();
+                      if (this.origType) {
+                        t.blur();
+                      } else {
+                        t.contentEditable = false;
+                        t.parentNode.children[1].contentEditable = true;
+                        t.parentNode.children[1].focus();
+                      }
                     }
                     break;
                   case 'blur':
                     var p = t.parentNode;
                     t = p.lastChild;
-                    if ((c == 'json-string' || c == 'json-number' || c == 'json-null' || c == 'json-undefined' || c == 'json-key')
+                    if ((c == 'json-string' || c == 'json-number' || c == 'json-boolean' || c == 'json-null' || c == 'json-key')
                       && (!e.relatedTarget || e.relatedTarget.parentNode != p)) {
-                      if (p.firstChild.textContent && t.textContent) {
+                      if (p.children[1].textContent && t.textContent) {
                         this.submit(t);
                       } else {
                         this.cancel(t);

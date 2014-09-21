@@ -4,7 +4,7 @@
   padding: 0;
 }
 .json li {
-  margin-left: 1.2em;
+  padding-left: 1.2em;
 }
 .json li:after {
   content: ",";
@@ -12,19 +12,39 @@
 .json li:last-child:after {
   display: none;
 }
+.json-delete {
+  display: none;
+  width: .95em;
+  height: .85em;
+  margin: 0 .25em 0 -1.2em;
+  border-radius: .3em;
+  text-align: center;
+  line-height: .8em;
+  color: #808080;
+  font-weight: bold;
+  cursor: pointer;
+}
+.json-delete:hover {
+  color: white;
+  background: #c5201c;
+  text-shadow: 1px 1px black;
+}
+.json li:hover > .json-delete {
+  display: inline-block;
+}
 .json-object:before, .json-array:before {
   content: "";
   display: inline-block;
   border-style: solid;
   border-width: .6em .35em 0 .35em;
   border-color: #5a5a5a transparent transparent transparent;
-  margin-right: .5em;
+  margin: 0 .35em 0 .15em;
   cursor: pointer;
 }
 .json-object.closed:before, .json-array.closed:before {
   border-width: .35em 0 .35em .6em;
   border-color: transparent transparent transparent #5a5a5a;
-  margin-right: .6em;
+  margin: 0 .4em 0 .2em;
 }
 .json-object.closed li, .json-array.closed li {
   display: none;
@@ -36,7 +56,7 @@
   content: "}";
 }
 .json-object.closed ul:before {
-  content: "{\2026";
+  content: "{…";
 }
 .json-array ol:before {
   content: "[";
@@ -45,7 +65,7 @@
   content: "]";
 }
 .json-array.closed ol:before {
-  content: "[\2026";
+  content: "[…";
 }
 .json-string:before, .json-string:after {
   content: "\"";
@@ -55,13 +75,13 @@
   white-space: pre-wrap;
 }
 .json-string {
-  color: #C5201C;
+  color: #c5201c;
   white-space: pre-wrap;
 }
 .json-number, .json-boolean {
-  color: #1C00CF;
+  color: #1c00cf;
 }
-.json-undefined, .json-null {
+.json-null {
   color: #808080;
 }
 .json span[contenteditable=true] {
