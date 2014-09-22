@@ -144,6 +144,7 @@ kernel.add('string', function() {
       return buffer;
     },
     fromUTF8Buffer: function(buffer) {
+      buffer = new Uint8Array(buffer);
       var string = '';
       for (var n, len = buffer.length, i = 0; i < len; i++) {
         n = buffer[i];
@@ -227,7 +228,7 @@ kernel.add('http', function() {
       field = field.split('=');
       var key = decodeURIComponent(field[0].replace(/\+/g, '%20')),
           value = decodeURIComponent(field[1].replace(/\+/g, '%20'));
-      if (!o[key])
+      if (!o.hasOwnProperty(key))
         o[key] = value;
       else if (Array.isArray(o[key]))
         o[key].push(value);
@@ -281,8 +282,8 @@ kernel.add('http', function() {
               callback(request, {
                 end: function(body, headers, status) {
                   headers = headers || {};
-                  if (typeof body == 'string')
-                    body = o.string.toUTF8Buffer(body).buffer;
+                  if (!(body instanceof ArrayBuffer))
+                    body = o.string.toUTF8Buffer(String(body)).buffer;
                   headers['Content-Length'] = body.byteLength;
                   if (!headers['Content-Type']) headers['Content-Type'] = 'text/plain';
                   if (!headers.Connection) headers.Connection = 'close';
@@ -354,6 +355,15 @@ kernel.add('html', function() {
 });
 
 kernel.add('database', function() {
+
+  // Database entries:
+  // {
+  //   type: (string|number|boolean|null|array|object)
+  //   parent: (path of parent entry; indexed)
+  //   path: (URL path of this entry; primary key)
+  //   value: (or null if array or object)
+  // }
+
   var self, db, open = function(callback) {
     var request = indexedDB.open('browserver');
     request.onupgradeneeded = function() {
@@ -363,7 +373,8 @@ kernel.add('database', function() {
     };
     request.onsuccess = function(e) {
       callback(db = e.target.result);
-      self.set('', {
+      // TODO: remove
+      self.put('', {
         string: 'hello world',
         number: 123,
         null: null,
@@ -378,27 +389,28 @@ kernel.add('database', function() {
   };
   return self = {
     // TODO: specify length and depth limit
-    get: function(path, callback) { // GET
+    get: function(path, callback) {
       open(function() {
         var store = db.transaction('data').objectStore('data');
         store.get(path).onsuccess = function(e) {
-          var result = e.target.result,
-              value = result.value,
+          var result = e.target.result;
+          if (!result) return callback(result);
+          var value = result.value,
               pending = 0;
-          if (result.type == 'object' || r.type == 'array') {
+          if (result.type == 'object' || result.type == 'array') {
             value = result.type == 'object' ? {} : [];
-            (function children(value, path) {
+            (function next(value, path) {
               pending++;
               store.index('parent').openCursor(path).onsuccess = function(e) {
                 var cursor = e.target.result;
                 if (cursor) {
                   var result = cursor.value,
-                      key = result.path.split('/').slice(-1);
+                      key = decodeURIComponent(result.path.split('/').slice(-1));
                   if (Array.isArray(value)) key = parseInt(key, 10);
                   value[key] = result.value;
                   if (result.type == 'object' || result.type == 'array') {
                     value[key] = result.type == 'object' ? {} : [];
-                    children(value[key], result.path);
+                    next(value[key], result.path);
                   }
                   cursor.continue();
                 } else if (!--pending) {
@@ -412,31 +424,44 @@ kernel.add('database', function() {
         };
       });
     },
-    set: function(path, value, callback) { // PUT
+    put: function(path, value, callback) {
       open(function() {
         var trans = db.transaction('data', 'readwrite');
-        (function set(path, value) {
+        (function next(path, value) {
           var type = Array.isArray(value) ? 'array' : typeof value == 'object' ? value ? 'object' : 'null' : typeof value,
               parent = path ? path.split('/').slice(0, -1).join('/') : null;
           trans.objectStore('data').put({path: path, parent: parent, type: type, value: typeof value == 'object' ? null : value});
           if (type == 'array') {
             value.forEach(function(value, i) {
-              set(path ? path+'/'+i : i, value);
+              next(path ? path+'/'+i : i, value);
             });
           } else if (type == 'object') {
             Object.keys(value).forEach(function(key) {
-              set(path ? path+'/'+key : key, value[key]);
+              next(path ? path+'/'+encodeURIComponent(key) : key, value[key]);
             });
           }
         })(path, value);
         trans.oncomplete = callback;
       });
     },
-    insert: function(path, value, callback) { // SPLICE
-      
-    },
-    remove: function(path, callback) { // DELETE
-      
+    delete: function(path, callback) {
+      open(function() {
+        var trans = db.transaction('data', 'readwrite'),
+            store = trans.objectStore('data');
+        (function next(path) {
+          store.delete(path);
+          store.index('parent').openCursor(path).onsuccess = function(e) {
+            var cursor = e.target.result;
+            if (cursor) {
+              var result = cursor.value;
+              if (result.type == 'object' || result.type == 'array')
+                next(result.path);
+              cursor.continue();
+            }
+          }
+        })(path);
+        trans.oncomplete = callback;
+      });
     }
   };
 });
@@ -450,54 +475,31 @@ kernel.add('database', function() {
 // - error if it does not exist
 
 chrome.app.runtime.onLaunched.addListener(function() {
-  kernel.use({http: 0, html: 0, database: 0}, function(o) {
-  
-    var data = {
-      string: 'hello world',
-      number: 123,
-      null: null,
-      object: {key: 'value'},
-      array: ['element']
-    };
-    
-    o.http.serve({port: 4088}, function(request, response) {
-      var path = request.path.substr(1).split('/'),
-          key = path.length > 1 || path[0] ? path.slice(-1).pop() : false;
-          
-      o.database.get(path.slice(0, -1).join('/'), function(parent) {
-        var object = key === false ? parent : parent[key];
-        if (key === false) parent = false;
-        try {
-          switch (request.method.toLowerCase()) {
-            case 'get':
-              return response.end(JSON.stringify(object), {'Content-Type': 'application/json'});
-            case 'put':
-              if (!parent) return response.end('404 Resource not found', null, 404);
-              parent[key] = JSON.parse(request.body);
-              break;
-            case 'post':
-              if (!parent) return response.end('404 Resource not found', null, 404);
-              if (typeof object != 'undefined' && !Array.isArray(object))
-                return response.end('415 Resource is not an array', null, 415);
-              var value = JSON.parse(request.body);
-              if (!object) {
-                parent[key] = [value];
-              } else {
-                object.push(value);
-              }
-              break;
-            case 'delete':
-              delete parent[key];
-              break;
-          }
-        } catch (e) {
-          return response.end('415 Invalid JSON', null, 415);
-        }
-        return response.end('200 Success');
-      });
-    });
-    
+  kernel.use({http: 0, html: 0, database: 0, string: 0}, function(o) {
     o.http.serve({port: 8088}, function(request, response) {
+      if (request.headers.View == 'data' || request.query.view == 'data') {
+        var path = request.path.substr(1);
+        switch (request.method.toLowerCase()) {
+          case 'get':
+            return o.database.get(path, function(object) {
+              if (object === undefined) response.end('404 Resource Not Found', null, 404);
+              response.end(JSON.stringify(object), {'Content-Type': 'application/json'});
+            });
+          case 'put':
+            // TODO: check if parent record exists first?
+            var data = o.string.fromUTF8Buffer(request.body);
+            try { data = JSON.parse(data); } catch (e) {}
+            return o.database.put(path, data, function() {
+              response.end('200 Success');
+            });
+          case 'delete':
+            return o.database.delete(path, function() {
+              response.end('200 Success');
+            });
+          default:
+            return response.end('501 Not Implemented', null, 501);
+        }
+      }
       if (request.path.length > 1) { // proxy request
         var xhr = new XMLHttpRequest();
         xhr.responseType = 'arraybuffer';
@@ -505,178 +507,182 @@ chrome.app.runtime.onLaunched.addListener(function() {
           response.end(xhr.response, {'Content-Type': o.http.getMimeType((request.path.match(/\.([^.]*)$/) || [])[1])});
         };
         xhr.onerror = function() {
-          response.end('404 Resource not found', null, 404);
+          response.end('404 Resource Not Found', null, 404);
         };
         xhr.open('GET', request.path);
-        xhr.send();
-        return;
+        return xhr.send();
       }
-      response.end(o.html([
-        {'!doctype': {html: null}},
-        {head: [
-          {title: 'Browserver'},
-          {meta: {charset: 'utf-8'}},
-          {link: {rel: 'stylesheet', href: '/browserver.css'}},
-          {link: {rel: 'shortcut icon', href: '/icon.png'}}
-        ]},
-        {body: [
-          {pre: {id: 'value', 'class': 'json', children: JSON.stringify(data, null, 2)}},
-          {script: {src: 'http://rawgit.com/kganser/jsml/master/src/jsml.js'}},
-          {script: function(d) {
-            if (!d) return JSON.stringify(data);
-            var json = function(data) {
-              var type = Array.isArray(data) ? 'array' : typeof data == 'object' ? data ? 'object' : 'null' : typeof data;
-              return {span: {className: 'json-'+type, children: type == 'array'
-                ? {ol: data.map(function(e) { return {li: [{span: {className: 'json-delete', children: '×'}}, json(e)]}; })}
-                : type == 'object'
-                  ? {ul: Object.keys(data).map(function(key) { return {li: [{span: {className: 'json-delete', children: '×'}}, {span: {className: 'json-key', children: key}}, ': ', json(data[key])]}; })}
-                  : String(data)}};
-            };
-            var xhr = function(o, callback) {
-              var request = new XMLHttpRequest();
-              request.onload = callback && function() { callback(request); };
-              request.open(o.method || 'GET', o.path);
-              request.send(o.body);
-            };
-            var value = document.getElementById('value');
-            
-            value.textContent = '';
-            jsml(json(d), value);
-            
-            var handler = {
-              object: function(elem) {
-                return elem.parentNode.parentNode.parentNode.className == 'json-object';
-              },
-              cancel: function(elem) {
-                if (!this.path) return;
-                this.path = null;
-                if (this.origType) { // revert if editing
-                  elem.contentEditable = false;
-                  elem.className = this.origType;
-                  elem.textContent = this.origValue;
-                  this.path = this.origType = this.origValue = null;
-                } else { // remove if adding
-                  elem.parentNode.parentNode.removeChild(elem.parentNode);
-                }
-              },
-              submit: function(elem) {
-                if (!this.path) return;
-                if (this.origType && elem.textContent == this.origValue) { // value unchanged
-                  elem.contentEditable = false;
-                  this.path = this.origType = this.origValue = null;
-                } else {
-                  var method = 'SPLICE';
-                  if (this.object(elem)) {
-                    this.path.splice(-1, 1, elem.parentNode.children[1].textContent);
-                    method = 'PUT';
+      o.database.get('', function(data) {
+        response.end(o.html([
+          {'!doctype': {html: null}},
+          {head: [
+            {title: 'Browserver'},
+            {meta: {charset: 'utf-8'}},
+            {link: {rel: 'stylesheet', href: '/browserver.css'}},
+            {link: {rel: 'shortcut icon', href: '/icon.png'}}
+          ]},
+          {body: [
+            {pre: {id: 'value', 'class': 'json', children: JSON.stringify(data, null, 2)}},
+            {script: {src: 'http://rawgit.com/kganser/jsml/master/src/jsml.js'}},
+            {script: function(d) {
+              if (!d) return JSON.stringify(data);
+              var json = function(data) {
+                var type = Array.isArray(data) ? 'array' : typeof data == 'object' ? data ? 'object' : 'null' : typeof data;
+                return {span: {className: 'json-'+type, children: type == 'array'
+                  ? {ol: data.map(function(e) { return {li: [{span: {className: 'json-delete', children: '×'}}, json(e)]}; })}
+                  : type == 'object'
+                    ? {ul: Object.keys(data).map(function(key) { return {li: [{span: {className: 'json-delete', children: '×'}}, {span: {className: 'json-key', children: key}}, ': ', json(data[key])]}; })}
+                    : String(data)}};
+              };
+              var xhr = function(o, callback) {
+                var request = new XMLHttpRequest();
+                request.onload = callback && function() { callback(request); };
+                request.open(o.method || 'GET', o.path);
+                request.setRequestHeader('View', 'data');
+                request.send(o.body);
+              };
+              var value = document.getElementById('value');
+              
+              value.textContent = '';
+              jsml(json(d), value);
+              
+              var handler = {
+                object: function(elem) {
+                  return elem.parentNode.parentNode.parentNode.className == 'json-object';
+                },
+                cancel: function(elem) {
+                  if (!this.path) return;
+                  this.path = null;
+                  if (this.origType) { // revert if editing
+                    elem.contentEditable = false;
+                    elem.className = this.origType;
+                    elem.textContent = this.origValue;
+                    this.path = this.origType = this.origValue = null;
+                  } else { // remove if adding
+                    elem.parentNode.parentNode.removeChild(elem.parentNode);
                   }
-                  var value = elem.textContent;
-                  try { value = JSON.parse(value); } catch (e) {}
-                  console.log(method+' /'+this.path.map(encodeURIComponent).join('/')+'\n'+JSON.stringify(value));
-                  this.path = this.origType = this.origValue = null; // reset must be done before DOM changes (?) to prevent double-submit on keydown and blur
-                  elem.parentNode.children[1].contentEditable = false;
-                  elem.parentNode.replaceChild(jsml(json(value)), elem);
-                }
-              },
-              handleEvent: function(e) {
-                var t = e.target,
-                    c = t.className;
-                switch (e.type) {
-                  case 'click':
-                    if (c == 'json-object' || c == 'json-array') {
-                      t.className += ' closed';
-                    } else if (c == 'json-object closed' || c == 'json-array closed') {
-                      t.className = c.split(' ')[0];
-                    } else if (c == 'json-delete' || c == 'json-string' || c == 'json-number' || c == 'json-boolean' || c == 'json-null' || t.tagName == 'LI') {
-                      var item;
-                      if (t.tagName == 'LI') {
-                        if (t.parentNode.tagName == 'OL') {
-                          item = t.parentNode.insertBefore(jsml({li: [
-                            {span: {className: 'json-delete', children: '×'}},
-                            {span: {className: 'json-null'}}
-                          ]}), t.nextSibling);
+                },
+                submit: function(elem) {
+                  if (!this.path) return;
+                  if (this.origType && elem.textContent == this.origValue) { // value unchanged
+                    elem.contentEditable = false;
+                    this.path = this.origType = this.origValue = null;
+                  } else {
+                    var method = 'SPLICE';
+                    if (this.object(elem)) {
+                      this.path.splice(-1, 1, elem.parentNode.children[1].textContent);
+                      method = 'PUT';
+                    }
+                    var value = elem.textContent;
+                    try { value = JSON.parse(value); } catch (e) {}
+                    console.log(method+' /'+this.path.map(encodeURIComponent).join('/')+'\n'+JSON.stringify(value));
+                    xhr({method: method, path: '/'+this.path.map(encodeURIComponent).join('/'), body: JSON.stringify(value)});
+                    this.path = this.origType = this.origValue = null; // reset must be done before DOM changes (?) to prevent double-submit on keydown and blur
+                    elem.parentNode.children[1].contentEditable = false;
+                    elem.parentNode.replaceChild(jsml(json(value)), elem);
+                  }
+                },
+                handleEvent: function(e) {
+                  var t = e.target,
+                      c = t.className;
+                  switch (e.type) {
+                    case 'click':
+                      if (c == 'json-object' || c == 'json-array') {
+                        t.className += ' closed';
+                      } else if (c == 'json-object closed' || c == 'json-array closed') {
+                        t.className = c.split(' ')[0];
+                      } else if (c == 'json-delete' || c == 'json-string' || c == 'json-number' || c == 'json-boolean' || c == 'json-null' || t.tagName == 'LI') {
+                        var item;
+                        if (t.tagName == 'LI') {
+                          if (t.parentNode.tagName == 'OL') {
+                            item = t.parentNode.insertBefore(jsml({li: [
+                              {span: {className: 'json-delete', children: '×'}},
+                              {span: {className: 'json-null'}}
+                            ]}), t.nextSibling);
+                          } else {
+                            item = jsml({li: [
+                              {span: {className: 'json-delete', children: '×'}},
+                              {span: {className: 'json-key'}}, ': ',
+                              {span: {className: 'json-null'}}
+                            ]}, t.parentNode);
+                          }
+                          t = item.children[1];
                         } else {
-                          item = jsml({li: [
-                            {span: {className: 'json-delete', children: '×'}},
-                            {span: {className: 'json-key'}}, ': ',
-                            {span: {className: 'json-null'}}
-                          ]}, t.parentNode);
+                          item = t.parentNode;
+                          this.origType = c;
+                          this.origValue = t.textContent;
                         }
-                        t = item.children[1];
-                      } else {
-                        item = t.parentNode;
-                        this.origType = c;
-                        this.origValue = t.textContent;
+                        if (c != 'json-delete') {
+                          t.contentEditable = true;
+                          t.focus();
+                          document.execCommand('selectAll', false, null);
+                        }
+                        this.path = [];
+                        while (item != e.currentTarget) {
+                          this.path.unshift(item.children[1].className == 'json-key'
+                            ? item.children[1].textContent
+                            : Array.prototype.indexOf.call(item.parentNode.children, item));
+                          item = item.parentNode.parentNode.parentNode; // li/root > span > ul/ol > li
+                        }
+                        if (c == 'json-delete') {
+                          console.log('DELETE /'+this.path.map(encodeURIComponent).join('/'));
+                          xhr({method: 'DELETE', path: '/'+this.path.map(encodeURIComponent).join('/')});
+                          t.parentNode.parentNode.removeChild(t.parentNode);
+                          this.path = this.origType = this.origValue = null;
+                        }
                       }
-                      if (c != 'json-delete') {
-                        t.contentEditable = true;
-                        t.focus();
-                        document.execCommand('selectAll', false, null);
-                      }
-                      this.path = [];
-                      while (item != e.currentTarget) {
-                        this.path.unshift(item.children[1].className == 'json-key'
-                          ? item.children[1].textContent
-                          : Array.prototype.indexOf.call(item.parentNode.children, item));
-                        item = item.parentNode.parentNode.parentNode; // li/root > span > ul/ol > li
-                      }
-                      if (c == 'json-delete') {
-                        console.log('DELETE /'+this.path.map(encodeURIComponent).join('/'));
-                        t.parentNode.parentNode.removeChild(t.parentNode);
-                        this.path = this.origType = this.origValue = null;
-                      }
-                    }
-                    break;
-                  case 'keydown':
-                    var esc = e.keyCode == 27,
-                        tab = e.keyCode == 9,
-                        enter = e.keyCode == 13,
-                        colon = e.keyCode == 186,
-                        key = c == 'json-key';
-                    if (esc || !t.textContent && (tab || enter || key && colon)) { // cancel
-                      e.preventDefault();
-                      this.cancel(t);
-                    } else if (!key && (tab || enter) && !e.shiftKey) { // submit
-                      e.preventDefault();
-                      this.submit(t);
-                    } else if (key && t.textContent && (tab || enter || colon)) { // move to value
-                      e.preventDefault();
-                      t.contentEditable = false;
-                      t.parentNode.lastChild.contentEditable = true;
-                      t.parentNode.lastChild.focus();
-                    } else if (this.object(t) && !key && (tab || enter) && e.shiftKey) { // move to key
-                      e.preventDefault();
-                      if (this.origType) {
-                        t.blur();
-                      } else {
-                        t.contentEditable = false;
-                        t.parentNode.children[1].contentEditable = true;
-                        t.parentNode.children[1].focus();
-                      }
-                    }
-                    break;
-                  case 'blur':
-                    var p = t.parentNode;
-                    t = p.lastChild;
-                    if ((c == 'json-string' || c == 'json-number' || c == 'json-boolean' || c == 'json-null' || c == 'json-key')
-                      && (!e.relatedTarget || e.relatedTarget.parentNode != p)) {
-                      if (p.children[1].textContent && t.textContent) {
-                        this.submit(t);
-                      } else {
+                      break;
+                    case 'keydown':
+                      var esc = e.keyCode == 27,
+                          tab = e.keyCode == 9,
+                          enter = e.keyCode == 13,
+                          colon = e.keyCode == 186,
+                          key = c == 'json-key';
+                      if (esc || !t.textContent && (tab || enter || key && colon)) { // cancel
+                        e.preventDefault();
                         this.cancel(t);
+                      } else if (!key && (tab || enter) && !e.shiftKey) { // submit
+                        e.preventDefault();
+                        this.submit(t);
+                      } else if (key && t.textContent && (tab || enter || colon)) { // move to value
+                        e.preventDefault();
+                        t.contentEditable = false;
+                        t.parentNode.lastChild.contentEditable = true;
+                        t.parentNode.lastChild.focus();
+                      } else if (this.object(t) && !key && (tab || enter) && e.shiftKey) { // move to key
+                        e.preventDefault();
+                        if (this.origType) {
+                          t.blur();
+                        } else {
+                          t.contentEditable = false;
+                          t.parentNode.children[1].contentEditable = true;
+                          t.parentNode.children[1].focus();
+                        }
                       }
-                    }
-                    break;
+                      break;
+                    case 'blur':
+                      var p = t.parentNode;
+                      t = p.lastChild;
+                      if ((c == 'json-string' || c == 'json-number' || c == 'json-boolean' || c == 'json-null' || c == 'json-key')
+                        && (!e.relatedTarget || e.relatedTarget.parentNode != p)) {
+                        if (p.children[1].textContent && t.textContent) {
+                          this.submit(t);
+                        } else {
+                          this.cancel(t);
+                        }
+                      }
+                      break;
+                  }
                 }
-              }
-            };
-            
-            value.addEventListener('click', handler);
-            value.addEventListener('keydown', handler);
-            value.addEventListener('blur', handler, true);
-          }}
-        ]}
-      ]), {'Content-Type': 'text/html'});
+              };
+              
+              value.addEventListener('click', handler);
+              value.addEventListener('keydown', handler);
+              value.addEventListener('blur', handler, true);
+            }}
+          ]}
+        ]), {'Content-Type': 'text/html'});
+      });
     });
   });
 });
