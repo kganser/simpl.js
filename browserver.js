@@ -363,8 +363,13 @@ kernel.add('database', function() {
   //   path: (URL path of this entry; primary key)
   //   value: (or null if array or object)
   // }
+  
+  // TODO: change path entry to 'key', make keyPath [parent, key]
+  // TODO: check for numeric keys when putting to array; save numeric keys
+  // TODO: insert for arrays (increments index for all values >= desired index before putting)
 
-  var self, db, open = function(callback) {
+  var db;
+  var open = function(callback) {
     var request = indexedDB.open('browserver');
     request.onupgradeneeded = function() {
       db = request.result;
@@ -372,75 +377,89 @@ kernel.add('database', function() {
         .createIndex('parent', 'parent');
     };
     request.onsuccess = function(e) {
-      callback(db = e.target.result);
-      // TODO: remove
-      self.put('', {
-        string: 'hello world',
-        number: 123,
-        null: null,
-        object: {key: 'value'},
-        array: ['element']
-      }, function() {});
+      db = e.target.result;
+      // Ensure that top level is an object
+      var trans = db.transaction('data', 'readwrite');
+      put(trans.objectStore('data'), '', {});
+      trans.oncomplete = callback;
     };
     request.onerror = function(e) {
       console.log('db error', e);
     };
     open = function(callback) { callback(); };
   };
-  return self = {
+  var put = function(store, path, value) {
+    var type = Array.isArray(value) ? 'array' : typeof value == 'object' ? value ? 'object' : 'null' : typeof value,
+        parent = path ? path.split('/').slice(0, -1).join('/') : null,
+        record = {path: path, parent: parent, type: type, value: typeof value == 'object' ? null : value};
+    store.put(record);
+    return record;
+  };
+  var recursivePut = function(store, path, value) {
+    var type = put(store, path, value).type;
+    if (type == 'array') {
+      value.forEach(function(value, i) {
+        recursivePut(store, path ? path+'/'+i : i, value);
+      });
+    } else if (type == 'object') {
+      Object.keys(value).forEach(function(key) {
+        recursivePut(store, path ? path+'/'+encodeURIComponent(key) : key, value[key]);
+      });
+    }
+  };
+  var deleteChildren = function(store, path) {
+    store.index('parent').openCursor(path).onsuccess = function(e) {
+      var cursor = e.target.result;
+      if (!cursor) return;
+      var result = cursor.value;
+      store.delete(result.path);
+      if (result.type == 'object' || result.type == 'array')
+        deleteChildren(store, result.path);
+      cursor.continue();
+    }
+  };
+  return {
     // TODO: specify length and depth limit
     get: function(path, callback) {
       open(function() {
-        var store = db.transaction('data').objectStore('data');
+        var trans = db.transaction('data'),
+            store = trans.objectStore('data'),
+            value;
         store.get(path).onsuccess = function(e) {
           var result = e.target.result;
-          if (!result) return callback(result);
-          var value = result.value,
-              pending = 0;
+          if (!result) return;
+          value = result.value;
           if (result.type == 'object' || result.type == 'array') {
             value = result.type == 'object' ? {} : [];
-            (function next(value, path) {
-              pending++;
+            (function recursiveGet(value, path) {
               store.index('parent').openCursor(path).onsuccess = function(e) {
                 var cursor = e.target.result;
-                if (cursor) {
-                  var result = cursor.value,
-                      key = decodeURIComponent(result.path.split('/').slice(-1));
-                  if (Array.isArray(value)) key = parseInt(key, 10);
-                  value[key] = result.value;
-                  if (result.type == 'object' || result.type == 'array') {
-                    value[key] = result.type == 'object' ? {} : [];
-                    next(value[key], result.path);
-                  }
-                  cursor.continue();
-                } else if (!--pending) {
-                  callback(value);
+                if (!cursor) return
+                var result = cursor.value,
+                    key = decodeURIComponent(result.path.split('/').slice(-1));
+                if (Array.isArray(value)) key = parseInt(key, 10);
+                value[key] = result.value;
+                if (result.type == 'object' || result.type == 'array') {
+                  value[key] = result.type == 'object' ? {} : [];
+                  recursiveGet(value[key], result.path);
                 }
+                cursor.continue();
               };
             })(value, path);
-          } else {
-            callback(value);
           }
+        };
+        trans.oncomplete = function() {
+          callback(value);
         };
       });
     },
     put: function(path, value, callback) {
+      // TODO: check if parent record exists first
       open(function() {
-        var trans = db.transaction('data', 'readwrite');
-        (function next(path, value) {
-          var type = Array.isArray(value) ? 'array' : typeof value == 'object' ? value ? 'object' : 'null' : typeof value,
-              parent = path ? path.split('/').slice(0, -1).join('/') : null;
-          trans.objectStore('data').put({path: path, parent: parent, type: type, value: typeof value == 'object' ? null : value});
-          if (type == 'array') {
-            value.forEach(function(value, i) {
-              next(path ? path+'/'+i : i, value);
-            });
-          } else if (type == 'object') {
-            Object.keys(value).forEach(function(key) {
-              next(path ? path+'/'+encodeURIComponent(key) : key, value[key]);
-            });
-          }
-        })(path, value);
+        var trans = db.transaction('data', 'readwrite'),
+            store = trans.objectStore('data');
+        deleteChildren(store, path);
+        recursivePut(store, path, value);
         trans.oncomplete = callback;
       });
     },
@@ -448,18 +467,8 @@ kernel.add('database', function() {
       open(function() {
         var trans = db.transaction('data', 'readwrite'),
             store = trans.objectStore('data');
-        (function next(path) {
-          store.delete(path);
-          store.index('parent').openCursor(path).onsuccess = function(e) {
-            var cursor = e.target.result;
-            if (cursor) {
-              var result = cursor.value;
-              if (result.type == 'object' || result.type == 'array')
-                next(result.path);
-              cursor.continue();
-            }
-          }
-        })(path);
+        store.delete(path);
+        deleteChildren(store, path);
         trans.oncomplete = callback;
       });
     }
@@ -486,7 +495,6 @@ chrome.app.runtime.onLaunched.addListener(function() {
               response.end(JSON.stringify(object), {'Content-Type': 'application/json'});
             });
           case 'put':
-            // TODO: check if parent record exists first?
             var data = o.string.fromUTF8Buffer(request.body);
             try { data = JSON.parse(data); } catch (e) {}
             return o.database.put(path, data, function() {
@@ -591,11 +599,12 @@ chrome.app.runtime.onLaunched.addListener(function() {
                         t.className += ' closed';
                       } else if (c == 'json-object closed' || c == 'json-array closed') {
                         t.className = c.split(' ')[0];
-                      } else if (c == 'json-delete' || c == 'json-string' || c == 'json-number' || c == 'json-boolean' || c == 'json-null' || t.tagName == 'LI') {
+                      } else if (c == 'json-delete' || c == 'json-string' || c == 'json-number' || c == 'json-boolean' || c == 'json-null' || t.tagName == 'LI' || t.tagName == 'OL' || t.tagName == 'UL') {
                         var item;
-                        if (t.tagName == 'LI') {
-                          if (t.parentNode.tagName == 'OL') {
-                            item = t.parentNode.insertBefore(jsml({li: [
+                        if (t.tagName == 'LI' || t.tagName == 'OL' || t.tagName == 'UL') {
+                          if (t.tagName == 'LI') t = t.parentNode;
+                          if (t.tagName == 'OL') {
+                            item = t.insertBefore(jsml({li: [
                               {span: {className: 'json-delete', children: '×'}},
                               {span: {className: 'json-null'}}
                             ]}), t.nextSibling);
@@ -604,7 +613,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
                               {span: {className: 'json-delete', children: '×'}},
                               {span: {className: 'json-key'}}, ': ',
                               {span: {className: 'json-null'}}
-                            ]}, t.parentNode);
+                            ]}, t);
                           }
                           t = item.children[1];
                         } else {
