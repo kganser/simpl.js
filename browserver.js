@@ -227,7 +227,7 @@ kernel.add('http', function() {
     if (query) query.split('&').forEach(function(field) {
       field = field.split('=');
       var key = decodeURIComponent(field[0].replace(/\+/g, '%20')),
-          value = decodeURIComponent(field[1].replace(/\+/g, '%20'));
+          value = field[1] && decodeURIComponent(field[1].replace(/\+/g, '%20'));
       if (!o.hasOwnProperty(key))
         o[key] = value;
       else if (Array.isArray(o[key]))
@@ -259,7 +259,7 @@ kernel.add('http', function() {
                 headers = headers.substr(0, split).split('\r\n');
                 var line = headers.shift().split(' '),
                     uri = line[1] ? line[1].split('?', 2) : [];
-                request.method = line[0];
+                request.method = line[0].toUpperCase();
                 request.uri = line[1];
                 request.path = uri[0];
                 request.query = parseQuery(uri[1]);
@@ -358,29 +358,25 @@ kernel.add('database', function() {
 
   // Database entries:
   // {
+  //   key: (key or index relative to parent)
+  //   parent: (URL path of parent entry)
   //   type: (string|number|boolean|null|array|object)
-  //   parent: (path of parent entry; indexed)
-  //   path: (URL path of this entry; primary key)
   //   value: (or null if array or object)
   // }
-  
-  // TODO: change path entry to 'key', make keyPath [parent, key]
-  // TODO: check for numeric keys when putting to array; save numeric keys
-  // TODO: insert for arrays (increments index for all values >= desired index before putting)
 
   var db;
   var open = function(callback) {
     var request = indexedDB.open('browserver');
     request.onupgradeneeded = function() {
       db = request.result;
-      db.createObjectStore('data', {keyPath: 'path'})
+      db.createObjectStore('data', {keyPath: ['parent', 'key']})
         .createIndex('parent', 'parent');
     };
     request.onsuccess = function(e) {
       db = e.target.result;
-      // Ensure that top level is an object
+      // top level is an object
       var trans = db.transaction('data', 'readwrite');
-      put(trans.objectStore('data'), '', {});
+      putElement(trans.objectStore('data'), makeKey([]), {});
       trans.oncomplete = callback;
     };
     request.onerror = function(e) {
@@ -388,22 +384,87 @@ kernel.add('database', function() {
     };
     open = function(callback) { callback(); };
   };
-  var put = function(store, path, value) {
+  var makeKey = function(path) {
+    var key = path.length ? path[path.length-1] : '';
+    return [path.length < 2 && !key ? 0 : path.slice(0, -1).join('/'), typeof key == 'number' ? key : decodeURIComponent(key)];
+  };
+  var makePath = function(key) {
+    return (key[0] ? key[0]+'/' : '')+encodeURIComponent(key[1]);
+  };
+  var getPath = function(store, path, callback) {
+    // substitute array indices in path with element keys
+    path = path.split('/');
+    (function advance(i) {
+      while (i < path.length && !/0|[1-9][0-9]*/.test(path[i])) i++;
+      if (i == path.length) return callback(path, true);
+      var position = path[i] = parseInt(path[i]);
+      store.get([path.slice(0, i).join('/'), position]).onsuccess = function(e) {
+        var result = e.target.result;
+        if (!result) return callback(path, false);
+        if (result.type != 'array') return advance(i+1);
+        store.index('parent').openCursor(path.slice(0, i).join('/')).onsuccess = function(e) {
+          var cursor = e.target.result;
+          if (cursor && position) {
+            cursor.advance(position);
+            position = 0;
+          } else {
+            if (cursor) path[i] = cursor.value.key;
+            advance(i+1);
+          }
+        };
+      };
+    })(1);
+  };
+  var get = function(store, key, callback) {
+    var empty = true;
+    store.get(key).onsuccess = function(e) {
+      var result = e.target.result;
+      if (!result) return empty && callback();
+      empty = recursiveGet(store, result, makePath(key), callback);
+    };
+  };
+  var recursiveGet = function(store, parent, path, callback) {
+    var value = parent.value,
+        type = parent.type,
+        pending = 1;
+    if (type == 'object' || type == 'array') {
+      value = type == 'object' ? {} : [];
+      store.index('parent').openCursor(path).onsuccess = function(e) {
+        var cursor = e.target.result;
+        if (!cursor)
+          return --pending || callback(value);
+        var result = cursor.value;
+        pending++;
+        recursiveGet(store, result, makePath([result.parent, result.key]), function(child) {
+          if (type == 'object') {
+            value[result.key] = child;
+          } else {
+            value.push(child);
+          }
+          if (!--pending) callback(value);
+        });
+        cursor.continue();
+      };
+    } else {
+      callback(value);
+    }
+  };
+  var putElement = function(store, key, value) {
     var type = Array.isArray(value) ? 'array' : typeof value == 'object' ? value ? 'object' : 'null' : typeof value,
-        parent = path ? path.split('/').slice(0, -1).join('/') : null,
-        record = {path: path, parent: parent, type: type, value: typeof value == 'object' ? null : value};
+        record = {parent: key[0], key: key[1], type: type, value: typeof value == 'object' ? null : value};
     store.put(record);
     return record;
   };
-  var recursivePut = function(store, path, value) {
-    var type = put(store, path, value).type;
+  var recursivePut = function(store, key, value) {
+    var type = putElement(store, key, value).type,
+        parent = makePath(key);
     if (type == 'array') {
       value.forEach(function(value, i) {
-        recursivePut(store, path ? path+'/'+i : i, value);
+        recursivePut(store, [parent, i], value);
       });
     } else if (type == 'object') {
       Object.keys(value).forEach(function(key) {
-        recursivePut(store, path ? path+'/'+encodeURIComponent(key) : key, value[key]);
+        recursivePut(store, [parent, key], value[key]);
       });
     }
   };
@@ -412,9 +473,9 @@ kernel.add('database', function() {
       var cursor = e.target.result;
       if (!cursor) return;
       var result = cursor.value;
-      store.delete(result.path);
+      store.delete([result.parent, result.key]);
       if (result.type == 'object' || result.type == 'array')
-        deleteChildren(store, result.path);
+        deleteChildren(store, makePath([result.parent, result.key]));
       cursor.continue();
     }
   };
@@ -422,85 +483,118 @@ kernel.add('database', function() {
     // TODO: specify length and depth limit
     get: function(path, callback) {
       open(function() {
-        var trans = db.transaction('data'),
-            store = trans.objectStore('data'),
-            value;
-        store.get(path).onsuccess = function(e) {
-          var result = e.target.result;
-          if (!result) return;
-          value = result.value;
-          if (result.type == 'object' || result.type == 'array') {
-            value = result.type == 'object' ? {} : [];
-            (function recursiveGet(value, path) {
-              store.index('parent').openCursor(path).onsuccess = function(e) {
-                var cursor = e.target.result;
-                if (!cursor) return
-                var result = cursor.value,
-                    key = decodeURIComponent(result.path.split('/').slice(-1));
-                if (Array.isArray(value)) key = parseInt(key, 10);
-                value[key] = result.value;
-                if (result.type == 'object' || result.type == 'array') {
-                  value[key] = result.type == 'object' ? {} : [];
-                  recursiveGet(value[key], result.path);
-                }
-                cursor.continue();
-              };
-            })(value, path);
-          }
-        };
-        trans.oncomplete = function() {
-          callback(value);
-        };
+        var store = db.transaction('data').objectStore('data');
+        getPath(store, path, function(path, exists) {
+          if (!exists) return callback();
+          get(store, makeKey(path), callback);
+        });
       });
     },
-    put: function(path, value, callback) {
-      // TODO: check if parent record exists first
+    put: function(path, value, insert, callback) {
+      if (!path) return callback('Cannot replace root object');
       open(function() {
         var trans = db.transaction('data', 'readwrite'),
             store = trans.objectStore('data');
-        deleteChildren(store, path);
-        recursivePut(store, path, value);
-        trans.oncomplete = callback;
+        getPath(store, path, function(path) {
+          var parentPath = path.slice(0, -1);
+          store.get(makeKey(parentPath)).onsuccess = function(e) {
+            var parent = e.target.result,
+                key = path[path.length-1];
+            parentPath = parentPath.join('/');
+            if (!parent)
+              return callback('Parent resource does not exist');
+            if (parent.type != 'array' && insert)
+              return callback('Parent resource is not an array');
+            if (parent.type != 'object' && parent.type != 'array')
+              return callback('Parent resource is not an object or array');
+            if (parent.type == 'array') {
+              if (!/0|[1-9][0-9]*/.test(key))
+                return callback('Invalid index to array resource');
+              key = parseInt(key);
+            }
+            if (insert) {
+              var i = 0, realKey = 0, lastShiftKey = -1,
+                  index = store.index('parent');
+              index.openCursor(parentPath).onsuccess = function(e) { // can this be openKeyCursor?
+                var cursor = e.target.result;
+                if (cursor && i < key) {
+                  // before desired position, track real key as previous key + 1
+                  realKey = cursor.value.key+1;
+                  cursor.continue();
+                } else if (cursor && cursor.value.key == realKey+i-key) {
+                  // all contiguous keys after desired position must be shifted by one
+                  lastShiftKey = cursor.value.key;
+                  cursor.continue();
+                } else if (lastShiftKey >= 0) {
+                  // shift subsequent elements' keys
+                  index.openCursor(parentPath, 'prev').onsuccess = function(e) {
+                    var cursor = e.target.result,
+                        element = cursor.value,
+                        key = element.key;
+                    if (key >= realKey) {
+                      if (key <= lastShiftKey) {
+                        get(store, [parentPath, key], function(result) {
+                          deleteChildren(store, parentPath+'/'+key);
+                          recursivePut(store, [parentPath, key+1], result);
+                          cursor.continue();
+                        });
+                      } else {
+                        cursor.continue();
+                      }
+                    } else {
+                      recursivePut(store, [parentPath, realKey], value);
+                    }
+                  };
+                } else {
+                  // didn't need to shift anything
+                  recursivePut(store, [parentPath, key], value);
+                }
+                i++;
+              };
+            } else {
+              deleteChildren(store, path.join('/'));
+              recursivePut(store, [parentPath, key], value);
+            }
+            trans.oncomplete = function() { callback(); };
+          };
+        });
       });
     },
     delete: function(path, callback) {
+      if (!path) return callback('Cannot delete root object');
       open(function() {
         var trans = db.transaction('data', 'readwrite'),
             store = trans.objectStore('data');
-        store.delete(path);
-        deleteChildren(store, path);
-        trans.oncomplete = callback;
+        getPath(store, path, function(path, exists) {
+          if (!exists) return callback('Resource not found');
+          store.delete(makeKey(path));
+          deleteChildren(store, path.join('/'));
+        });
+        trans.oncomplete = function() { callback(); };
       });
     }
   };
 });
-
-// PUT assigns a value (from request body) to the global object at the given path
-// - errors if parent object does not exist
-// POST pushes a value (from request body) onto array at given path
-// - creates array first if path is undefined in parent object
-// - errors if already defined as something other than an array, or parent object undefined
-// DELETE deletes key represented by path in parent object, if it exists
-// - error if it does not exist
 
 chrome.app.runtime.onLaunched.addListener(function() {
   kernel.use({http: 0, html: 0, database: 0, string: 0}, function(o) {
     o.http.serve({port: 8088}, function(request, response) {
       if (request.headers.View == 'data' || request.query.view == 'data') {
         var path = request.path.substr(1);
-        switch (request.method.toLowerCase()) {
-          case 'get':
+        switch (request.method) {
+          case 'GET':
             return o.database.get(path, function(object) {
               if (object === undefined) response.end('404 Resource Not Found', null, 404);
               response.end(JSON.stringify(object), {'Content-Type': 'application/json'});
             });
-          case 'put':
+          case 'PUT':
+          case 'INSERT':
             var data = o.string.fromUTF8Buffer(request.body);
             try { data = JSON.parse(data); } catch (e) {}
-            return o.database.put(path, data, function() {
-              response.end('200 Success');
+            return o.database.put(path, data, request.method == 'INSERT', function(error) {
+              response.end(error ? '403 '+error : '200 Success', null, error ? 403 : 200);
             });
-          case 'delete':
+          case 'DELETE':
             return o.database.delete(path, function() {
               response.end('200 Success');
             });
@@ -576,7 +670,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
                     elem.contentEditable = false;
                     this.path = this.origType = this.origValue = null;
                   } else {
-                    var method = 'SPLICE';
+                    var method = 'INSERT';
                     if (this.object(elem)) {
                       this.path.splice(-1, 1, elem.parentNode.children[1].textContent);
                       method = 'PUT';
@@ -600,14 +694,14 @@ chrome.app.runtime.onLaunched.addListener(function() {
                       } else if (c == 'json-object closed' || c == 'json-array closed') {
                         t.className = c.split(' ')[0];
                       } else if (c == 'json-delete' || c == 'json-string' || c == 'json-number' || c == 'json-boolean' || c == 'json-null' || t.tagName == 'LI' || t.tagName == 'OL' || t.tagName == 'UL') {
-                        var item;
+                        var item = t;
                         if (t.tagName == 'LI' || t.tagName == 'OL' || t.tagName == 'UL') {
                           if (t.tagName == 'LI') t = t.parentNode;
                           if (t.tagName == 'OL') {
                             item = t.insertBefore(jsml({li: [
                               {span: {className: 'json-delete', children: '×'}},
                               {span: {className: 'json-null'}}
-                            ]}), t.nextSibling);
+                            ]}), item.nextSibling);
                           } else {
                             item = jsml({li: [
                               {span: {className: 'json-delete', children: '×'}},
