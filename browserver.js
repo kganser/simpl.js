@@ -398,7 +398,7 @@ kernel.add('database', function() {
       while (i < path.length && !/0|[1-9][0-9]*/.test(path[i])) i++;
       if (i == path.length) return callback(path, true);
       var position = path[i] = parseInt(path[i]);
-      store.get([path.slice(0, i).join('/'), position]).onsuccess = function(e) {
+      store.get(makeKey(path.slice(0, i))).onsuccess = function(e) {
         var result = e.target.result;
         if (!result) return callback(path, false);
         if (result.type != 'array') return advance(i+1);
@@ -420,34 +420,32 @@ kernel.add('database', function() {
     store.get(key).onsuccess = function(e) {
       var result = e.target.result;
       if (!result) return empty && callback();
-      empty = recursiveGet(store, result, makePath(key), callback);
+      empty = function next(parent, path, callback) {
+        var value = parent.value,
+            type = parent.type,
+            pending = 1;
+        if (type == 'object' || type == 'array') {
+          value = type == 'object' ? {} : [];
+          store.index('parent').openCursor(path).onsuccess = function(e) {
+            var cursor = e.target.result;
+            if (!cursor) return --pending || callback(value);
+            var result = cursor.value;
+            pending++;
+            next(result, makePath([result.parent, result.key]), function(child) {
+              if (type == 'object') {
+                value[result.key] = child;
+              } else {
+                value.push(child);
+              }
+              if (!--pending) callback(value);
+            });
+            cursor.continue();
+          };
+        } else {
+          callback(value);
+        }
+      }(result, makePath(key), callback);
     };
-  };
-  var recursiveGet = function(store, parent, path, callback) {
-    var value = parent.value,
-        type = parent.type,
-        pending = 1;
-    if (type == 'object' || type == 'array') {
-      value = type == 'object' ? {} : [];
-      store.index('parent').openCursor(path).onsuccess = function(e) {
-        var cursor = e.target.result;
-        if (!cursor)
-          return --pending || callback(value);
-        var result = cursor.value;
-        pending++;
-        recursiveGet(store, result, makePath([result.parent, result.key]), function(child) {
-          if (type == 'object') {
-            value[result.key] = child;
-          } else {
-            value.push(child);
-          }
-          if (!--pending) callback(value);
-        });
-        cursor.continue();
-      };
-    } else {
-      callback(value);
-    }
   };
   var putElement = function(store, key, value) {
     var type = Array.isArray(value) ? 'array' : typeof value == 'object' ? value ? 'object' : 'null' : typeof value,
@@ -455,16 +453,16 @@ kernel.add('database', function() {
     store.put(record);
     return record;
   };
-  var recursivePut = function(store, key, value) {
+  var put = function(store, key, value) {
     var type = putElement(store, key, value).type,
         parent = makePath(key);
     if (type == 'array') {
       value.forEach(function(value, i) {
-        recursivePut(store, [parent, i], value);
+        put(store, [parent, i], value);
       });
     } else if (type == 'object') {
       Object.keys(value).forEach(function(key) {
-        recursivePut(store, [parent, key], value[key]);
+        put(store, [parent, key], value[key]);
       });
     }
   };
@@ -531,29 +529,23 @@ kernel.add('database', function() {
                     var cursor = e.target.result,
                         element = cursor.value,
                         key = element.key;
-                    if (key >= realKey) {
-                      if (key <= lastShiftKey) {
-                        get(store, [parentPath, key], function(result) {
-                          deleteChildren(store, parentPath+'/'+key);
-                          recursivePut(store, [parentPath, key+1], result);
-                          cursor.continue();
-                        });
-                      } else {
-                        cursor.continue();
-                      }
-                    } else {
-                      recursivePut(store, [parentPath, realKey], value);
-                    }
+                    if (key < realKey) return put(store, [parentPath, realKey], value);
+                    if (key > lastShiftKey) return cursor.continue();
+                    get(store, [parentPath, key], function(result) {
+                      deleteChildren(store, parentPath+'/'+key);
+                      put(store, [parentPath, key+1], result);
+                      cursor.continue();
+                    });
                   };
                 } else {
                   // didn't need to shift anything
-                  recursivePut(store, [parentPath, key], value);
+                  put(store, [parentPath, key], value);
                 }
                 i++;
               };
             } else {
               deleteChildren(store, path.join('/'));
-              recursivePut(store, [parentPath, key], value);
+              put(store, [parentPath, key], value);
             }
             trans.oncomplete = function() { callback(); };
           };
