@@ -379,9 +379,6 @@ kernel.add('database', function() {
       putElement(trans.objectStore('data'), makeKey([]), {});
       trans.oncomplete = callback;
     };
-    request.onerror = function(e) {
-      console.log('db error', e);
-    };
     open = function(callback) { callback(); };
   };
   var makeKey = function(path) {
@@ -665,9 +662,10 @@ chrome.app.runtime.onLaunched.addListener(function() {
                     this.path = this.origType = this.origValue = null;
                   } else {
                     var method = 'INSERT';
-                    if (this.object(elem)) {
-                      this.path.splice(-1, 1, elem.parentNode.children[1].textContent);
+                    if (this.origType || this.object(elem)) {
                       method = 'PUT';
+                      if (!this.origType)
+                        this.path.splice(-1, 1, elem.parentNode.children[1].textContent);
                     }
                     var value = elem.textContent;
                     try { value = JSON.parse(value); } catch (e) {}
