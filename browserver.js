@@ -393,20 +393,25 @@ kernel.add('database', function() {
   };
   var getPath = function(store, path, callback) {
     // substitute array indices in path with element keys
+    // if last segment is an array index, its original (numeric) value
+    // will be returned as `position`
+    var position;
     path = path.split('/');
     (function advance(i) {
       while (i < path.length && !/0|[1-9][0-9]*/.test(path[i])) i++;
-      if (i == path.length) return callback(path, true);
-      var position = path[i] = parseInt(path[i]);
+      if (i == path.length) return callback(path, true, position);
+      var skip = position = parseInt(path[i]);
       store.get(makeKey(path.slice(0, i))).onsuccess = function(e) {
         var result = e.target.result;
-        if (!result) return callback(path, false);
+        if (!result) return callback(path, false, position);
         if (result.type != 'array') return advance(i+1);
+        // set to numeric index initially, and to key if element is found
+        path[i] = position;
         store.index('parent').openCursor(path.slice(0, i).join('/')).onsuccess = function(e) {
           var cursor = e.target.result;
-          if (cursor && position) {
-            cursor.advance(position);
-            position = 0;
+          if (cursor && skip) {
+            cursor.advance(skip);
+            skip = 0;
           } else {
             if (cursor) path[i] = cursor.value.key;
             advance(i+1);
@@ -493,33 +498,30 @@ kernel.add('database', function() {
       open(function() {
         var trans = db.transaction('data', 'readwrite'),
             store = trans.objectStore('data');
-        getPath(store, path, function(path) {
+        getPath(store, path, function(path, exists, position) {
           var parentPath = path.slice(0, -1);
           store.get(makeKey(parentPath)).onsuccess = function(e) {
             var parent = e.target.result,
                 key = path[path.length-1];
-            parentPath = parentPath.join('/');
             if (!parent)
               return callback('Parent resource does not exist');
             if (parent.type != 'array' && insert)
               return callback('Parent resource is not an array');
             if (parent.type != 'object' && parent.type != 'array')
               return callback('Parent resource is not an object or array');
-            if (parent.type == 'array') {
-              if (!/0|[1-9][0-9]*/.test(key))
-                return callback('Invalid index to array resource');
-              key = parseInt(key);
-            }
+            if (parent.type == 'array' && typeof key != 'number')
+              return callback('Invalid index to array resource');
+            parentPath = parentPath.join('/');
             if (insert) {
               var i = 0, realKey = 0, lastShiftKey = -1,
                   index = store.index('parent');
-              index.openCursor(parentPath).onsuccess = function(e) { // can this be openKeyCursor?
+              index.openCursor(parentPath).onsuccess = function(e) {
                 var cursor = e.target.result;
-                if (cursor && i < key) {
+                if (cursor && i < position) {
                   // before desired position, track real key as previous key + 1
                   realKey = cursor.value.key+1;
                   cursor.continue();
-                } else if (cursor && cursor.value.key == realKey+i-key) {
+                } else if (cursor && cursor.value.key == realKey+i-position) {
                   // all contiguous keys after desired position must be shifted by one
                   lastShiftKey = cursor.value.key;
                   cursor.continue();
@@ -539,7 +541,7 @@ kernel.add('database', function() {
                   };
                 } else {
                   // didn't need to shift anything
-                  put(store, [parentPath, key], value);
+                  put(store, [parentPath, realKey], value);
                 }
                 i++;
               };
