@@ -222,23 +222,8 @@ kernel.add('socket', function() {
 
 kernel.add('http', function() {
 
-  var parseQuery = function(query) {
-    var o = {};
-    if (query) query.split('&').forEach(function(field) {
-      field = field.split('=');
-      var key = decodeURIComponent(field[0].replace(/\+/g, '%20')),
-          value = field[1] && decodeURIComponent(field[1].replace(/\+/g, '%20'));
-      if (!o.hasOwnProperty(key))
-        o[key] = value;
-      else if (Array.isArray(o[key]))
-        o[key].push(value);
-      else
-        o[key] = [o[key], value];
-    });
-    return o;
-  };
-  
-  return {
+  var self;
+  return self = {
     serve: function(options, callback) {
       kernel.use({socket: 0, string: 0}, function(o) {
         o.socket.listen(options, function(socket) {
@@ -262,7 +247,7 @@ kernel.add('http', function() {
                 request.method = line[0].toUpperCase();
                 request.uri = line[1];
                 request.path = uri[0];
-                request.query = parseQuery(uri[1]);
+                request.query = self.parseQuery(uri[1]);
                 headers.forEach(function(line) {
                   line = line.split(': ', 2);
                   request.headers[line[0]] = line[1];
@@ -278,7 +263,7 @@ kernel.add('http', function() {
             if (split > -1 && (!request.headers['Content-Length'] || request.body.byteLength >= request.headers['Content-Length'])) {
               complete = true;
               if (request.headers['Content-Type'] == 'application/x-www-form-urlencoded')
-                request.post = parseQuery(o.string.fromAsciiBuffer(request.body));
+                request.post = self.parseQuery(o.string.fromAsciiBuffer(request.body));
               callback(request, {
                 end: function(body, headers, status) {
                   headers = headers || {};
@@ -287,7 +272,9 @@ kernel.add('http', function() {
                   headers['Content-Length'] = body.byteLength;
                   if (!headers['Content-Type']) headers['Content-Type'] = 'text/plain';
                   if (!headers.Connection) headers.Connection = 'close';
-                  socket.write(o.string.toUTF8Buffer(['HTTP/1.1 '+(status || '200 OK')].concat(Object.keys(headers).map(function(header) { return header+': '+headers[header]; })).join('\r\n')+'\r\n\r\n').buffer);
+                  socket.write(o.string.toUTF8Buffer(['HTTP/1.1 '+self.getStatus(status)].concat(Object.keys(headers).map(function(header) {
+                    return header+': '+headers[header];
+                  })).join('\r\n')+'\r\n\r\n').buffer);
                   socket.write(body, socket.disconnect);
                 }
               });
@@ -295,6 +282,54 @@ kernel.add('http', function() {
           });
         });
       });
+    },
+    getStatus: function(code) {
+      if (!code) return '200 OK';
+      if (typeof code != 'number') return code;
+      // from https://developer.mozilla.org/en-US/docs/Web/HTTP/Response_codes
+      return code+' '+{
+        100: 'Continue',
+        101: 'Switching Protocol',
+        200: 'OK',
+        201: 'Created',
+        202: 'Accepted',
+        203: 'Non-Authoritative Information',
+        204: 'No Content',
+        205: 'Reset Content',
+        206: 'Partial Content',
+        300: 'Multiple Choice',
+        301: 'Moved Permanently',
+        302: 'Found',
+        303: 'See Other',
+        304: 'Not Modified',
+        305: 'Use Proxy',
+        307: 'Temporary Redirect',
+        308: 'Permanent Redirect',
+        400: 'Bad Request',
+        401: 'Unauthorized',
+        402: 'Payment Required',
+        403: 'Forbidden',
+        404: 'Not Found',
+        405: 'Method Not Allowed',
+        406: 'Not Acceptable',
+        407: 'Proxy Authentication Required',
+        408: 'Request Timeout',
+        409: 'Conflict',
+        410: 'Gone',
+        411: 'Length Required',
+        412: 'Precondition Failed',
+        413: 'Request Entity Too Large',
+        414: 'Request-URI Too Long',
+        415: 'Unsupported Media Type',
+        416: 'Requested Range Not Satisfiable',
+        417: 'Expectation Failed',
+        500: 'Internal Server Error',
+        501: 'Not Implemented',
+        502: 'Bad Gateway',
+        503: 'Service Unavailable',
+        504: 'Gateway Timeout',
+        505: 'HTTP Version Not Supported'
+      }[code];
     },
     getMimeType: function(ext) {
       // partial list from nginx mime_types file
@@ -322,6 +357,21 @@ kernel.add('http', function() {
         avi:  'video/x-msvideo',
         wmv:  'video/x-ms-wmv'
       }[ext];
+    },
+    parseQuery: function(query) {
+      var o = {};
+      if (query) query.split('&').forEach(function(field) {
+        field = field.split('=');
+        var key = decodeURIComponent(field[0].replace(/\+/g, '%20')),
+            value = field[1] && decodeURIComponent(field[1].replace(/\+/g, '%20'));
+        if (!o.hasOwnProperty(key))
+          o[key] = value;
+        else if (Array.isArray(o[key]))
+          o[key].push(value);
+        else
+          o[key] = [o[key], value];
+      });
+      return o;
     }
   };
 });
@@ -396,11 +446,11 @@ kernel.add('database', function() {
     path = path.split('/');
     (function advance(i) {
       while (i < path.length && !/0|[1-9][0-9]*/.test(path[i])) i++;
-      if (i == path.length) return callback(path, true, position);
+      if (i == path.length) return callback(path, position);
       var skip = position = parseInt(path[i]);
       store.get(makeKey(path.slice(0, i))).onsuccess = function(e) {
         var result = e.target.result;
-        if (!result) return callback(path, false, position);
+        if (!result) return callback(path, position);
         if (result.type != 'array') return advance(i+1);
         // set to numeric index initially, and to key if element is found
         path[i] = position;
@@ -484,8 +534,7 @@ kernel.add('database', function() {
     get: function(path, callback) {
       open(function() {
         var store = db.transaction('data').objectStore('data');
-        getPath(store, path, function(path, exists) {
-          if (!exists) return callback();
+        getPath(store, path, function(path) {
           get(store, makeKey(path), callback);
         });
       });
@@ -495,7 +544,7 @@ kernel.add('database', function() {
       open(function() {
         var trans = db.transaction('data', 'readwrite'),
             store = trans.objectStore('data');
-        getPath(store, path, function(path, exists, position) {
+        getPath(store, path, function(path, position) {
           var parentPath = path.slice(0, -1);
           store.get(makeKey(parentPath)).onsuccess = function(e) {
             var parent = e.target.result,
@@ -551,13 +600,32 @@ kernel.add('database', function() {
         });
       });
     },
+    append: function(path, value, callback) {
+      open(function() {
+        var trans = db.transaction('data', 'readwrite'),
+            store = trans.objectStore('data');
+        getPath(store, path, function(path) {
+          store.get(makeKey(path)).onsuccess = function(e) {
+            var parent = e.target.result;
+            if (!parent)
+              return callback('Parent resource does not exist');
+            if (parent.type != 'array')
+              return callback('Parent resource is not an array');
+            store.index('parent').openCursor(path = path.join('/'), 'prev').onsuccess = function(e) {
+              var cursor = e.target.result;
+              put(store, [path, cursor ? cursor.value.key+1 : 0], value);
+            };
+            trans.oncomplete = function() { callback(); };
+          };
+        });
+      });
+    },
     delete: function(path, callback) {
       if (!path) return callback('Cannot delete root object');
       open(function() {
         var trans = db.transaction('data', 'readwrite'),
             store = trans.objectStore('data');
-        getPath(store, path, function(path, exists) {
-          if (!exists) return callback('Resource not found');
+        getPath(store, path, function(path) {
           store.delete(makeKey(path));
           deleteChildren(store, path.join('/'));
         });
@@ -571,26 +639,28 @@ chrome.app.runtime.onLaunched.addListener(function() {
   kernel.use({http: 0, html: 0, database: 0, string: 0}, function(o) {
     o.http.serve({port: 8088}, function(request, response) {
       if (request.headers.View == 'data' || request.query.view == 'data') {
-        var path = request.path.substr(1);
+        var path = request.path.substr(1),
+            errorHandler = function(error) {
+              response.end(error ? '403 '+error : '200 Success', null, error ? 403 : 200);
+            };
         switch (request.method) {
           case 'GET':
             return o.database.get(path, function(object) {
-              if (object === undefined) response.end('404 Resource Not Found', null, 404);
+              if (object === undefined) response.end('404 Resource not found', null, 404);
               response.end(JSON.stringify(object), {'Content-Type': 'application/json'});
             });
           case 'PUT':
+          case 'POST':
           case 'INSERT':
             var data = o.string.fromUTF8Buffer(request.body);
             try { data = JSON.parse(data); } catch (e) {}
-            return o.database.put(path, data, request.method == 'INSERT', function(error) {
-              response.end(error ? '403 '+error : '200 Success', null, error ? 403 : 200);
-            });
+            return request.method == 'POST'
+              ? o.database.append(path, data, errorHandler)
+              : o.database.put(path, data, request.method == 'INSERT', errorHandler);
           case 'DELETE':
-            return o.database.delete(path, function() {
-              response.end('200 Success');
-            });
+            return o.database.delete(path, errorHandler);
           default:
-            return response.end('501 Not Implemented', null, 501);
+            return response.end('501 Method not implemented', null, 501);
         }
       }
       if (request.path.length > 1) { // proxy request
@@ -600,7 +670,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
           response.end(xhr.response, {'Content-Type': o.http.getMimeType((request.path.match(/\.([^.]*)$/) || [])[1])});
         };
         xhr.onerror = function() {
-          response.end('404 Resource Not Found', null, 404);
+          response.end('404 Resource not found', null, 404);
         };
         xhr.open('GET', request.path);
         return xhr.send();
@@ -639,6 +709,13 @@ chrome.app.runtime.onLaunched.addListener(function() {
               value.textContent = '';
               jsml(json(d), value);
               
+              // TODO: refactor to library
+              // TODO: post to and insert to beginning of arrays
+              // TODO: handle duplicate keys in objects
+              // TODO: handle key ordering in objects
+              // TODO: implement sort on arrays
+              // TODO: pending request indicator
+              // TODO: handle pagination in objects, arrays (when implemented in db api)
               var handler = {
                 object: function(elem) {
                   return elem.parentNode.parentNode.parentNode.className == 'json-object';
@@ -688,18 +765,18 @@ chrome.app.runtime.onLaunched.addListener(function() {
                       } else if (c == 'json-delete' || c == 'json-string' || c == 'json-number' || c == 'json-boolean' || c == 'json-null' || t.tagName == 'LI' || t.tagName == 'OL' || t.tagName == 'UL') {
                         var item = t;
                         if (t.tagName == 'LI' || t.tagName == 'OL' || t.tagName == 'UL') {
-                          if (t.tagName == 'LI') t = t.parentNode;
-                          if (t.tagName == 'OL') {
-                            item = t.insertBefore(jsml({li: [
+                          if (item.tagName == 'LI') item = t.parentNode;
+                          if (item.tagName == 'OL') {
+                            item = item.insertBefore(jsml({li: [
                               {span: {className: 'json-delete', children: '×'}},
                               {span: {className: 'json-null'}}
-                            ]}), item.nextSibling);
+                            ]}), t.tagName == 'OL' ? t.firstChild : t.nextSibling);
                           } else {
                             item = jsml({li: [
                               {span: {className: 'json-delete', children: '×'}},
                               {span: {className: 'json-key'}}, ': ',
                               {span: {className: 'json-null'}}
-                            ]}, t);
+                            ]}, item);
                           }
                           t = item.children[1];
                         } else {
