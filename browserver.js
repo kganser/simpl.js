@@ -1,10 +1,17 @@
 chrome.app.runtime.onLaunched.addListener(function() {
   kernel.use({http: 0, html: 0, database: 0, string: 0, async: 0}, function(o) {
   
-    var key = 'yabadabadoo';
+    var key = 'yabadabadoo',
+        fromBits = sjcl.codec.base64.fromBits,
+        toBits = sjcl.codec.base64.toBits;
+    
     var sid = function() {
       // session id can be predictable, so no 'paranoia' necessary
-      return sjcl.codec.base64.fromBits(sjcl.random.randomWords(6, 0), true, true);
+      return fromBits(sjcl.random.randomWords(6, 0), true, true);
+    };
+    var pbkdf2 = function(password, salt) {
+      var value = sjcl.misc.cachedPbkdf2(password, salt && {salt: toBits(salt, true)});
+      return {key: fromBits(value.key, true, true), salt: fromBits(value.salt, true, true)};
     };
     
     // login site
@@ -32,7 +39,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
         case '/login':
           if (request.method == 'POST' && request.post.username) {
             return o.database.get('users/'+encodeURIComponent(request.post.username), function(user) {
-              if (!user || user.password !== request.post.password)
+              if (!user || user.password !== pbkdf2(request.post.password, user.salt).key)
                 return render(['Invalid login. ', {a: {href: '/login', children: 'Try again'}}], 401);
               var session = sid();
               o.database.put('sessions/'+session, request.post.username, function() {
@@ -58,10 +65,10 @@ chrome.app.runtime.onLaunched.addListener(function() {
             return o.database.get(path, function(user) {
               if (!user) {
                 // TODO: create empty sessions and users objects if necessary
-                // TODO: use password hash and salt
-                var session = sid();
+                var session = sid(),
+                    hash = pbkdf2(request.post.password);
                 return o.async.join(
-                  function(callback) { o.database.put(path, {name: request.post.name, password: request.post.password}, callback); },
+                  function(callback) { o.database.put(path, {name: request.post.name, password: hash.key, salt: hash.salt}, callback); },
                   function(callback) { o.database.put('sessions/'+session, request.post.username, callback); },
                   function() { response.end('User created', {'Set-Cookie': 'sid='+session, Location: '/'}, 303); }
                 );
