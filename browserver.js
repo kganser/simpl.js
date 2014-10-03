@@ -134,9 +134,9 @@ chrome.app.runtime.onLaunched.addListener(function() {
           ]},
           {body: [
             {pre: {id: 'value', 'class': 'json', children: JSON.stringify(data, null, 2)}},
-            {script: {src: '/kernel.js'}},
-            {script: {src: '/html.js'}},
-            {script: {src: '/jsonv.js'}},
+            {script: {src: '/lib/kernel.js'}},
+            {script: {src: '/lib/html.js'}},
+            {script: {src: '/lib/jsonv.js'}},
             {script: function(json) {
               if (!json) return JSON.stringify(data);
               kernel.use({jsonv: 0}, function(o) {
