@@ -8,9 +8,9 @@ kernel.add('database', function() {
   //   value: (or null if array or object)
   // }
 
-  var db;
-  var open = function(callback) {
-    var request = indexedDB.open('browserver');
+  var db, open = function(callback) {
+    var queue = [callback],
+        request = indexedDB.open('browserver');
     request.onupgradeneeded = function() {
       db = request.result;
       db.createObjectStore('data', {keyPath: ['parent', 'key']})
@@ -21,9 +21,14 @@ kernel.add('database', function() {
       // top level is an object
       var trans = db.transaction('data', 'readwrite');
       putElement(trans.objectStore('data'), makeKey([]), {});
-      trans.oncomplete = callback;
+      trans.oncomplete = function() {
+        while (callback = queue.shift()) callback();
+        open = function(callback) { callback(); };
+      };
     };
-    open = function(callback) { callback(); };
+    open = function(callback) {
+      queue.push(callback);
+    };
   };
   var makeKey = function(path) {
     var key = path.length ? path[path.length-1] : '';
@@ -135,6 +140,10 @@ kernel.add('database', function() {
     },
     put: function(path, value, insert, callback) {
       if (!path) return callback('Cannot replace root object');
+      if (typeof insert == 'function') {
+        callback = insert;
+        insert = false;
+      }
       open(function() {
         var trans = db.transaction('data', 'readwrite'),
             store = trans.objectStore('data');
@@ -187,7 +196,7 @@ kernel.add('database', function() {
               };
             } else {
               deleteChildren(store, path.join('/'));
-              put(store, [parentPath, key], value);
+              put(store, [parentPath, decodeURIComponent(key)], value);
             }
             trans.oncomplete = function() { callback(); };
           };

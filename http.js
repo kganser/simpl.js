@@ -4,7 +4,7 @@ kernel.add('http', function() {
     serve: function(options, callback) {
       kernel.use({socket: 0, string: 0}, function(o) {
         o.socket.listen(options, function(socket) {
-          var request = {headers: {}, query: {}, post: {}, peerAddress: socket.peerAddress},
+          var request = {headers: {}, query: {}, post: {}, cookie: {}, peerAddress: socket.peerAddress},
               headers = '',
               split = -1,
               complete;
@@ -28,6 +28,12 @@ kernel.add('http', function() {
                 headers.forEach(function(line) {
                   line = line.split(': ', 2);
                   request.headers[line[0]] = line[1];
+                });
+                if (request.headers.Cookie) request.headers.Cookie.split(/; */).forEach(function(pair) {
+                  pair = pair.split('=', 2);
+                  if (pair.length < 2) return;
+                  var value = pair[1];
+                  request.cookie[pair[0]] = decodeURIComponent(value[0] == '"' ? value.slice(1, -1) : value);
                 });
                 //console.log(request.method, request.uri);
               }
