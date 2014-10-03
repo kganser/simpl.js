@@ -1,13 +1,25 @@
 chrome.app.runtime.onLaunched.addListener(function() {
   kernel.use({http: 0, html: 0, database: 0, string: 0, async: 0}, function(o) {
   
-    var key = 'yabadabadoo',
+    var key = sjcl.codec.utf8String.toBits('yabadabadoo'),
         fromBits = sjcl.codec.base64.fromBits,
         toBits = sjcl.codec.base64.toBits;
     
     var sid = function() {
       // session id can be predictable, so no 'paranoia' necessary
-      return fromBits(sjcl.random.randomWords(6, 0), true, true);
+      var data = sjcl.random.randomWords(6, 0),
+          base64 = fromBits(data, true, true);
+      return {
+        signed: base64+'.'+fromBits(new sjcl.misc.hmac(key).mac(data), true, true),
+        unsigned: base64
+      };
+    };
+    var verify = function(signed) {
+      try {
+        signed = signed.split('.', 2);
+        if (fromBits(new sjcl.misc.hmac(key).mac(toBits(signed[0], true)), true, true) == signed[1])
+          return true;
+      } catch (e) {}
     };
     var pbkdf2 = function(password, salt) {
       var value = sjcl.misc.cachedPbkdf2(password, salt && {salt: toBits(salt, true)});
@@ -26,11 +38,12 @@ chrome.app.runtime.onLaunched.addListener(function() {
       switch (request.path) {
         case '/':
           // TODO: add and verify cookie signature
-          if (request.cookie.sid) {
-            return o.database.get('sessions/'+encodeURIComponent(request.cookie.sid), function(username) {
+          if (verify(request.cookie.sid)) {
+            var session = request.cookie.sid.split('.')[0];
+            return o.database.get('sessions/'+encodeURIComponent(session), function(username) {
               if (!username) return logoff(null, 'Invalid session');
               o.database.get('users/'+encodeURIComponent(username), function(user) {
-                if (!user) return logoff(request.cookie.sid, 'Unknown user');
+                if (!user) return logoff(session, 'Unknown user');
                 render(['Welcome, '+user.name+'! ', {a: {href: '/logoff', children: 'Log off'}}]);
               });
             });
@@ -42,8 +55,8 @@ chrome.app.runtime.onLaunched.addListener(function() {
               if (!user || user.password !== pbkdf2(request.post.password, user.salt).key)
                 return render(['Invalid login. ', {a: {href: '/login', children: 'Try again'}}], 401);
               var session = sid();
-              o.database.put('sessions/'+session, request.post.username, function() {
-                response.end('Login successful', {'Set-Cookie': 'sid='+session, Location: '/'}, 303);
+              o.database.put('sessions/'+session.unsigned, request.post.username, function() {
+                response.end('Login successful', {'Set-Cookie': 'sid='+session.signed, Location: '/'}, 303);
               });
             });
           }
@@ -57,7 +70,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
             {input: {type: 'submit', value: 'Log In'}}
           ]}}]);
         case '/logoff':
-          return logoff(request.cookie.sid, 'Logged off');
+          return logoff(request.cookie.sid.split('.')[0], 'Logged off');
         case '/register':
           if (request.method == 'POST' && request.post.username) {
             // TODO: make this transactional with a transaction api in database.js
@@ -69,8 +82,8 @@ chrome.app.runtime.onLaunched.addListener(function() {
                     hash = pbkdf2(request.post.password);
                 return o.async.join(
                   function(callback) { o.database.put(path, {name: request.post.name, password: hash.key, salt: hash.salt}, callback); },
-                  function(callback) { o.database.put('sessions/'+session, request.post.username, callback); },
-                  function() { response.end('User created', {'Set-Cookie': 'sid='+session, Location: '/'}, 303); }
+                  function(callback) { o.database.put('sessions/'+session.unsigned, request.post.username, callback); },
+                  function() { response.end('User created', {'Set-Cookie': 'sid='+session.signed, Location: '/'}, 303); }
                 );
               }
               render(['Username '+request.post.username+' is already taken. ', {a: {href: '/register', children: 'Try again'}}], 401);
@@ -89,6 +102,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
             {input: {type: 'submit', value: 'Register'}}
           ]}}]);
       }
+      response.end('404 Resource not found', null, 404);
     });
     
     // database site
