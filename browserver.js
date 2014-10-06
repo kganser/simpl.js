@@ -1,5 +1,5 @@
 chrome.app.runtime.onLaunched.addListener(function() {
-  kernel.use({http: 0, html: 0, database: 0, string: 0, async: 0}, function(o) {
+  kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function(o) {
   
     var key = sjcl.codec.utf8String.toBits('yabadabadoo'),
         fromBits = sjcl.codec.base64.fromBits,
@@ -17,8 +17,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
     var verify = function(signed) {
       try {
         signed = signed.split('.', 2);
-        if (fromBits(new sjcl.misc.hmac(key).mac(toBits(signed[0], true)), true, true) == signed[1])
-          return true;
+        return fromBits(new sjcl.misc.hmac(key).mac(toBits(signed[0], true)), true, true) == signed[1];
       } catch (e) {}
     };
     var pbkdf2 = function(password, salt) {
@@ -37,7 +36,6 @@ chrome.app.runtime.onLaunched.addListener(function() {
       };
       switch (request.path) {
         case '/':
-          // TODO: add and verify cookie signature
           if (verify(request.cookie.sid)) {
             var session = request.cookie.sid.split('.')[0];
             return o.database.get('sessions/'+encodeURIComponent(session), function(username) {
@@ -133,16 +131,11 @@ chrome.app.runtime.onLaunched.addListener(function() {
         }
       }
       if (request.path.length > 1) { // proxy request
-        var xhr = new XMLHttpRequest();
-        xhr.responseType = 'arraybuffer';
-        xhr.onload = function() {
-          response.end(xhr.response, {'Content-Type': o.http.getMimeType((request.path.match(/\.([^.]*)$/) || [])[1])});
-        };
-        xhr.onerror = function() {
-          response.end('404 Resource not found', null, 404);
-        };
-        xhr.open('GET', request.path);
-        return xhr.send();
+        return o.xhr(request.path, {responseType: 'arraybuffer'}, function(e) {
+          if (e.target.status != 200)
+            return response.end('404 Resource not found', null, 404);
+          response.end(e.target.response, {'Content-Type': o.http.getMimeType((request.path.match(/\.([^.]*)$/) || [])[1])});
+        });
       }
       o.database.get('', function(data) {
         response.end(o.html.markup([

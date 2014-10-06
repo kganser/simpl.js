@@ -5,7 +5,7 @@
   "offline_enabled": true,
   "version": "2",
   "minimum_chrome_version": "24",
-  "permissions": [{"socket": ["tcp-listen"]}, "unlimitedStorage"],
+  "permissions": [{"socket": ["tcp-listen"]}, "unlimitedStorage", "http://*/", "https://*/", "ftp://*/"],
   "app": {
     "background": {
       "page": "browserver.html"
