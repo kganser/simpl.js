@@ -10,14 +10,49 @@ ul {
   margin: 0;
   padding: 0;
 }
-.form {
-  position: fixed;
-  width: 100%;
-  max-width: 780px;
-  background: rgba(240, 240, 240, .8);
-  margin: 0 -10px;
-  padding: 20px;
+.report, .show-report .record {
+  display: none;
+}
+.show-report .report {
+  display: block;
+}
+header {
+  margin: 0 -10px 20px -10px;
+  padding-bottom: 20px;
+  background: #ececec;
   text-align: center;
+}
+nav {
+  margin: 0 auto 20px auto;
+}
+nav span {
+  display: inline-block;
+  width: 100px;
+  background: white;
+  margin: 0 2px;
+  padding: 3px 0;
+  box-shadow: 0 0 5px rgba(0, 0, 0, .2);
+  cursor: pointer;
+}
+.date {
+  display: inline-block;
+  vertical-align: middle;
+  width: 50px;
+  background: white;
+  box-shadow: 0 0 5px rgba(0, 0, 0, .2);
+  text-align: center;
+  margin-right: 10px;
+  padding-bottom: 5px;
+}
+.date div {
+  background: #a00;
+  color: white;
+  font-size: 11px;
+  padding: 2px 0;
+  margin-bottom: 5px;
+}
+.date.weekend div {
+  background: gray;
 }
 .issue {
   display: inline-block;
@@ -54,45 +89,39 @@ ul {
   margin: 0 5px;
   padding: 1px 4px;
 }
-.list {
-  padding-top: 110px;
+header .report ul {
+  margin: 0 auto;
+  width: 756px;
+  text-align: left;
 }
-.list ul {
-  padding-left: 60px;
-}
-.list li {
-  margin-bottom: 10px;
-}
-.list li:after {
-  content: "";
-  display: block;
-  clear: both;
-}
-.list ul li:after {
-  content: none;
-}
-.date {
+header .report li {
   display: inline-block;
-  vertical-align: middle;
-  width: 50px;
-  background: white;
-  box-shadow: 0 0 5px rgba(0, 0, 0, .2);
-  text-align: center;
-  margin: 0 10px 5px 0;
-  padding-bottom: 5px;
 }
-.list .date {
-  float: left;
+.report .date {
+  margin: 0 2px 4px 2px;
+  opacity: .5;
   cursor: pointer;
 }
-.date div {
-  background: #a00;
-  color: white;
-  padding: 2px 0;
-  margin-bottom: 5px;
+.report .date:hover, .report .date.selected {
+  opacity: 1;
 }
-.date.weekend div {
-  background: gray;
+.content li {
+  margin-bottom: 10px;
+  padding-left: 60px;
+  clear: both;
+}
+.content li li {
+  padding: 0;
+  clear: none;
+}
+.content li.total {
+  border-top: solid 1px #ececec;
+  padding-top: 10px;
+}
+.content .date {
+  float: left;
+  margin: 0 0 10px -60px;
+  cursor: pointer;
 }
 .time {
   float: left;
@@ -117,6 +146,7 @@ ul {
 }
 .previous {
   display: block;
+  clear: both;
   margin: 0 auto 20px auto;
   padding: 5px 20px;
   background: white;

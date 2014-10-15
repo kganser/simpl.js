@@ -121,9 +121,11 @@ chrome.app.runtime.onLaunched.addListener(function() {
         });
       switch (request.path) {
         case '/issues':
-          if (!request.headers.Authorization)
+          try {
+            var credentials = atob(request.headers.Authorization.split(' ')[1] || '').split(':', 2);
+          } catch (e) {
             return response.end(o.http.getStatus(401), {'WWW-Authenticate': 'Basic realm="redmine.slytrunk.com credentials"'}, 401);
-          var credentials = atob(request.headers.Authorization.split(' ')[1] || '').split(':', 2);
+          }
           return o.xhr('http://redmine.slytrunk.com/issues.json?assigned_to_id=me&status_id=*&limit=100', {
             user: credentials[0],
             password: credentials[1],
@@ -177,10 +179,10 @@ chrome.app.runtime.onLaunched.addListener(function() {
               {script: {src: 'http://localhost:8088/lib/async.js'}},
               {script: function() {
                 kernel.use({html: 0, xhr: 0, async: 0}, function(o) {
-                  var issues = {}, issue, hours, entries, add, form, suggest, previous,
+                  var issues = {}, issue, hours, dates, entries, add, form, suggest, previous, report,
                       days = 'Sun Mon Tues Wed Thurs Fri Sat'.split(' '),
                       months = 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' '),
-                      today = new Date();
+                      today = new Date(), now = Date.now();
                   var dateString = function(d) {
                     var y = d.getFullYear(),
                         m = d.getMonth()+1,
@@ -204,8 +206,9 @@ chrome.app.runtime.onLaunched.addListener(function() {
                         callback(issues = e.target.response);
                       });
                     },
-                    function(dates) {
-                      var page = 0, now = Date.now();
+                    function(data) {
+                      dates = data;
+                      var page = 0;
                       previous.textContent = 'Previous';
                       previous.disabled = add.disabled = false;
                       (previous.onclick = function() {
@@ -219,7 +222,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
                                   items.remove(issue);
                                 });
                               }}},
-                              {div: {className: 'time', children: hours+' hr'}},
+                              {div: {className: 'time', children: hours+' h'}},
                               {div: {className: 'name', children: issues[issue] ? issues[issue].name : issue}}
                             ]};
                           }), date);
@@ -229,66 +232,105 @@ chrome.app.runtime.onLaunched.addListener(function() {
                     }
                   );
                   o.html.dom([
-                    {div: {className: 'form', children: function(e) {
-                      form = e;
-                      return [
-                        dateIcon(today),
-                        {div: {className: 'issue', children: [
-                          {input: {type: 'text', placeholder: 'issue', onkeyup: function(e) {
-                            issue = this.value;
-                            var items = issue.length < 2 ? [] : Object.keys(issues).map(function(id) {
-                              return [id, issues[id]];
-                            }).filter(function(item) {
-                              return (item[1].id+item[1].name.toLowerCase()).indexOf(issue.toLowerCase()) > -1;
-                            });
-                            o.html.dom(items.map(function(item) {
-                              return {li: {children: item[1].name, onclick: function() {
-                                issue = item[0];
-                                e.target.value = item[1].name;
-                                o.html.dom(null, suggest, true);
-                                hours.focus();
-                              }}};
-                            }), suggest, true);
-                          }, onfocus: function() {
-                            suggest.style.display = 'block';
-                          }, onblur: function() {
-                            setTimeout(function() {
-                              suggest.style.display = 'none'; // TODO: more elegant solution?
-                            }, 500);
-                          }}},
-                          {ul: function(e) { suggest = e; }}
-                        ]}},
-                        {input: {type: 'text', className: 'hours', placeholder: 'hours', children: function(e) { hours = e; }}},
-                        {button: {children: function(e) { add = e; return 'Add'; }, disabled: true, onclick: function(e) {
-                          this.disabled = true;
-                          var entry,
-                              date = dateString(today),
-                              time = parseFloat(hours.value);
-                          if (!time || time < 0) {
-                            alert('Invalid number of hours');
-                          } else {
-                            o.xhr('/entries', {
-                              method: 'POST',
-                              data: JSON.stringify({date: date, time: time, issue: issue})
-                            }, function() {
-                              e.target.disabled = false;
-                              entries.get(date).insert(time, issue);
-                            });
-                          }
-                        }}}
-                      ];
-                    }}},
-                    {ul: {className: 'list', children: (entries = o.html.model({}, function(value, date) {
-                      date = date.split('-');
-                      date = new Date(date[0], parseInt(date[1], 10)-1, parseInt(date[2], 10));
-                      return {li: [
-                        dateIcon(date, function() {
-                          form.replaceChild(o.html.dom(dateIcon(today = date)), form.firstChild);
-                        }),
-                        {ul: value.view}
-                      ]};
-                    })).view}},
-                    {button: {className: 'previous', children: function(e) { previous = e; return 'Loading...'; }, disabled: true}}
+                    {header: [
+                      {nav: [
+                        {span: {children: 'Record', onclick: function() { document.body.className = ''; }}},
+                        {span: {children: 'Report', onclick: function() { document.body.className = 'show-report'; }}}
+                      ]},
+                      {div: {className: 'record', children: function(e) {
+                        form = e;
+                        return [
+                          dateIcon(today),
+                          {div: {className: 'issue', children: [
+                            {input: {type: 'text', placeholder: 'issue', onkeyup: function(e) {
+                              issue = this.value;
+                              var items = issue.length < 2 ? [] : Object.keys(issues).map(function(id) {
+                                return [id, issues[id]];
+                              }).filter(function(item) {
+                                return (item[1].id+item[1].name.toLowerCase()).indexOf(issue.toLowerCase()) > -1;
+                              });
+                              o.html.dom(items.map(function(item) {
+                                return {li: {children: item[1].name, onclick: function() {
+                                  issue = item[0];
+                                  e.target.value = item[1].name;
+                                  o.html.dom(null, suggest, true);
+                                  hours.focus();
+                                }}};
+                              }), suggest, true);
+                            }, onfocus: function() {
+                              suggest.style.display = 'block';
+                            }, onblur: function() {
+                              setTimeout(function() {
+                                suggest.style.display = 'none'; // TODO: more elegant solution?
+                              }, 500);
+                            }}},
+                            {ul: function(e) { suggest = e; }}
+                          ]}},
+                          {input: {type: 'text', className: 'hours', placeholder: 'hours', children: function(e) { hours = e; }}},
+                          {button: {children: function(e) { add = e; return 'Add'; }, disabled: true, onclick: function(e) {
+                            this.disabled = true;
+                            var entry,
+                                date = dateString(today),
+                                time = parseFloat(hours.value);
+                            if (!time || time < 0) {
+                              alert('Invalid number of hours');
+                            } else {
+                              o.xhr('/entries', {
+                                method: 'POST',
+                                data: JSON.stringify({date: date, time: time, issue: issue})
+                              }, function() {
+                                e.target.disabled = false;
+                                entries.get(date).insert(time, issue);
+                              });
+                            }
+                          }}}
+                        ];
+                      }}},
+                      {div: {className: 'report', children: [
+                        {ul: function() {
+                          var span = {};
+                          return new Array(23 + new Date(now).getDay()).join(' ').split('').map(function(x, i, days) {
+                            var date = new Date(now-(days.length-i-1)*24*60*60*1000),
+                                value = dateString(date);
+                            return {li: [dateIcon(date, function() {
+                              if (this.classList.contains('selected')) delete span[value];
+                              else span[value] = dates[value] || {};
+                              this.classList.toggle('selected');
+                              var totals = {}, total = 0;
+                              Object.keys(span).forEach(function(date) {
+                                Object.keys(date = span[date]).forEach(function(issue) {
+                                  totals[issue] = (totals[issue] || 0) + date[issue];
+                                });
+                              });
+                              o.html.dom({ul: Object.keys(totals).concat([1]).map(function(issue, i, arr) {
+                                var last = i == arr.length-1;
+                                if (!last) total += totals[issue];
+                                return {li: {className: last ? 'total' : '', children: [
+                                  {div: {className: 'time', children: (last ? total : totals[issue])+' h'}},
+                                  {div: {className: 'name', children: last ? 'Total' : issues[issue].name}}
+                                ]}};
+                              })}, report, true);
+                            })]};
+                          });
+                        }}
+                      ]}}
+                    ]},
+                    {div: {className: 'content', children: [
+                      {div: {className: 'record', children: [
+                        {ul: (entries = o.html.model({}, function(value, date) {
+                          date = date.split('-');
+                          date = new Date(date[0], parseInt(date[1], 10)-1, parseInt(date[2], 10));
+                          return {li: [
+                            dateIcon(date, function() {
+                              form.replaceChild(o.html.dom(dateIcon(today = date)), form.firstChild);
+                            }),
+                            {ul: value.view}
+                          ]};
+                        })).view},
+                        {button: {className: 'previous', children: function(e) { previous = e; return 'Loading...'; }, disabled: true}}
+                      ]}},
+                      {div: {className: 'report', children: function(e) { report = e; }}}
+                    ]}}
                   ], document.body);
                 });
               }}
