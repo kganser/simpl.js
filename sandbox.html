@@ -8,6 +8,7 @@
         var apps = {}, host = o.proxy({
           run: function(args) {
             if (apps[args[0]]) return; // TODO: support multiple workers per app
+            // TODO: determine if iframe proxy is necessary. workers might be sufficient
             (apps[args[0]] = o.proxy({
               database_get: function(args, callback) { host.send('database_get', args, callback); },
               database_put: function(args, callback) { host.send('database_put', args, callback); },
@@ -17,13 +18,14 @@
               socket_read: function(args, callback) { host.send('socket_read', args, callback, true); },
               socket_write: function(args, callback) { host.send('socket_write', args, callback); },
               socket_disconnect: function(args, callback) { host.send('socket_disconnect', args, callback); }
-            }, 'http://localhost:7088/'+encodeURIComponent(args[0])+'?run', true)).peer.onerror = function(e) {
+            }, URL.createObjectURL(new Blob([args[1]], {type: 'text/javascript'})), true)).peer.onerror = function(e) {
               host.send('error', [args[0], e.message, e.filename, e.lineno]);
             };
           },
           stop: function(args) {
             if (!apps[args[0]]) return;
             apps[args[0]].peer.terminate();
+            delete apps[args[0]];
           }
         });
       });

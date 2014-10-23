@@ -1,5 +1,5 @@
 chrome.app.runtime.onLaunched.addListener(function() {
-  kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0, proxy: 0}, function(o) {
+  kernel.use({http: 0, html: 0, database: 0, xhr: 0, socket: 0, string: 0, async: 0, proxy: 0}, function(o) {
   
     var key = sjcl.codec.utf8String.toBits('yabadabadoo'),
         fromBits = sjcl.codec.base64.fromBits,
@@ -342,7 +342,8 @@ chrome.app.runtime.onLaunched.addListener(function() {
     
     // code editor
     o.xhr('/lib/kernel.js', function(e) {
-      var kernel = e.target.responseText;
+      var running = {},
+          kernel = e.target.responseText;
       var proxy = o.proxy({
         database_get: function(args, callback) { o.database.get(args[0], callback); },
         database_put: function(args, callback) { o.database.put(args[0], args[1], args[2], callback); },
@@ -357,7 +358,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
               message = args[1],
               filename = args[2],
               lineno = args[3];
-          console.err(module, message);
+          console.error(module, message, filename, lineno);
           // TODO: communicate module error in UI
         }
       }, '/sandbox.html');
@@ -365,8 +366,17 @@ chrome.app.runtime.onLaunched.addListener(function() {
       o.http.serve({port: 7088}, function(request, response) {
         if (request.path == '/') {
           if (request.method == 'POST' && request.post && request.post.module) {
-            proxy.send('run', [request.post.module]);
-            return response.end('Success', {Location: '/'}, 303);
+            var module = request.post.module;
+            return o.database.get('modules/'+encodeURIComponent(module), function(code) {
+              if (running[module]) {
+                proxy.send('stop', [module]);
+                delete running[module];
+              } else {
+                proxy.send('run', [module, kernel+code]);
+                running[module] = true;
+              }
+              response.end('Success', {Location: '/'}, 303);
+            });
           }
           return o.database.get('modules', function(modules) {
             response.end(o.html.markup([
@@ -382,7 +392,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
                     {ul: {id: 'modules', children: Object.keys(modules).map(function(module) {
                       return {li: [
                         {a: {href: '/'+encodeURIComponent(module), target: '_blank', children: module}}, ' ',
-                        {button: {type: 'submit', name: 'module', value: module, children: 'Run'}}
+                        {button: {type: 'submit', name: 'module', value: module, children: running[module] ? 'Stop' : 'Run'}}
                       ]};
                     })}}
                   ]}},
@@ -431,10 +441,12 @@ chrome.app.runtime.onLaunched.addListener(function() {
         
         o.database.get(path, function(code) {
           // TODO: use something other than query string for different representations?
-          if (request.query.hasOwnProperty('raw'))
-            return response.end(code, {'Content-Type': 'application/x-javascript'});
-          if (request.query.hasOwnProperty('run'))
-            return response.end(kernel+code, {'Content-Type': 'application/x-javascript'});
+          if (request.query.hasOwnProperty('raw')) {
+            if (!code) return o.xhr('/lib/'+encodeURIComponent(module)+'.js', function(e) {
+              response.end(e.target.responseText, {'Content-Type': 'application/x-javascript'});
+            });
+            return response.end(code || '', {'Content-Type': 'application/x-javascript'});
+          }
           response.end(o.html.markup([
             {'!doctype': {html: null}},
             {html: [
