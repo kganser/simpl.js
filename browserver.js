@@ -1,5 +1,5 @@
 chrome.app.runtime.onLaunched.addListener(function() {
-  kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function(o) {
+  kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0, proxy: 0}, function(o) {
   
     var key = sjcl.codec.utf8String.toBits('yabadabadoo'),
         fromBits = sjcl.codec.base64.fromBits,
@@ -48,7 +48,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
           }
           return render(['Please ', {a: {href: '/register', children: 'Register'}}, ' or ', {a: {href: '/login', children: 'Log in'}}, '.']);
         case '/login':
-          if (request.method == 'POST' && request.post.username) {
+          if (request.method == 'POST' && request.post && request.post.username) {
             return o.database.get('users/'+encodeURIComponent(request.post.username), function(user) {
               if (!user || user.password !== pbkdf2(request.post.password, user.salt).key)
                 return render(['Invalid login. ', {a: {href: '/login', children: 'Try again'}}], 401);
@@ -70,7 +70,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
         case '/logoff':
           return logoff(request.cookie.sid.split('.')[0], 'Logged off');
         case '/register':
-          if (request.method == 'POST' && request.post.username) {
+          if (request.method == 'POST' && request.post && request.post.username) {
             // TODO: make this transactional with a transaction api in database.js
             var path = 'users/'+encodeURIComponent(request.post.username);
             return o.database.get(path, function(user) {
@@ -142,22 +142,18 @@ chrome.app.runtime.onLaunched.addListener(function() {
         case '/entries':
           switch (request.method) {
             case 'POST':
-              try {
-                var entry = JSON.parse(o.string.fromUTF8Buffer(request.body));
-                if (!/^\d{4}-\d{2}-\d{2}$/.test(entry.date) || typeof entry.time != 'number')
-                  throw 'invalid input';
-                return o.database.get('entries/'+entry.date, function(entries) {
-                  if (entries) return o.database.put('entries/'+entry.date+'/'+encodeURIComponent(entry.issue), entry.time, function() {
-                    response.end('Success');
-                  });
-                  var e = {}; e[entry.issue] = entry.time;
-                  o.database.put('entries/'+entry.date, e, function() {
-                    response.end('Success');
-                  });
+              var entry = request.json;
+              if (!entry || !/^\d{4}-\d{2}-\d{2}$/.test(entry.date) || typeof entry.time != 'number')
+                return response.end(o.http.getStatus(400), null, 400);;
+              return o.database.get('entries/'+entry.date, function(entries) {
+                if (entries) return o.database.put('entries/'+entry.date+'/'+encodeURIComponent(entry.issue), entry.time, function() {
+                  response.end('Success');
                 });
-              } catch (e) {
-                return response.end(o.http.getStatus(400), null, 400);
-              }
+                var e = {}; e[entry.issue] = entry.time;
+                o.database.put('entries/'+entry.date, e, function() {
+                  response.end('Success');
+                });
+              });
             case 'GET':
               return o.database.get('entries', function(entries) {
                 response.end(JSON.stringify(entries), {'Content-Type': 'application/json'});
@@ -220,6 +216,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
                                 this.disabled = true;
                                 o.xhr('/entries/'+date+'/'+encodeURIComponent(issue), {method: 'DELETE'}, function() {
                                   items.remove(issue);
+                                  delete dates[date][issue];
                                 });
                               }}},
                               {div: {className: 'time', children: hours+' h'}},
@@ -247,7 +244,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
                               var items = issue.length < 2 ? [] : Object.keys(issues).map(function(id) {
                                 return [id, issues[id]];
                               }).filter(function(item) {
-                                return (item[1].id+item[1].name.toLowerCase()).indexOf(issue.toLowerCase()) > -1;
+                                return ~(item[1].id+item[1].name.toLowerCase()).indexOf(issue.toLowerCase());
                               });
                               o.html.dom(items.map(function(item) {
                                 return {li: {children: item[1].name, onclick: function() {
@@ -277,10 +274,13 @@ chrome.app.runtime.onLaunched.addListener(function() {
                             } else {
                               o.xhr('/entries', {
                                 method: 'POST',
-                                data: JSON.stringify({date: date, time: time, issue: issue})
+                                data: JSON.stringify({date: date, time: time, issue: issue}),
+                                headers: {'Content-Type': 'application/json'}
                               }, function() {
                                 e.target.disabled = false;
                                 entries.get(date).insert(time, issue);
+                                if (!dates[date]) dates[date] = {};
+                                dates[date][issue] = time;
                               });
                             }
                           }}}
@@ -340,11 +340,140 @@ chrome.app.runtime.onLaunched.addListener(function() {
       response.end('404 Resource not found', null, 404);
     });
     
+    // code editor
+    o.xhr('/lib/kernel.js', function(e) {
+      var kernel = e.target.responseText;
+      var proxy = o.proxy({
+        database_get: function(args, callback) { o.database.get(args[0], callback); },
+        database_put: function(args, callback) { o.database.put(args[0], args[1], args[2], callback); },
+        database_append: function(args, callback) { o.database.append(args[0], args[1], callback); },
+        database_delete: function(args, callback) { o.database.delete(args[0], callback); },
+        socket_listen: function(args, callback) { o.socket.listen(args[0], function(o) { callback({socketId: o.socketId, peerAddress: o.peerAddress}); }); },
+        socket_read: function(args, callback) { o.socket.read(args[0], callback); },
+        socket_write: function(args, callback) { o.socket.write(args[0], args[1], callback); },
+        socket_disconnect: function(args, callback) { o.socket.disconnect(args[0]); },
+        error: function(args, callback) {
+          var module = args[0],
+              message = args[1],
+              filename = args[2],
+              lineno = args[3];
+          console.err(module, message);
+          // TODO: communicate module error in UI
+        }
+      }, '/sandbox.html');
+      
+      o.http.serve({port: 7088}, function(request, response) {
+        if (request.path == '/') {
+          if (request.method == 'POST' && request.post && request.post.module) {
+            proxy.send('run', [request.post.module]);
+            return response.end('Success', {Location: '/'}, 303);
+          }
+          return o.database.get('modules', function(modules) {
+            response.end(o.html.markup([
+              {'!doctype': {html: null}},
+              {html: [
+                {head: [
+                  {title: 'Browserver'}
+                ]},
+                {body: [
+                  {input: {type: 'text', placeholder: 'Module name', id: 'name'}},
+                  {button: {children: 'Add', disabled: 'disabled', id: 'add'}},
+                  {form: {action: '/', method: 'post', children: [
+                    {ul: {id: 'modules', children: Object.keys(modules).map(function(module) {
+                      return {li: [
+                        {a: {href: '/'+encodeURIComponent(module), target: '_blank', children: module}}, ' ',
+                        {button: {type: 'submit', name: 'module', value: module, children: 'Run'}}
+                      ]};
+                    })}}
+                  ]}},
+                  {script: {src: 'http://localhost:8088/lib/kernel.js'}},
+                  {script: {src: 'http://localhost:8088/lib/html.js'}},
+                  {script: function(m) {
+                    if (!m) return Object.keys(modules);
+                    kernel.use({html: 0}, function(o) {
+                      var add = document.getElementById('add'),
+                          name = document.getElementById('name'),
+                          list = document.getElementById('modules');
+                      name.onkeyup = function() {
+                        add.disabled = !this.value;
+                      };
+                      add.onclick = function() {
+                        if (~m.indexOf(name.value)) return alert('Module name already exists');
+                        m.push(name.value);
+                        o.html.dom({li: [
+                          {a: {href: '/'+encodeURIComponent(name.value), target: '_blank', children: name.value}}, ' ',
+                          {button: {type: 'submit', name: 'module', value: name.value, children: 'Run'}}
+                        ]}, list);
+                      };
+                    });
+                  }}
+                ]}
+              ]}
+            ]), {'Content-Type': 'text/html'});
+          });
+        }
+        
+        var module = decodeURIComponent(request.path.substr(1)),
+            path = 'modules/'+encodeURIComponent(module);
+        
+        if (request.method == 'DELETE')
+          return o.database.delete(path, function() {
+            response.end('Success');
+          });
+        
+        if (request.method == 'POST') {
+          // TODO: validate encoding
+          var code = o.string.fromUTF8Buffer(request.body);
+          return o.database.put(path, code, function() {
+            response.end('Success', {Location: request.path}, 303);
+          });
+        }
+        
+        o.database.get(path, function(code) {
+          // TODO: use something other than query string for different representations?
+          if (request.query.hasOwnProperty('raw'))
+            return response.end(code, {'Content-Type': 'application/x-javascript'});
+          if (request.query.hasOwnProperty('run'))
+            return response.end(kernel+code, {'Content-Type': 'application/x-javascript'});
+          response.end(o.html.markup([
+            {'!doctype': {html: null}},
+            {html: [
+              {head: [
+                {title: 'Browserver'},
+                {meta: {charset: 'utf-8'}},
+                {link: {rel: 'stylesheet', href: 'http://codemirror.net/lib/codemirror.css'}},
+                {style: 'body { margin: 0; } .CodeMirror { height: auto; } .CodeMirror-scroll { overflow-x: auto; overflow-y: hidden; }'},
+              ]},
+              {body: [
+                {textarea: code || ''},
+                {script: {src: 'http://codemirror.net/lib/codemirror.js'}},
+                {script: {src: 'http://codemirror.net/mode/javascript/javascript.js'}},
+                {script: {src: 'http://codemirror.net/addon/edit/matchbrackets.js'}},
+                {script: {src: 'http://codemirror.net/addon/search/match-highlighter.js'}},
+                {script: function() {
+                  CodeMirror.fromTextArea(document.getElementsByTagName('textarea')[0], {
+                    lineNumbers: true,
+                    matchBrackets: true,
+                    highlightSelectionMatches: true
+                  });
+                  CodeMirror.commands.save = function(cm) {
+                    var request = new XMLHttpRequest();
+                    request.open('POST', location.pathname);
+                    request.send(cm.getValue());
+                  };
+                }}
+              ]}
+            ]}
+          ]), {'Content-Type': 'text/html'});
+        });
+      });
+    });
+    
     // database site
     o.http.serve({port: 8088}, function(request, response) {
       if (request.headers.View == 'data' || request.query.view == 'data') {
         var path = request.path.substr(1),
-            errorHandler = function(error) {
+            handler = function(error) {
               response.end(error ? '403 '+error : '200 Success', null, error ? 403 : 200);
             };
         switch (request.method) {
@@ -356,13 +485,11 @@ chrome.app.runtime.onLaunched.addListener(function() {
           case 'PUT':
           case 'POST':
           case 'INSERT':
-            var data = o.string.fromUTF8Buffer(request.body);
-            try { data = JSON.parse(data); } catch (e) {}
             return request.method == 'POST'
-              ? o.database.append(path, data, errorHandler)
-              : o.database.put(path, data, request.method == 'INSERT', errorHandler);
+              ? o.database.append(path, request.json, handler)
+              : o.database.put(path, request.json, request.method == 'INSERT', handler);
           case 'DELETE':
-            return o.database.delete(path, errorHandler);
+            return o.database.delete(path, handler);
           default:
             return response.end('501 Method not implemented', null, 501);
         }
@@ -388,10 +515,10 @@ chrome.app.runtime.onLaunched.addListener(function() {
             {script: {src: '/lib/kernel.js'}},
             {script: {src: '/lib/html.js'}},
             {script: {src: '/lib/jsonv.js'}},
-            {script: function(json) {
-              if (!json) return JSON.stringify(data);
+            {script: function() {
               kernel.use({jsonv: 0}, function(o) {
-                o.jsonv(json, document.getElementById('value'));
+                var elem = document.getElementById('value');
+                o.jsonv(JSON.parse(elem.textContent), elem);
               });
             }}
           ]}
