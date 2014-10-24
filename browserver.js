@@ -342,38 +342,38 @@ chrome.app.runtime.onLaunched.addListener(function() {
     
     // code editor
     o.xhr('/lib/kernel.js', function(e) {
-      var running = {},
+      var apps = {},
           kernel = e.target.responseText;
-      var proxy = o.proxy({
-        database_get: function(args, callback) { o.database.get(args[0], callback); },
-        database_put: function(args, callback) { o.database.put(args[0], args[1], args[2], callback); },
-        database_append: function(args, callback) { o.database.append(args[0], args[1], callback); },
-        database_delete: function(args, callback) { o.database.delete(args[0], callback); },
-        socket_listen: function(args, callback) { o.socket.listen(args[0], function(o) { callback({socketId: o.socketId, peerAddress: o.peerAddress}); }); },
-        socket_read: function(args, callback) { o.socket.read(args[0], callback); },
-        socket_write: function(args, callback) { o.socket.write(args[0], args[1], callback); },
-        socket_disconnect: function(args, callback) { o.socket.disconnect(args[0]); },
-        error: function(args, callback) {
-          var module = args[0],
-              message = args[1],
-              filename = args[2],
-              lineno = args[3];
-          console.error(module, message, filename, lineno);
-          // TODO: communicate module error in UI
-        }
-      }, '/sandbox.html');
       
       o.http.serve({port: 7088}, function(request, response) {
         if (request.path == '/') {
           if (request.method == 'POST' && request.post && request.post.module) {
             var module = request.post.module;
             return o.database.get('modules/'+encodeURIComponent(module), function(code) {
-              if (running[module]) {
-                proxy.send('stop', [module]);
-                delete running[module];
+              if (apps[module]) {
+                apps[module].peer.terminate();
+                delete apps[module];
               } else {
-                proxy.send('run', [module, kernel+code]);
-                running[module] = true;
+                apps[module] = o.proxy({
+                  module: function(args, callback) {
+                    var module = encodeURIComponent(args[0]);
+                    o.database.get('modules/'+module, function(code) {
+                      if (!code) return o.xhr('/lib/'+module+'.js', function(e) { callback(e.target.responseText); });
+                      callback(code);
+                    });
+                  },
+                  database_get: function(args, callback) { o.database.get(args[0], callback); },
+                  database_put: function(args, callback) { o.database.put(args[0], args[1], args[2], callback); },
+                  database_append: function(args, callback) { o.database.append(args[0], args[1], callback); },
+                  database_delete: function(args, callback) { o.database.delete(args[0], callback); },
+                  socket_listen: function(args, callback) { o.socket.listen(args[0], function(o) { callback({socketId: o.socketId, peerAddress: o.peerAddress}); }); },
+                  socket_read: function(args, callback) { o.socket.read(args[0], callback); },
+                  socket_write: function(args, callback) { o.socket.write(args[0], args[1], callback); },
+                  socket_disconnect: function(args, callback) { o.socket.disconnect(args[0]); }
+                }, kernel+code).peer.onerror = function(e) {
+                  // TODO: communicate module error in UI
+                  delete apps[module];
+                };
               }
               response.end('Success', {Location: '/'}, 303);
             });
@@ -392,7 +392,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
                     {ul: {id: 'modules', children: Object.keys(modules).map(function(module) {
                       return {li: [
                         {a: {href: '/'+encodeURIComponent(module), target: '_blank', children: module}}, ' ',
-                        {button: {type: 'submit', name: 'module', value: module, children: running[module] ? 'Stop' : 'Run'}}
+                        {button: {type: 'submit', name: 'module', value: module, children: apps[module] ? 'Stop' : 'Run'}}
                       ]};
                     })}}
                   ]}},
@@ -440,28 +440,21 @@ chrome.app.runtime.onLaunched.addListener(function() {
         }
         
         o.database.get(path, function(code) {
-          // TODO: use something other than query string for different representations?
-          if (request.query.hasOwnProperty('raw')) {
-            if (!code) return o.xhr('/lib/'+encodeURIComponent(module)+'.js', function(e) {
-              response.end(e.target.responseText, {'Content-Type': 'application/x-javascript'});
-            });
-            return response.end(code || '', {'Content-Type': 'application/x-javascript'});
-          }
           response.end(o.html.markup([
             {'!doctype': {html: null}},
             {html: [
               {head: [
                 {title: 'Browserver'},
                 {meta: {charset: 'utf-8'}},
-                {link: {rel: 'stylesheet', href: 'http://codemirror.net/lib/codemirror.css'}},
+                {link: {rel: 'stylesheet', href: 'http://localhost:8088/codemirror/codemirror.css'}},
                 {style: 'body { margin: 0; } .CodeMirror { height: auto; } .CodeMirror-scroll { overflow-x: auto; overflow-y: hidden; }'},
               ]},
               {body: [
                 {textarea: code || ''},
-                {script: {src: 'http://codemirror.net/lib/codemirror.js'}},
-                {script: {src: 'http://codemirror.net/mode/javascript/javascript.js'}},
-                {script: {src: 'http://codemirror.net/addon/edit/matchbrackets.js'}},
-                {script: {src: 'http://codemirror.net/addon/search/match-highlighter.js'}},
+                {script: {src: 'http://localhost:8088/codemirror/codemirror.js'}},
+                {script: {src: 'http://localhost:8088/codemirror/javascript.js'}},
+                {script: {src: 'http://localhost:8088/codemirror/matchbrackets.js'}},
+                {script: {src: 'http://localhost:8088/codemirror/match-highlighter.js'}},
                 {script: function() {
                   CodeMirror.fromTextArea(document.getElementsByTagName('textarea')[0], {
                     lineNumbers: true,
@@ -519,8 +512,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
           {head: [
             {title: 'Browserver'},
             {meta: {charset: 'utf-8'}},
-            {link: {rel: 'stylesheet', href: '/browserver.css'}},
-            {link: {rel: 'shortcut icon', href: '/icon.png'}}
+            {link: {rel: 'stylesheet', href: '/browserver.css'}}
           ]},
           {body: [
             {pre: {id: 'value', 'class': 'json', children: JSON.stringify(data, null, 2)}},

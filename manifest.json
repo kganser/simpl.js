@@ -10,8 +10,5 @@
     "background": {
       "page": "browserver.html"
     }
-  },
-  "sandbox": {
-    "pages": ["sandbox.html"]
   }
 }
