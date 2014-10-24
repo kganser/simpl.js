@@ -351,10 +351,10 @@ chrome.app.runtime.onLaunched.addListener(function() {
             var module = request.post.module;
             return o.database.get('modules/'+encodeURIComponent(module), function(code) {
               if (apps[module]) {
-                apps[module].peer.terminate();
+                apps[module].terminate();
                 delete apps[module];
               } else {
-                apps[module] = o.proxy({
+                (apps[module] = o.proxy({
                   module: function(args, callback) {
                     var module = encodeURIComponent(args[0]);
                     o.database.get('modules/'+module, function(code) {
@@ -370,7 +370,7 @@ chrome.app.runtime.onLaunched.addListener(function() {
                   socket_read: function(args, callback) { o.socket.read(args[0], callback); },
                   socket_write: function(args, callback) { o.socket.write(args[0], args[1], callback); },
                   socket_disconnect: function(args, callback) { o.socket.disconnect(args[0]); }
-                }, kernel+code).peer.onerror = function(e) {
+                }, kernel+code).peer).onerror = function(e) {
                   // TODO: communicate module error in UI
                   delete apps[module];
                 };
