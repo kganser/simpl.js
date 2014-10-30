@@ -4,11 +4,14 @@
   "description": "Web server framework",
   "offline_enabled": true,
   "version": "2",
-  "minimum_chrome_version": "24",
-  "permissions": [{"socket": ["tcp-listen"]}, "unlimitedStorage", "http://*/", "https://*/", "ftp://*/"],
+  "minimum_chrome_version": "33",
+  "permissions": ["unlimitedStorage", "http://*/", "https://*/", "ftp://*/"],
   "app": {
     "background": {
       "page": "browserver.html"
     }
+  },
+  "sockets": {
+    "tcpServer": {"listen": "*"}
   }
 }

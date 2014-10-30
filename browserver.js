@@ -1,5 +1,5 @@
 chrome.app.runtime.onLaunched.addListener(function() {
-  kernel.use({http: 0, html: 0, database: 0, xhr: 0, socket: 0, string: 0, async: 0, proxy: 0}, function(o) {
+  kernel.use({http: 0, html: 0, database: 0, xhr: 0, socket: 0, string: 0, async: 0}, function(o, proxy) {
   
     var key = sjcl.codec.utf8String.toBits('yabadabadoo'),
         fromBits = sjcl.codec.base64.fromBits,
@@ -354,23 +354,13 @@ chrome.app.runtime.onLaunched.addListener(function() {
                 apps[module].terminate();
                 delete apps[module];
               } else {
-                (apps[module] = o.proxy({
-                  module: function(args, callback) {
-                    var module = encodeURIComponent(args[0]);
-                    o.database.get('modules/'+module, function(code) {
-                      if (!code) return o.xhr('/lib/'+module+'.js', function(e) { callback(e.target.responseText); });
-                      callback(code);
-                    });
-                  },
-                  database_get: function(args, callback) { o.database.get(args[0], callback); },
-                  database_put: function(args, callback) { o.database.put(args[0], args[1], args[2], callback); },
-                  database_append: function(args, callback) { o.database.append(args[0], args[1], callback); },
-                  database_delete: function(args, callback) { o.database.delete(args[0], callback); },
-                  socket_listen: function(args, callback) { o.socket.listen(args[0], function(o) { callback({socketId: o.socketId, peerAddress: o.peerAddress}); }); },
-                  socket_read: function(args, callback) { o.socket.read(args[0], callback); },
-                  socket_write: function(args, callback) { o.socket.write(args[0], args[1], callback); },
-                  socket_disconnect: function(args, callback) { o.socket.disconnect(args[0]); }
-                }, kernel+code).peer).onerror = function(e) {
+                (apps[module] = proxy(null, kernel+code, function(module, callback) {
+                  module = encodeURIComponent(module);
+                  o.database.get('modules/'+module, function(code) {
+                    if (code) return callback(code);
+                    o.xhr('/lib/'+module+'.js', function(e) { callback(e.target.responseText); });
+                  });
+                }).peer).onerror = function(e) {
                   // TODO: communicate module error in UI
                   delete apps[module];
                 };
