@@ -354,16 +354,17 @@ chrome.app.runtime.onLaunched.addListener(function() {
                 apps[module].terminate();
                 delete apps[module];
               } else {
-                (apps[module] = proxy(null, kernel+code, function(module, callback) {
+                apps[module] = proxy(null, kernel+code, function(module, callback) {
                   module = encodeURIComponent(module);
                   o.database.get('modules/'+module, function(code) {
                     if (code) return callback(code);
                     o.xhr('/lib/'+module+'.js', function(e) { callback(e.target.responseText); });
                   });
-                }).peer).onerror = function(e) {
+                }, function(e) {
                   // TODO: communicate module error in UI
+                  console.error(e);
                   delete apps[module];
-                };
+                });
               }
               response.end('Success', {Location: '/'}, 303);
             });
