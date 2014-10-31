@@ -1,6 +1,6 @@
 kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy) {
 
-  o.xhr('/lib/kernel.js', function(e) {
+  o.xhr('/kernel.js', function(e) {
     var apps = {},
         kernel = e.target.responseText;
     
@@ -17,7 +17,7 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy
                 module = encodeURIComponent(module);
                 o.database.get('modules/'+module, function(code) {
                   if (code) return callback(code);
-                  o.xhr('/lib/'+module+'.js', function(e) { callback(e.target.responseText); });
+                  o.xhr('/modules/'+module+'.js', function(e) { callback(e.target.responseText); });
                 });
               }, function(e) {
                 // TODO: communicate module error in UI
@@ -33,7 +33,8 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy
             {'!doctype': {html: null}},
             {html: [
               {head: [
-                {title: 'Browserver'}
+                {title: 'Browserver'},
+                {link: {rel: 'shortcut icon', href: 'http://localhost:8001/icon.png'}}
               ]},
               {body: [
                 {input: {type: 'text', placeholder: 'Module name', id: 'name'}},
@@ -46,8 +47,8 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy
                     ]};
                   })}}
                 ]}},
-                {script: {src: 'http://localhost:8001/lib/kernel.js'}},
-                {script: {src: 'http://localhost:8001/lib/html.js'}},
+                {script: {src: 'http://localhost:8001/kernel.js'}},
+                {script: {src: 'http://localhost:8001/modules/html.js'}},
                 {script: function(m) {
                   if (!m) return Object.keys(modules);
                   kernel.use({html: 0}, function(o) {
@@ -81,13 +82,11 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy
           response.end('Success');
         });
       
-      if (request.method == 'POST') {
-        // TODO: validate encoding
-        var code = o.string.fromUTF8Buffer(request.body);
-        return o.database.put(path, code, function() {
+      // TODO: validate encoding
+      if (request.method == 'POST')
+        return o.database.put(path, o.string.fromUTF8Buffer(request.body), function() {
           response.end('Success', {Location: request.path}, 303);
         });
-      }
       
       o.database.get(path, function(code) {
         response.end(o.html.markup([
@@ -96,6 +95,7 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy
             {head: [
               {title: 'Browserver'},
               {meta: {charset: 'utf-8'}},
+              {link: {rel: 'shortcut icon', href: 'http://localhost:8001/icon.png'}},
               {link: {rel: 'stylesheet', href: 'http://localhost:8001/codemirror/codemirror.css'}},
               {style: 'body { margin: 0; } .CodeMirror { height: auto; } .CodeMirror-scroll { overflow-x: auto; overflow-y: hidden; }'},
             ]},
