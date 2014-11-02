@@ -1,0 +1,54 @@
+body {
+  margin: 0;
+  font: 13px sans-serif;
+}
+.CodeMirror {
+  height: auto;
+}
+.CodeMirror-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+#nav {
+  position: fixed;
+  width: 200px;
+  height: 100%;
+  overflow-y: auto;
+}
+#module {
+  position: relative;
+}
+input {
+  padding: 5px 0 5px 10px;
+  border: none;
+  width: 140px;
+}
+ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+li {
+  padding: 5px 10px;
+  position: relative;
+  cursor: pointer;
+  margin-top: 1px;
+}
+button {
+  position: absolute;
+  width: 50px;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  border: none;
+  background: #f7f7f7;
+}
+.active {
+  background: #f7f7f7;
+}
+.active button {
+  background: #f0f0f0;
+}
+#editor {
+  margin-left: 200px;
+}

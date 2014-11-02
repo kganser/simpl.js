@@ -14,7 +14,7 @@ kernel.add('jsonv', function(o) {
       var request = new XMLHttpRequest();
       request.onload = callback && function() { callback(request); };
       request.open(o.method || 'GET', o.path);
-      request.setRequestHeader('View', 'data');
+      request.setRequestHeader('Accept', 'application/json');
       request.setRequestHeader('Content-Type', 'application/json');
       request.send(o.body);
     };

@@ -61,13 +61,13 @@ kernel.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
             {title: 'Time Tracker'},
             {meta: {charset: 'utf-8'}},
             {meta: {name: 'viewport', content: 'width=device-width, initial-scale=1.0, user-scalable=no'}},
-            {link: {rel: 'stylesheet', href: 'http://localhost:8001/apps/time-tracker/time-tracker.css'}}
+            {link: {rel: 'stylesheet', href: '/apps/time-tracker/time-tracker.css'}}
           ]},
           {body: [
-            {script: {src: 'http://localhost:8001/kernel.js'}},
-            {script: {src: 'http://localhost:8001/modules/html.js'}},
-            {script: {src: 'http://localhost:8001/modules/xhr.js'}},
-            {script: {src: 'http://localhost:8001/modules/async.js'}},
+            {script: {src: '/kernel.js'}},
+            {script: {src: '/modules/html.js'}},
+            {script: {src: '/modules/xhr.js'}},
+            {script: {src: '/modules/async.js'}},
             {script: function() {
               kernel.use({html: 0, xhr: 0, async: 0}, function(o) {
                 var issues = {}, issue, hours, dates, entries, add, form, suggest, previous, report,
@@ -231,7 +231,12 @@ kernel.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
             }}
           ]}
         ]}), {'Content-Type': 'text/html'});
+      default:
+        return o.xhr(location.origin+request.path, {responseType: 'arraybuffer'}, function(e) {
+          if (e.target.status != 200)
+            return response.end('404 Resource not found', null, 404);
+          response.end(e.target.response, {'Content-Type': o.http.getMimeType((request.path.match(/\.([^.]*)$/) || [])[1])});
+        });
     }
-    response.end('404 Resource not found', null, 404);
   });
 });
