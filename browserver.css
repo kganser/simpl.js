@@ -18,10 +18,19 @@ body {
 #module {
   position: relative;
 }
+#module button {
+  background: #3c3;
+  color: white;
+}
+#module button[disabled] {
+  color: rgba(255, 255, 255, .5);
+}
 input {
-  padding: 5px 0 5px 10px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 5px 50px 5px 10px;
   border: none;
-  width: 140px;
+  outline: none;
 }
 ul {
   list-style: none;
@@ -42,6 +51,7 @@ button {
   right: 0;
   border: none;
   background: #f7f7f7;
+  outline: none;
 }
 .active {
   background: #f7f7f7;

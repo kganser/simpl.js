@@ -53,17 +53,20 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy
                 {script: function(m) {
                   if (!m) return modules;
                   kernel.use({html: 0, xhr: 0}, function(o) {
-                    var name, add, list, tab, active = Object.keys(m)[0], entry = function(name) {
+                    var name, add, list, tab, active = Object.keys(m)[0];
+                    var toggle = function(name, elem) {
+                      if (tab) tab.className = '';
+                      (tab = elem).className = 'active';
+                      active = name;
+                      editor.setValue(m[name].code);
+                    };
+                    var entry = function(name) {
                       var encoded = encodeURIComponent(name),
                           module = m[name];
                       return {li: function(e) {
                         if (name == active)
                           (tab = e).className = 'active';
-                        e.onclick = function() {
-                          if (tab) tab.className = '';
-                          (tab = this).className = 'active';
-                          editor.setValue(module.code);
-                        };
+                        e.onclick = function() { toggle(name, this); };
                         return [
                           name,
                           {button: {children: module.running ? 'Stop' : 'Run', onclick: function(e) {
@@ -84,9 +87,7 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy
                           {button: {disabled: 'disabled', children: function(e) { add = e; return 'Add'; }, onclick: function() {
                             if (m[name.value]) return alert('Module name already exists');
                             m[name.value] = {code: ''};
-                            tab.className = '';
-                            active = name.value;
-                            o.html.dom(entry(name.value), list);
+                            toggle(name.value, o.html.dom(entry(name.value), list));
                             name.value = '';
                           }}}
                         ]}},
