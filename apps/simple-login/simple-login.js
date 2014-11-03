@@ -1,6 +1,6 @@
 kernel.use({http: 0, database: 0, html: 0, async: 0, crypto: 0}, function(o) {
   
-  var key = o.crypto.codec.utf8String.toBits('yabadabadoo'),
+  var key = o.crypto.codec.utf8String.toBits(config.sessionKey),
       fromBits = o.crypto.codec.base64.fromBits,
       toBits = o.crypto.codec.base64.toBits;
   
@@ -24,7 +24,7 @@ kernel.use({http: 0, database: 0, html: 0, async: 0, crypto: 0}, function(o) {
     return {key: fromBits(value.key, true, true), salt: fromBits(value.salt, true, true)};
   };
   
-  o.http.serve({port: 8004}, function(request, response) {
+  o.http.serve({port: config.port}, function(request, response) {
     var render = function(body, status) {
       response.end(o.html.markup({html: [{body: body}]}), {'Content-Type': 'text/html'}, status);
     };

@@ -1,5 +1,6 @@
 kernel.add('jsonv', function(o) {
-  return function(data, element) {
+  return function(data, element, listener) {
+    listener = listener || function() {};
     
     var json = function(data) {
       var type = Array.isArray(data) ? 'array' : typeof data == 'object' ? data ? 'object' : 'null' : typeof data;
@@ -9,18 +10,6 @@ kernel.add('jsonv', function(o) {
           ? {ul: Object.keys(data).map(function(key) { return {li: [{span: {className: 'json-delete', children: '×'}}, {span: {className: 'json-key', children: key}}, ': ', json(data[key])]}; })}
           : String(data)}};
     };
-    
-    var xhr = function(o, callback) {
-      var request = new XMLHttpRequest();
-      request.onload = callback && function() { callback(request); };
-      request.open(o.method || 'GET', o.path);
-      request.setRequestHeader('Accept', 'application/json');
-      request.setRequestHeader('Content-Type', 'application/json');
-      request.send(o.body);
-    };
-    
-    element.textContent = '';
-    o.html.dom(json(data), element);
     
     // TODO: better interface between DOM and data
     // TODO: post to and insert to beginning of arrays
@@ -59,8 +48,7 @@ kernel.add('jsonv', function(o) {
           }
           var value = elem.textContent;
           try { value = JSON.parse(value); } catch (e) {}
-          console.log(method+' /'+this.path.map(encodeURIComponent).join('/')+'\n'+JSON.stringify(value));
-          xhr({method: method, path: '/'+this.path.map(encodeURIComponent).join('/'), body: JSON.stringify(value)});
+          listener(method, this.path.map(encodeURIComponent).join('/'), value);
           this.path = this.origType = this.origValue = null; // reset must be done before DOM changes (?) to prevent double-submit on keydown and blur
           elem.parentNode.children[1].contentEditable = false;
           elem.parentNode.replaceChild(o.html.dom(json(value)), elem);
@@ -110,8 +98,7 @@ kernel.add('jsonv', function(o) {
                 item = item.parentNode.parentNode.parentNode; // li/root > span > ul/ol > li
               }
               if (c == 'json-delete') {
-                console.log('DELETE /'+this.path.map(encodeURIComponent).join('/'));
-                xhr({method: 'DELETE', path: '/'+this.path.map(encodeURIComponent).join('/')});
+                listener('DELETE', this.path.map(encodeURIComponent).join('/'));
                 t.parentNode.parentNode.removeChild(t.parentNode);
                 this.path = this.origType = this.origValue = null;
               }
@@ -164,5 +151,15 @@ kernel.add('jsonv', function(o) {
     element.addEventListener('click', handler);
     element.addEventListener('keydown', handler);
     element.addEventListener('blur', handler, true);
+    
+    var self = {
+      update: function(data) {
+        element.textContent = '';
+        o.html.dom(json(data), element);
+      }
+    };
+    
+    self.update(data);
+    return self;
   };
 }, {html: 0});

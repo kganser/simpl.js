@@ -1,3 +1,9 @@
+@font-face {
+  font-family: entypo;
+  src: url(/entypo.woff);
+  font-weight: normal;
+  font-style: normal;
+}
 body {
   margin: 0;
   font: 13px sans-serif;
@@ -9,26 +15,44 @@ body {
   overflow-x: auto;
   overflow-y: hidden;
 }
-#nav {
+pre {
+  margin: 0;
+}
+nav {
   position: fixed;
-  width: 200px;
+  width: 249px;
   height: 100%;
   overflow-y: auto;
 }
-#module {
-  position: relative;
+h2 {
+  margin: 0 0 1px 0;
+  padding: 2px 0 2px 10px;
+  font-size: 11px;
+  font-weight: normal;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  background: #333;
+  color: #ccc;
 }
-#module button {
+.form {
+  position: relative;
+  margin-bottom: 1px;
+}
+.form button {
   background: #3c3;
   color: white;
+  position: absolute;
+  top: 0;
+  right: 0;
 }
-#module button[disabled] {
-  color: rgba(255, 255, 255, .5);
+.form button:before {
+  content: "➕";
 }
 input {
   box-sizing: border-box;
   width: 100%;
-  padding: 5px 50px 5px 10px;
+  height: 25px;
+  padding: 0 30px 0 10px;
   border: none;
   outline: none;
 }
@@ -37,28 +61,91 @@ ul {
   margin: 0;
   padding: 0;
 }
-li {
-  padding: 5px 10px;
+nav li {
+  padding: 5px 0 0 10px;
+  height: 20px;
   position: relative;
   cursor: pointer;
-  margin-top: 1px;
+  margin-bottom: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.controls {
+  float: right;
+  margin: -5px 0;
 }
 button {
-  position: absolute;
-  width: 50px;
-  top: 0;
-  bottom: 0;
-  right: 0;
+  position: relative;
+  padding: 0;
+  height: 25px;
+  width: 30px;
+  margin-left: 1px;
   border: none;
+  color: #666;
   background: #f7f7f7;
   outline: none;
+  overflow: hidden;
 }
-.active {
+button:before {
+  font: 26px entypo;
+  display: inline-block;
+  margin-top: -11px;
+}
+button:hover, button:focus, .edit-config .selected .config {
+  color: white;
+}
+.run:hover, .run:focus {
+  background: #3c3;
+}
+.delete:hover, .delete:focus,
+.stop:hover, .stop:focus {
+  background: #c33;
+}
+.config:hover, .config:focus, .edit-config .selected .config,
+.log:hover, .log:focus,
+.docs:hover, .docs:focus {
+  background: #36c;
+}
+.run:before {
+  content: "▶";
+}
+.config:before {
+  content: "⚙";
+}
+.delete:before {
+  content: "";
+}
+.log:before {
+  content: "☰";
+}
+.stop:before {
+  content: "■";
+}
+.docs:before {
+  content: "ℹ";
+}
+.stop, .log, .running .run, .running .config, .running .delete {
+  display: none;
+}
+.running .stop, .running .log {
+  display: inline;
+}
+.selected {
   background: #f7f7f7;
 }
-.active button {
-  background: #f0f0f0;
+.selected button {
+  background: #e0e0e0;
 }
-#editor {
-  margin-left: 200px;
+#main {
+  margin-left: 250px;
+}
+#config {
+  padding: 4px 8px;
+}
+#config, .edit-config #main .CodeMirror {
+  display: none;
+}
+.edit-config #config {
+  display: block;
 }

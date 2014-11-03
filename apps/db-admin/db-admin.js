@@ -1,5 +1,5 @@
 kernel.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
-  o.http.serve({port: 8002}, function(request, response) {
+  o.http.serve({port: config.port}, function(request, response) {
     if (request.headers.Accept == 'application/json' || request.query.format == 'json') {
       var path = request.path.substr(1),
           handler = function(error) {
@@ -35,17 +35,24 @@ kernel.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
         {head: [
           {title: 'DB Admin'},
           {meta: {charset: 'utf-8'}},
-          {link: {rel: 'stylesheet', href: '/apps/db-admin/db-admin.css'}}
+          {link: {rel: 'stylesheet', href: '/jsonv.css'}}
         ]},
         {body: [
           {pre: {id: 'value', 'class': 'json', children: JSON.stringify(data, null, 2)}},
           {script: {src: '/kernel.js'}},
           {script: {src: '/modules/html.js'}},
-          {script: {src: '/apps/db-admin/jsonv.js'}},
+          {script: {src: '/jsonv.js'}},
           {script: function() {
             kernel.use({jsonv: 0}, function(o) {
               var elem = document.getElementById('value');
-              o.jsonv(JSON.parse(elem.textContent), elem);
+              o.jsonv(JSON.parse(elem.textContent), elem, function(method, path, data) {
+                console.log(method, path, data);
+                var request = new XMLHttpRequest();
+                request.open(method, '/'+path);
+                request.setRequestHeader('Accept', 'application/json');
+                request.setRequestHeader('Content-Type', 'application/json');
+                request.send(JSON.stringify(data));
+              });
             });
           }}
         ]}

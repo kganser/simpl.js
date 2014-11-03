@@ -1,5 +1,5 @@
 kernel.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
-  o.http.serve({port: 8003}, function(request, response) {
+  o.http.serve({port: config.port}, function(request, response) {
     var match;
     if (request.method == 'DELETE' && (match = /^\/(entries\/\d{4}-\d{2}-\d{2})\/([^\/]*)$/.exec(request.path)))
       return o.database.get(match[1], function(date) {
@@ -19,9 +19,9 @@ kernel.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
         try {
           var credentials = atob(request.headers.Authorization.split(' ')[1] || '').split(':', 2);
         } catch (e) {
-          return response.end(o.http.getStatus(401), {'WWW-Authenticate': 'Basic realm="redmine.slytrunk.com credentials"'}, 401);
+          return response.end(o.http.getStatus(401), {'WWW-Authenticate': 'Basic realm="'+config.redmineHost+' credentials"'}, 401);
         }
-        return o.xhr('http://redmine.slytrunk.com/issues.json?assigned_to_id=me&status_id=*&limit=100', {
+        return o.xhr('http://'+config.redmineHost+'/issues.json?assigned_to_id=me&status_id=*&limit=100', {
           user: credentials[0],
           password: credentials[1],
           responseType: 'json'
@@ -30,7 +30,7 @@ kernel.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
             return response.end(o.http.getStatus(500), null, 500);
           var issues = {};
           e.target.response.issues.forEach(function(issue) {
-            issues[issue.id] = {id: issue.id, name: issue.project.name+' - '+issue.subject, url: 'http://redmine.slytrunk.com/issues/'+issue.id};
+            issues[issue.id] = {id: issue.id, name: issue.project.name+' - '+issue.subject, url: 'http://'+config.redmineHost+'/issues/'+issue.id};
           });
           response.end(JSON.stringify(issues), {'Content-Type': 'application/json'});
         });

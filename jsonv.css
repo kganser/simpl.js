@@ -17,7 +17,6 @@
   width: .95em;
   height: .85em;
   margin: 0 .25em 0 -1.2em;
-  border-radius: .3em;
   text-align: center;
   line-height: .8em;
   color: #808080;
@@ -27,7 +26,6 @@
 .json-delete:hover {
   color: white;
   background: #c5201c;
-  text-shadow: 1px 1px black;
 }
 .json li:hover > .json-delete {
   display: inline-block;
