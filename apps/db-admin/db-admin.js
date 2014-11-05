@@ -27,7 +27,7 @@ kernel.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
       return o.xhr(location.origin+request.path, {responseType: 'arraybuffer'}, function(e) {
         if (e.target.status != 200)
           return response.end('404 Resource not found', null, 404);
-        response.end(e.target.response, {'Content-Type': o.http.getMimeType((request.path.match(/\.([^.]*)$/) || [])[1])});
+        response.end(e.target.response, {'Content-Type': o.http.mimeType((request.path.match(/\.([^.]*)$/) || [])[1])});
       });
     o.database.get('', function(data) {
       response.end(o.html.markup([

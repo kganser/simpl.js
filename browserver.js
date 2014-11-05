@@ -12,9 +12,8 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
     ].forEach(function(app, i, apps) {
       o.xhr('/apps/'+app.dir+'/'+app.dir+'.js', function(e) {
         data[app.name] = {code: e.target.responseText, config: app.config};
-        if (Object.keys(data).length == apps.length) {
+        if (Object.keys(data).length == apps.length)
           o.database.put('apps', data, function() {});
-        }
       });
     });
   });
@@ -273,10 +272,10 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
       );
     }
     
-    return o.xhr(location.origin+request.path, {responseType: 'arraybuffer'}, function(e) {
+    o.xhr(location.origin+request.path, {responseType: 'arraybuffer'}, function(e) {
       if (e.target.status != 200)
         return response.end('404 Resource not found', null, 404);
-      response.end(e.target.response, {'Content-Type': o.http.getMimeType((request.path.match(/\.([^.]*)$/) || [])[1])});
+      response.end(e.target.response, {'Content-Type': o.http.mimeType((request.path.match(/\.([^.]*)$/) || [])[1])});
     });
   });
 });

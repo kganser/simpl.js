@@ -3,72 +3,75 @@ kernel.add('http', function(o) {
   return self = {
     serve: function(options, callback) {
       o.socket.listen(options, function(socket) {
-        var request = {headers: {}, query: {}, cookie: {}, peerAddress: socket.peerAddress},
-            headers = '',
-            split = -1,
-            complete;
-        // TODO: support keep-alive, chunked encoding, and (ultimately) pipelined requests
+        //console.log('connection established', socket.socketId);
+        var request = {cookie: {}},
+            headers = '', remaining, read;
+        // TODO: support keep-alive, chunked encoding, http2
         return function(buffer) {
-          if (complete) return;
-          if (split < 0) {
-            // headers are ascii
-            var offset = headers.length;
-            headers += o.string.fromAsciiBuffer(buffer);
-            if ((split = headers.indexOf('\r\n\r\n')) > -1) {
-              request.body = buffer.slice(split+4-offset);
-              headers = headers.substr(0, split).split('\r\n');
-              var line = headers.shift().split(' '),
-                  uri = line[1] ? line[1].split('?', 2) : [];
-              request.method = line[0].toUpperCase();
-              request.uri = line[1];
-              request.path = uri[0];
-              request.query = self.parseQuery(uri[1]);
-              headers.forEach(function(line) {
-                line = line.split(': ', 2);
-                request.headers[line[0]] = line[1];
-              });
-              if (request.headers.Cookie) request.headers.Cookie.split(/; */).forEach(function(pair) {
-                pair = pair.split('=', 2);
-                if (pair.length < 2) return;
-                var value = pair[1];
-                request.cookie[pair[0]] = decodeURIComponent(value[0] == '"' ? value.slice(1, -1) : value);
-              });
-            }
-          } else {
-            var body = new Uint8Array(request.body.byteLength+buffer.byteLength);
-            body.set(new Uint8Array(request.body), 0);
-            body.set(new Uint8Array(buffer), request.body.byteLength);
-            request.body = body.buffer;
-          }
-          if (split > -1 && (!request.headers['Content-Length'] || request.body.byteLength >= request.headers['Content-Length'])) {
-            complete = true;
-            switch ((request.headers['Content-Type'] || '').split(';')[0]) {
-              case 'application/x-www-form-urlencoded':
-                request.post = self.parseQuery(o.string.fromAsciiBuffer(request.body));
-                break;
-              case 'application/json': // TODO: verify utf8
-                try { request.json = JSON.parse(o.string.fromUTF8Buffer(request.body)); } catch (e) {}
-                break;
-            }
-            callback(request, {
-              end: function(body, headers, status) {
-                headers = headers || {};
-                if (!(body instanceof ArrayBuffer))
-                  body = o.string.toUTF8Buffer(String(body)).buffer;
-                headers['Content-Length'] = body.byteLength;
-                if (!headers['Content-Type']) headers['Content-Type'] = 'text/plain';
-                if (!headers.Connection) headers.Connection = 'close';
-                socket.write(o.string.toUTF8Buffer(['HTTP/1.1 '+self.getStatus(status)].concat(Object.keys(headers).map(function(header) {
-                  return header+': '+headers[header];
-                })).join('\r\n')+'\r\n\r\n').buffer);
-                socket.write(body, socket.disconnect);
+          do {
+            var end = buffer.byteLength;
+            if (!request.headers) {
+              // headers are ascii
+              var split, offset = headers.length;
+              headers += o.string.fromAsciiBuffer(buffer);
+              //console.log(headers.split('\r')[0]+'...', socket.socketId);
+              if ((split = headers.indexOf('\r\n\r\n')) > -1) {
+                headers = headers.substr(0, split).split('\r\n');
+                var line = headers.shift().split(' '),
+                    uri = line[1] ? line[1].split('?', 2) : [];
+                request.protocol = line[2];
+                request.method = line[0].toUpperCase();
+                request.uri = line[1];
+                request.path = uri[0];
+                request.query = self.parseQuery(uri[1]);
+                request.headers = {};
+                headers.forEach(function(line) {
+                  line = line.split(': ', 2);
+                  request.headers[line[0]] = line[1];
+                });
+                if (request.headers.Cookie) request.headers.Cookie.split(/; */).forEach(function(pair) {
+                  pair = pair.split('=', 2);
+                  if (pair.length < 2) return;
+                  var value = pair[1];
+                  request.cookie[pair[0]] = decodeURIComponent(value[0] == '"' ? value.slice(1, -1) : value);
+                });
+                remaining = request.headers['Content-Length'] || 0;
+                var start = split + 4 - offset;
+                // TODO: parse chunked encoding
+                end = Math.min(start + remaining, end);
+                remaining -= end - start;
+                read = callback(request, {
+                  end: function(body, headers, status) {
+                    if (!(body instanceof ArrayBuffer))
+                      body = o.string.toUTF8Buffer(String(body)).buffer;
+                    headers = headers || {};
+                    headers['Content-Length'] = body.byteLength;
+                    if (!headers['Content-Type']) headers['Content-Type'] = 'text/plain';
+                    // TODO: wait for buffer flush
+                    socket.write(o.string.toUTF8Buffer(['HTTP/1.1 '+self.statusMessage(status)].concat(Object.keys(headers).map(function(header) {
+                      return header+': '+headers[header];
+                    })).join('\r\n')+'\r\n\r\n').buffer);
+                    socket.write(body);
+                  }
+                });
+                if (typeof read != 'function') read = null;
+                else read(buffer.slice(start, end));
+                headers = '';
               }
-            });
-          }
+            } else {
+              if (read) read(end <= remaining ? buffer : buffer.slice(0, remaining));
+              if (end >= remaining) {
+                end = remaining;
+                request = {cookie: {}};
+              }
+              remaining -= end;
+            }
+            buffer = buffer.slice(end);
+          } while (buffer.byteLength);
         };
       });
     },
-    getStatus: function(code) {
+    statusMessage: function(code) {
       if (!code) return '200 OK';
       if (typeof code != 'number') return code;
       // from https://developer.mozilla.org/en-US/docs/Web/HTTP/Response_codes
@@ -116,7 +119,7 @@ kernel.add('http', function(o) {
         505: 'HTTP Version Not Supported'
       }[code];
     },
-    getMimeType: function(ext) {
+    mimeType: function(ext) {
       // partial list from nginx mime_types file
       return {
         html: 'text/html',
@@ -140,7 +143,8 @@ kernel.add('http', function(o) {
         mov:  'video/quicktime',
         flv:  'video/x-flv',
         avi:  'video/x-msvideo',
-        wmv:  'video/x-ms-wmv'
+        wmv:  'video/x-ms-wmv',
+        woff: 'application/font-woff'
       }[ext];
     },
     parseQuery: function(query) {

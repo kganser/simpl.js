@@ -132,14 +132,19 @@ kernel.add('database', function(proxy, self) {
       });
     }
   };
-  var deleteChildren = function(store, path) {
+  var deleteChildren = function(store, path, callback) {
+    var pending = 1;
     store.index('parent').openCursor(path).onsuccess = function(e) {
       var cursor = e.target.result;
-      if (!cursor) return;
-      var result = cursor.value;
-      store.delete([result.parent, result.key]);
-      if (result.type == 'object' || result.type == 'array')
-        deleteChildren(store, makePath([result.parent, result.key]));
+      if (!cursor) return --pending || callback();
+      var result = cursor.value,
+          next = function() { if (!--pending) callback(); };
+      pending++;
+      store.delete([result.parent, result.key]).onsuccess = next;
+      if (result.type == 'object' || result.type == 'array') {
+        pending++;
+        deleteChildren(store, makePath([result.parent, result.key]), next);
+      }
       cursor.continue();
     }
   };
@@ -198,9 +203,10 @@ kernel.add('database', function(proxy, self) {
                     if (key < realKey) return put(store, [parentPath, realKey], value);
                     if (key > lastShiftKey) return cursor.continue();
                     get(store, [parentPath, key], function(result) {
-                      deleteChildren(store, parentPath+'/'+key);
-                      put(store, [parentPath, key+1], result);
-                      cursor.continue();
+                      deleteChildren(store, parentPath+'/'+key, function() {
+                        put(store, [parentPath, key+1], result);
+                        cursor.continue();
+                      });
                     });
                   };
                 } else {
@@ -210,8 +216,9 @@ kernel.add('database', function(proxy, self) {
                 i++;
               };
             } else {
-              deleteChildren(store, path.join('/'));
-              put(store, [parentPath, decodeURIComponent(key)], value);
+              deleteChildren(store, path.join('/'), function() {
+                put(store, [parentPath, decodeURIComponent(key)], value);
+              });
             }
             trans.oncomplete = function() { callback(); };
           };
@@ -245,7 +252,7 @@ kernel.add('database', function(proxy, self) {
             store = trans.objectStore('data');
         getPath(store, path, function(path) {
           store.delete(makeKey(path));
-          deleteChildren(store, path.join('/'));
+          deleteChildren(store, path.join('/'), function() {});
         });
         trans.oncomplete = function() { callback(); };
       });
