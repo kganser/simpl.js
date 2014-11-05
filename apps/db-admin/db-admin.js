@@ -1,4 +1,4 @@
-kernel.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
+kernel.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
   o.http.serve({port: config.port}, function(request, response) {
     if (request.headers.Accept == 'application/json' || request.query.format == 'json') {
       var path = request.path.substr(1),
@@ -8,25 +8,32 @@ kernel.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
       switch (request.method) {
         case 'GET':
           return o.database.get(path, function(object) {
-            if (object === undefined) response.end('404 Resource not found', null, 404);
+            if (object === undefined) response.generic(404);
             response.end(JSON.stringify(object), {'Content-Type': 'application/json'});
           });
         case 'PUT':
         case 'POST':
         case 'INSERT':
-          return request.method == 'POST'
-            ? o.database.append(path, request.json, handler)
-            : o.database.put(path, request.json, request.method == 'INSERT', handler);
+          return request.slurp(function(body) {
+            try {
+              body = JSON.parse(o.string.fromUTF8Buffer(body));
+              if (request.method == 'POST')
+                return o.database.append(path, body, handler);
+              o.database.put(path, body, request.method == 'INSERT', handler);
+            } catch (e) {
+              response.generic(415);
+            }
+          });
         case 'DELETE':
           return o.database.delete(path, handler);
         default:
-          return response.end('501 Method not implemented', null, 501);
+          return response.generic(501);
       }
     }
     if (request.path.length > 1)
       return o.xhr(location.origin+request.path, {responseType: 'arraybuffer'}, function(e) {
         if (e.target.status != 200)
-          return response.end('404 Resource not found', null, 404);
+          return response.generic(404);
         response.end(e.target.response, {'Content-Type': o.http.mimeType((request.path.match(/\.([^.]*)$/) || [])[1])});
       });
     o.database.get('', function(data) {

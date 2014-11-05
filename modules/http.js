@@ -1,15 +1,46 @@
 kernel.add('http', function(o) {
-  var self;
+  
+  var self, entity = function(status, headers, body, chunk) {
+    if (!chunk) headers = headers || {};
+    else if (headers || status) throw 'HTTP headers already sent';
+    if (body instanceof ArrayBuffer)
+      body = new Uint8Array(body);
+    else if (!(body instanceof Uint8Array))
+      body = o.string.toUTF8Buffer(body ? String(body) : '');
+    if (headers) {
+      if (!headers['Content-Type']) headers['Content-Type'] = 'text/plain';
+      if (chunk) headers['Transfer-Encoding'] = 'chunked';
+      else headers['Content-Length'] = body.length;
+    }
+    var pre = o.string.toUTF8Buffer(headers
+      ? 'HTTP/1.1 '+self.statusMessage(status)+'\r\n'+Object.keys(headers).map(function(header) { return header+': '+headers[header]+'\r\n'; }).join('')+'\r\n'
+      : body.length.toString(16)+'\r\n');
+    var data = new Uint8Array(pre.length + body.length + (chunk ? 2 : 0));
+    data.set(pre, 0);
+    data.set(body, pre.length);
+    if (chunk) data.set([13, 10], data.length - 2);
+    return data.buffer;
+  };
+  
   return self = {
     serve: function(options, callback) {
       o.socket.listen(options, function(socket) {
         //console.log('connection established', socket.socketId);
-        var request = {cookie: {}},
-            headers = '', remaining, read;
-        // TODO: support keep-alive, chunked encoding, http2
+        var slurp = function(callback) {
+          var body = new Uint8Array(0);
+          read = function(data) {
+            if (!data) return callback(body);
+            var b = new Uint8Array(body.byteLength + data.byteLength);
+            b.set(new Uint8Array(body), 0);
+            b.set(new Uint8Array(data), body.byteLength);
+            body = b.buffer;
+          };
+        };
+        var request = {cookie: {}, slurp: slurp}, response,
+            headers = '', remaining, read, headersSent;
         return function(buffer) {
           do {
-            var end = buffer.byteLength;
+            var start = 0, end = buffer.byteLength;
             if (!request.headers) {
               // headers are ascii
               var split, offset = headers.length;
@@ -36,35 +67,32 @@ kernel.add('http', function(o) {
                   request.cookie[pair[0]] = decodeURIComponent(value[0] == '"' ? value.slice(1, -1) : value);
                 });
                 remaining = request.headers['Content-Length'] || 0;
-                var start = split + 4 - offset;
-                // TODO: parse chunked encoding
+                start = split + 4 - offset;
                 end = Math.min(start + remaining, end);
                 remaining -= end - start;
-                read = callback(request, {
-                  end: function(body, headers, status) {
-                    if (!(body instanceof ArrayBuffer))
-                      body = o.string.toUTF8Buffer(String(body)).buffer;
-                    headers = headers || {};
-                    headers['Content-Length'] = body.byteLength;
-                    if (!headers['Content-Type']) headers['Content-Type'] = 'text/plain';
-                    // TODO: wait for buffer flush
-                    socket.write(o.string.toUTF8Buffer(['HTTP/1.1 '+self.statusMessage(status)].concat(Object.keys(headers).map(function(header) {
-                      return header+': '+headers[header];
-                    })).join('\r\n')+'\r\n\r\n').buffer);
-                    socket.write(body);
+                var r = callback(request, response = {
+                  send: function(data, headers, status, callback) {
+                    socket.write(entity(status, !headersSent && (headers || {}), body, headersSent = true), callback);
+                  },
+                  end: function(body, headers, status, callback) {
+                    socket.write(entity(status, headers, body, headersSent), callback);
+                  },
+                  generic: function(status, callback) {
+                    response.end(self.statusMessage(status), callback);
                   }
                 });
-                if (typeof read != 'function') read = null;
-                else read(buffer.slice(start, end));
-                headers = '';
+                if (!read && typeof r == 'function') read = r;
+                headers = headersSent = '';
               }
             } else {
-              if (read) read(end <= remaining ? buffer : buffer.slice(0, remaining));
-              if (end >= remaining) {
-                end = remaining;
-                request = {cookie: {}};
-              }
+              if (end > remaining) end = remaining;
               remaining -= end;
+            }
+            // TODO: decode chunks if chunk-encoded
+            if (read) read(buffer.slice(start, end));
+            if (!remaining) {
+              if (read) read();
+              request = {cookie: {}, slurp: slurp};
             }
             buffer = buffer.slice(end);
           } while (buffer.byteLength);

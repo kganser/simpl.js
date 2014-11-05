@@ -15,11 +15,15 @@ kernel.add('xhr', function() {
     xhr.ontimeout = options.ontimeout;
     xhr.onreadystatechange = options.onreadystatechange;
     
-    Object.keys(options.headers || {}).forEach(function(name) {
-      xhr.setRequestHeader(name, options.headers[name]);
+    var headers = options.headers || {};
+    if (options.json && headers['Content-Type'] === undefined)
+      headers['Content-Type'] = 'application/json';
+    Object.keys(headers).forEach(function(name) {
+      var value = headers[name];
+      if (value != null) xhr.setRequestHeader(name, value);
     });
     
-    xhr.send(options.data);
+    xhr.send(options.json ? JSON.stringify(options.json) : options.data);
     return xhr;
   };
 });

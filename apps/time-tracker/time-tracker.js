@@ -1,4 +1,4 @@
-kernel.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
+kernel.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
   o.http.serve({port: config.port}, function(request, response) {
     var match;
     if (request.method == 'DELETE' && (match = /^\/(entries\/\d{4}-\d{2}-\d{2})\/([^\/]*)$/.exec(request.path)))
@@ -6,12 +6,12 @@ kernel.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
         var issues = date && Object.keys(date);
         if (issues && issues.length > 1)
           return o.database.delete(request.path.substr(1), function() {
-            response.end('Success');
+            response.generic();
           });
         if (!issues || issues[0] != decodeURIComponent(match[2]))
-          return response.end('Success');
+          return response.generic();
         o.database.delete(match[1], function() {
-          response.end('Success');
+          response.generic();
         });
       });
     switch (request.path) {
@@ -19,7 +19,7 @@ kernel.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
         try {
           var credentials = atob(request.headers.Authorization.split(' ')[1] || '').split(':', 2);
         } catch (e) {
-          return response.end(o.http.getStatus(401), {'WWW-Authenticate': 'Basic realm="'+config.redmineHost+' credentials"'}, 401);
+          return response.end(o.http.statusMessage(401), {'WWW-Authenticate': 'Basic realm="'+config.redmineHost+' credentials"'}, 401);
         }
         return o.xhr('http://'+config.redmineHost+'/issues.json?assigned_to_id=me&status_id=*&limit=100', {
           user: credentials[0],
@@ -27,7 +27,7 @@ kernel.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
           responseType: 'json'
         }, function(e) {
           if (!e.target.response)
-            return response.end(o.http.getStatus(500), null, 500);
+            return response.generic(500);
           var issues = {};
           e.target.response.issues.forEach(function(issue) {
             issues[issue.id] = {id: issue.id, name: issue.project.name+' - '+issue.subject, url: 'http://'+config.redmineHost+'/issues/'+issue.id};
@@ -37,24 +37,30 @@ kernel.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
       case '/entries':
         switch (request.method) {
           case 'POST':
-            var entry = request.json;
-            if (!entry || !/^\d{4}-\d{2}-\d{2}$/.test(entry.date) || typeof entry.time != 'number')
-              return response.end(o.http.getStatus(400), null, 400);;
-            return o.database.get('entries/'+entry.date, function(entries) {
-              if (entries) return o.database.put('entries/'+entry.date+'/'+encodeURIComponent(entry.issue), entry.time, function() {
-                response.end('Success');
-              });
-              var e = {}; e[entry.issue] = entry.time;
-              o.database.put('entries/'+entry.date, e, function() {
-                response.end('Success');
-              });
+            return request.slurp(function(body) {
+              try {
+                var entry = JSON.parse(o.string.fromUTF8Buffer(body));
+                if (!entry || !/^\d{4}-\d{2}-\d{2}$/.test(entry.date) || typeof entry.time != 'number')
+                  return response.generic(400);
+                o.database.get('entries/'+entry.date, function(entries) {
+                  if (entries) return o.database.put('entries/'+entry.date+'/'+encodeURIComponent(entry.issue), entry.time, function() {
+                    response.generic();
+                  });
+                  var e = {}; e[entry.issue] = entry.time;
+                  o.database.put('entries/'+entry.date, e, function() {
+                    response.generic();
+                  });
+                });
+              } catch (e) {
+                response.generic(415);
+              }
             });
           case 'GET':
             return o.database.get('entries', function(entries) {
               response.end(JSON.stringify(entries), {'Content-Type': 'application/json'});
             });
         }
-        return response.end(o.http.getStatus(501), null, 501);
+        return response.generic(501);
       case '/':
         return response.end(o.html.markup({html: [
           {head: [
@@ -169,8 +175,7 @@ kernel.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
                           } else {
                             o.xhr('/entries', {
                               method: 'POST',
-                              data: JSON.stringify({date: date, time: time, issue: issue}),
-                              headers: {'Content-Type': 'application/json'}
+                              json: {date: date, time: time, issue: issue}
                             }, function() {
                               e.target.disabled = false;
                               entries.get(date).insert(time, issue);
@@ -234,7 +239,7 @@ kernel.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
       default:
         o.xhr(location.origin+request.path, {responseType: 'arraybuffer'}, function(e) {
           if (e.target.status != 200)
-            return response.end('404 Resource not found', null, 404);
+            return response.generic(404);
           response.end(e.target.response, {'Content-Type': o.http.mimeType((request.path.match(/\.([^.]*)$/) || [])[1])});
         });
     }

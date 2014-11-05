@@ -35,64 +35,75 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
       var path = request.path.substr(1),
           parts = path.split('/'),
           method = request.method,
-          handler = function() { response.end('Success'); };
+          handler = function() { response.generic(); };
       
       if (parts.length == 2) {
         if (method == 'DELETE')
           return o.database.delete(path, handler);
-        if (method == 'POST') {
-          // TODO: validate encoding
-          var code = o.string.fromUTF8Buffer(request.body);
-          return o.database.put(parts[0] == 'apps' ? path+'/code' : path, code, function(error) {
-            if (!error) return handler();
-            o.database.put(path, {code: code, config: {}}, handler);
+        if (method == 'POST')
+          return request.slurp(function(body) {
+            var code = o.string.fromUTF8Buffer(body);
+            return o.database.put(parts[0] == 'apps' ? path+'/code' : path, code, function(error) {
+              if (!error) return handler();
+              o.database.put(path, {code: code, config: {}}, handler);
+            });
           });
-        }
       } else if (parts[2] == 'config') {
         handler = function() {
           o.database.get(parts.slice(0, 3).join('/'), function(config) {
             response.end(JSON.stringify(config), {'Content-Type': 'application/json'});
           });
-        }
-        if (method == 'POST')
-          return o.database.append(path, request.json, handler);
+        };
         if (method == 'PUT' || method == 'INSERT')
-          return o.database.put(path, request.json, method == 'INSERT', handler);
+          return request.slurp(function(body) {
+            try {
+              o.database.put(path, JSON.parse(o.string.fromUTF8Buffer(body)), method == 'INSERT', handler);
+            } catch (e) {
+              response.generic(415);
+            }
+          });
         if (method == 'DELETE')
           return o.database.delete(path, handler);
       }
       
     } else if (request.path == '/') {
     
-      if (request.method == 'POST' && request.post && request.post.app) {
-        var name = request.post.app;
-        if (request.post.action == 'stop' && apps[name]) {
-          apps[name].terminate();
-          delete apps[name];
-          return response.end('Stopped');
-        }
-        if (request.post.action == 'run' && !apps[name])
-          return o.async.join(
-            function(callback) {
-              if (kernel) return callback(kernel);
-              o.xhr('/kernel.js', function(e) { callback(kernel = e.target.responseText); });
-            },
-            function(callback) {
-              o.database.get('apps/'+encodeURIComponent(name), callback);
-            },
-            function(kernel, app) {
-              apps[name] = proxy(null, kernel+'var config = '+JSON.stringify(app.config)+';\n'+app.code, function(name, callback) {
-                o.database.get('modules/'+encodeURIComponent(name), callback);
-              }, function(e) {
-                // TODO: communicate module error in UI
-                console.error(e);
-                delete apps[name];
-              });
-              response.end('Started');
+      if (request.method == 'POST')
+        return request.slurp(function(body) {
+          try {
+            body = JSON.parse(o.string.fromUTF8Buffer(body));
+            var name = body.app;
+            if (body.action == 'stop' && apps[name]) {
+              apps[name].terminate();
+              delete apps[name];
+              return response.generic();
             }
-          );
-        return response.end('Invalid Request', null, 400);
-      }
+            if (body.action == 'run' && !apps[name])
+              return o.async.join(
+                function(callback) {
+                  if (kernel) callback(kernel);
+                  else o.xhr('/kernel.js', function(e) { callback(kernel = e.target.responseText); });
+                },
+                function(callback) {
+                  o.database.get('apps/'+encodeURIComponent(name), callback);
+                },
+                function(kernel, app) {
+                  if (!app) return response.generic(400);
+                  apps[name] = proxy(null, kernel+'var config = '+JSON.stringify(app.config)+';\n'+app.code, function(name, callback) {
+                    o.database.get('modules/'+encodeURIComponent(name), callback);
+                  }, function(e) {
+                    // TODO: communicate module error in UI
+                    console.error(e);
+                    delete apps[name];
+                  });
+                  response.generic();
+                }
+              );
+          } catch (e) {
+            response.generic(415);
+          }
+          response.generic(400);
+        });
       return o.async.join(
         function(callback) { o.database.get('apps', callback); },
         function(callback) { o.database.get('modules', callback); },
@@ -125,24 +136,24 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                         return modules[decodeURIComponent(selected.substr(8))];
                       return apps[decodeURIComponent(selected.substr(5))];
                     };
-                    var handler = function(action, app, item) {
+                    var handler = function(action, target, item) {
                       return function(e) {
                         e.stopPropagation();
-                        var del = action == 'delete';
-                        if (del && !confirm('Are you sure you want to delete?')) return;
+                        var command = action != 'delete' && {action: action, app: target};
+                        if (!command && !confirm('Are you sure you want to delete?')) return;
                         this.disabled = true;
-                        o.xhr(del ? '/'+app : '/', {
-                          method: del ? 'DELETE' : 'POST',
-                          headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                          data: 'action='+action+'&app='+app
+                        o.xhr(command ? '/' : '/'+target, {
+                          method: command ? 'POST' : 'DELETE',
+                          json: command
                         }, function() {
-                          if (del) {
-                            if (app.indexOf('apps')) delete modules[decodeURIComponent(app.substr(8))];
-                            else delete apps[decodeURIComponent(app.substr(5))];
-                            return item.parentNode.removeChild(item);
+                          if (command) {
+                            e.target.disabled = false;
+                            item.classList[action == 'run' ? 'add' : 'remove']('running');
+                          } else {
+                            if (target.indexOf('apps')) delete modules[decodeURIComponent(target.substr(8))];
+                            else delete apps[decodeURIComponent(target.substr(5))];
+                            item.parentNode.removeChild(item);
                           }
-                          e.target.disabled = false;
-                          item.classList[action == 'run' ? 'add' : 'remove']('running');
                         });
                       };
                     };
@@ -157,8 +168,7 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                       code.refresh();
                     };
                     var li = function(name, app) {
-                      var encoded = encodeURIComponent(name),
-                          path = (app ? 'apps/' : 'modules/')+encoded,
+                      var path = (app ? 'apps/' : 'modules/')+encodeURIComponent(name),
                           data = (app ? apps : modules)[name];
                       return {li: function(item) {
                         item.onclick = function(e) {
@@ -175,11 +185,11 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                         // TODO: implement log and docs
                         return [
                           {div: {className: 'controls', children: app ? [
-                            {button: {className: 'run', title: 'Run', onclick: handler('run', encoded, item)}},
+                            {button: {className: 'run', title: 'Run', onclick: handler('run', name, item)}},
                             {button: {className: 'config', title: 'Config'}},
                             {button: {className: 'delete', title: 'Delete', onclick: handler('delete', path, item)}},
                             //{button: {className: 'log', title: 'Log'}},
-                            {button: {className: 'stop', title: 'Stop', onclick: handler('stop', encoded, item)}}
+                            {button: {className: 'stop', title: 'Stop', onclick: handler('stop', name, item)}}
                           ] : [
                             //{button: {className: 'docs', title: 'Docs'}},
                             {button: {className: 'delete', title: 'Delete', onclick: handler('delete', path, item)}}
@@ -251,8 +261,7 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                             var app = entry();
                             o.xhr('/'+selected+'/config/'+path, {
                               method: method,
-                              headers: {'Content-Type': 'application/json'},
-                              data: JSON.stringify(data),
+                              json: data,
                               responseType: 'json',
                               onload: function(e) {
                                 if (e.target.status == 200)
@@ -274,7 +283,7 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
     
     o.xhr(location.origin+request.path, {responseType: 'arraybuffer'}, function(e) {
       if (e.target.status != 200)
-        return response.end('404 Resource not found', null, 404);
+        return response.generic(404);
       response.end(e.target.response, {'Content-Type': o.http.mimeType((request.path.match(/\.([^.]*)$/) || [])[1])});
     });
   });

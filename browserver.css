@@ -8,8 +8,8 @@ body {
   margin: 0;
   font: 13px sans-serif;
 }
-.CodeMirror {
-  height: auto;
+html, body, .CodeMirror {
+  height: 100%;
 }
 .CodeMirror-scroll {
   overflow-x: auto;
@@ -139,6 +139,7 @@ button:hover, button:focus, .edit-config .selected .config {
 }
 #main {
   margin-left: 250px;
+  height: 100%;
 }
 #config {
   padding: 4px 8px;
