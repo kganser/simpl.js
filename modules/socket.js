@@ -28,13 +28,17 @@ kernel.add('socket', function(proxy) {
       var clientSocketId = args[1];
       clients[clientSocketId] = servers[args[0]]({
         write: function(data, callback) {
-          if (!clients[clientSocketId]) return console.error('Already disconnected');
           proxy('write', [clientSocketId, data], callback, [data]);
         },
         disconnect: function() {
-          if (!clients[clientSocketId]) return;
           proxy('disconnect', [clientSocketId]);
           delete clients[clientSocketId];
+        },
+        setNoDelay: function(noDelay, callback) {
+          proxy('setNoDelay', [clientSocketId, noDelay], callback);
+        },
+        getInfo: function(callback) {
+          proxy('getInfo', [clientSocketId], callback);
         },
         socketId: clientSocketId
       });
@@ -47,22 +51,34 @@ kernel.add('socket', function(proxy) {
     write: function(args, callback) {
       write(args[0], args[1], callback);
     },
+    setNoDelay: function(args, callback) {
+      setNoDelay(args[0], args[1], callback);
+    },
+    getInfo: function(args, callback) {
+      getInfo(args[0], callback);
+    },
     disconnect: function(args) {
       disconnect(args[0]);
     },
     disconnectServer: function(args) {
       disconnectServer(args[0]);
-    }
+    },
+    getServerInfo: function(args, callback) {
+      getServerInfo(args[0], callback);
+    },
   });
   
   if (kernel.worker) return {
     listen: function(options, onConnect, callback) {
       proxy('listen', [options], function(error, socketId) {
-        if (error) return console.error(error);
+        if (error) return callback && callback(error);
         servers[socketId] = onConnect;
-        if (callback) callback({
+        if (callback) callback(false, {
           disconnect: function() {
             proxy('disconnectServer', [socketId]);
+          },
+          getInfo: function(callback) {
+            proxy('getServerInfo', [socketId], callback);
           }
         });
       });
@@ -80,13 +96,26 @@ kernel.add('socket', function(proxy) {
     });
   };
   var write = function(socketId, data, callback) {
+    if (!clients[socketId]) return callback && callback();
     sockets.tcp.send(socketId, data, callback || function() {});
+  };
+  var setNoDelay = function(socketId, noDelay, callback) {
+    if (!clients[socketId]) return callback && callback('Already disconnected');
+    sockets.tcp.setNoDelay(socketId, noDelay, callback || function() {});
+  };
+  var getInfo = function(socketId, callback) {
+    if (!clients[socketId]) return callback();
+    sockets.tcp.getInfo(socketId, callback);
   };
   var disconnect = function(socketId) {
     if (!clients[socketId]) return;
     sockets.tcp.disconnect(socketId);
     sockets.tcp.close(socketId);
     delete clients[socketId];
+  };
+  var getServerInfo = function(socketId, callback) {
+    if (!servers[socketId]) return callback();
+    sockets.tcp.getInfo(socketId, callback);
   };
   var disconnectServer = function(socketId) {
     if (!servers[socketId]) return;
@@ -98,11 +127,14 @@ kernel.add('socket', function(proxy) {
   return {
     listen: function(options, onConnect, callback) {
       listen(options, function(error, socketId) {
-        if (error) return console.error(error);
+        if (error) return callback && callback(error);
         servers[socketId] = onConnect;
-        if (callback) callback({
+        if (callback) callback(false, {
           disconnect: function() {
             disconnectServer(socketId);
+          },
+          getInfo: function(callback) {
+            getServerInfo(socketId, callback);
           }
         });
         if (!accept) {
@@ -111,11 +143,16 @@ kernel.add('socket', function(proxy) {
             sockets.tcp.setPaused(clientSocketId, false);
             clients[clientSocketId] = servers[info.socketId]({
               write: function(data, callback) {
-                if (!clients[clientSocketId]) return console.error('Already disconnected');
                 write(clientSocketId, data, callback);
               },
               disconnect: function() {
                 disconnect(clientSocketId);
+              },
+              setNoDelay: function(noDelay, callback) {
+                setNoDelay(clientSocketId, noDelay, callback);
+              },
+              getInfo: function(callback) {
+                getInfo(socketId, callback);
               },
               socketId: clientSocketId
             });

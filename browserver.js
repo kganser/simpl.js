@@ -115,7 +115,6 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
               {head: [
                 {title: 'Browserver'},
                 {meta: {charset: 'utf-8'}},
-                {link: {rel: 'shortcut icon', href: '/icon.png'}},
                 {link: {rel: 'stylesheet', href: '/codemirror.css'}},
                 {link: {rel: 'stylesheet', href: '/jsonv.css'}},
                 {link: {rel: 'stylesheet', href: '/browserver.css'}}

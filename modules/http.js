@@ -1,29 +1,34 @@
 kernel.add('http', function(o) {
   
-  var self, entity = function(status, headers, body, chunk) {
-    if (!chunk) headers = headers || {};
-    else if (headers || status) throw 'HTTP headers already sent';
+  var self, entity = function(status, headers, body, headersSent, chunk) {
+    if (headersSent && (headers || status)) throw 'HTTP headers already sent';
+    headers = headersSent ? false : (headers || {});
+    
     if (body instanceof ArrayBuffer)
       body = new Uint8Array(body);
     else if (!(body instanceof Uint8Array))
       body = o.string.toUTF8Buffer(body ? String(body) : '');
+    
+    var pre = '';
     if (headers) {
       if (!headers['Content-Type']) headers['Content-Type'] = 'text/plain';
       if (chunk) headers['Transfer-Encoding'] = 'chunked';
       else headers['Content-Length'] = body.length;
+      pre += 'HTTP/1.1 '+self.statusMessage(status)+'\r\n'+Object.keys(headers).map(function(header) { return header+': '+headers[header]+'\r\n'; }).join('')+'\r\n';
     }
-    var pre = o.string.toUTF8Buffer(headers
-      ? 'HTTP/1.1 '+self.statusMessage(status)+'\r\n'+Object.keys(headers).map(function(header) { return header+': '+headers[header]+'\r\n'; }).join('')+'\r\n'
-      : body.length.toString(16)+'\r\n');
+    
+    if (chunk) pre += body.length.toString(16)+'\r\n';
+    pre = o.string.toUTF8Buffer(pre);
     var data = new Uint8Array(pre.length + body.length + (chunk ? 2 : 0));
     data.set(pre, 0);
     data.set(body, pre.length);
     if (chunk) data.set([13, 10], data.length - 2);
+    
     return data.buffer;
   };
   
   return self = {
-    serve: function(options, callback) {
+    serve: function(options, onRequest, callback) {
       o.socket.listen(options, function(socket) {
         //console.log('connection established', socket.socketId);
         var slurp = function(callback) {
@@ -70,19 +75,19 @@ kernel.add('http', function(o) {
                 start = split + 4 - offset;
                 end = Math.min(start + remaining, end);
                 remaining -= end - start;
-                var r = callback(request, response = {
-                  send: function(data, headers, status, callback) {
-                    socket.write(entity(status, !headersSent && (headers || {}), body, headersSent = true), callback);
+                headers = headersSent = '';
+                var r = onRequest(request, response = {
+                  send: function(body, headers, status, callback) {
+                    socket.write(entity(status, headers, body, headersSent, headersSent = true), callback);
                   },
                   end: function(body, headers, status, callback) {
-                    socket.write(entity(status, headers, body, headersSent), callback);
+                    socket.write(entity(status, headers, body, headersSent, headersSent), callback);
                   },
                   generic: function(status, callback) {
                     response.end(self.statusMessage(status), callback);
                   }
-                });
+                }, socket);
                 if (!read && typeof r == 'function') read = r;
-                headers = headersSent = '';
               }
             } else {
               if (end > remaining) end = remaining;
@@ -97,7 +102,7 @@ kernel.add('http', function(o) {
             buffer = buffer.slice(end);
           } while (buffer.byteLength);
         };
-      });
+      }, callback);
     },
     statusMessage: function(code) {
       if (!code) return '200 OK';
