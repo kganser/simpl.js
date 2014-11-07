@@ -51,19 +51,24 @@ var kernel = function(modules, clients) {
 kernel = function(k) {
   var id = 0, log = {}, workers = [], moduleListeners = {}, globalListeners, 
       inWorker = typeof WorkerGlobalScope != 'undefined';
-      
-  var load = function(modules) {
-    if (inWorker) {
-      var remaining = modules.length;
-      modules.forEach(function(module, i) {
-        proxy('load', [module], function(code) {
-          modules[i] = URL.createObjectURL(new Blob([code || ''], {type: 'text/javascript'}));
-          if (!--remaining) importScripts.apply(null, modules);
-        });
-      });
-    }
-    return modules;
+  
+  if (inWorker) self.console = {
+    log: function() { proxy('log', Array.prototype.slice.call(arguments)); },
+    warn: function() { proxy('warn', Array.prototype.slice.call(arguments)); },
+    error: function() { proxy('error', Array.prototype.slice.call(arguments)); },
+    info: function() { proxy('info', Array.prototype.slice.call(arguments)); }
   };
+  
+  var load = inWorker ? function(modules) {
+    var remaining = modules.length;
+    modules.forEach(function(module, i) {
+      proxy('load', [module], function(code) {
+        modules[i] = URL.createObjectURL(new Blob([code || ''], {type: 'text/javascript'}));
+        if (!--remaining) importScripts.apply(null, modules);
+      });
+    });
+    return modules;
+  } : function(modules) { return modules; };
   var send = function(kernel, peer, module, command, args, callback, transferable) {
     // TODO: use a guid?
     var start = id;
@@ -78,14 +83,18 @@ kernel = function(k) {
       if (log[id]) log[id].apply(null, e.data.result);
       delete log[id];
     } else {
-      var worker = !inWorker && workers.filter(function(o) { return o.worker === e.target; })[0];
+      var worker = !inWorker && workers.filter(function(o) { return o.worker === e.target; })[0],
+          command = e.data.command;
       if (e.data.kernel) {
-        if (worker.load) worker.load(e.data.args[0], function(code) {
-          e.target.postMessage({id: id, result: [code]});
-        });
+        if (command == 'load') {
+          if (worker.load) worker.load(e.data.args[0], function(code) {
+            e.target.postMessage({id: id, result: [code]});
+          });
+        } else if (worker.log) {
+          worker.log(command, e.data.args);
+        }
       } else {
         var module = e.data.module,
-            command = e.data.command,
             listener = module == null ? worker ? worker.listeners[command] : globalListeners[command] : (moduleListeners[module] || {})[command];
         if (!listener) return console.error('no listener for command '+command+(module ? ' (module '+module+')' : ''));
         var destruct = listener(e.data.args, function() {
@@ -100,13 +109,13 @@ kernel = function(k) {
   };
   
   var channel = function(kernel, module) {
-    return function(listeners, code, load, onError) {
+    return function(listeners, code, load, log, error) {
       var worker, peer = code ? new Worker(URL.createObjectURL(new Blob([code], {type: 'text/javascript'}))) : self;
       if (kernel || code) peer.onmessage = receive;
       
       if (code != null) {
-        peer.onerror = onError;
-        workers.push(worker = {worker: peer, listeners: listeners || {}, load: load, destructors: []});
+        peer.onerror = error;
+        workers.push(worker = {worker: peer, listeners: listeners || {}, load: load, log: log, destructors: []});
       } else if (module != null) {
         moduleListeners[module] = listeners;
       } else {
@@ -131,11 +140,19 @@ kernel = function(k) {
   
   return {
     add: function(name, module, dependencies) {
-      if (dependencies) return kernel.use(dependencies, function(o) { kernel.add(name, function() { return module(o, channel(false, name)); }); }, name);
-      return load(k.add(name, function() { return module(channel(false, name)); }, dependencies));
+      if (dependencies) return kernel.use(dependencies, function(o) {
+        kernel.add(name, function() {
+          return module(o, channel(false, name));
+        });
+      }, name);
+      return load(k.add(name, function() {
+        return module(channel(false, name));
+      }, dependencies));
     },
     use: function(modules, callback, name) {
-      return load(k.use(modules, function(o) { callback(o, channel(false)); }, name));
+      return load(k.use(modules, function(o) {
+        callback(o, channel(false));
+      }, name));
     },
     worker: inWorker
   };

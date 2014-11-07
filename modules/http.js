@@ -78,10 +78,10 @@ kernel.add('http', function(o) {
                 headers = headersSent = '';
                 var r = onRequest(request, response = {
                   send: function(body, headers, status, callback) {
-                    socket.write(entity(status, headers, body, headersSent, headersSent = true), callback);
+                    socket.send(entity(status, headers, body, headersSent, headersSent = true), callback);
                   },
                   end: function(body, headers, status, callback) {
-                    socket.write(entity(status, headers, body, headersSent, headersSent), callback);
+                    socket.send(entity(status, headers, body, headersSent, headersSent), callback);
                   },
                   generic: function(status, callback) {
                     response.end(self.statusMessage(status), callback);

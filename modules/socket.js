@@ -10,7 +10,7 @@ kernel.add('socket', function(proxy) {
             proxy('accept', [socketId, connection.socketId]);
             return function(data) {
               // TODO: postMessage does not guarantee ordering
-              proxy('read', [connection.socketId, data], null, [data]);
+              proxy('receive', [connection.socketId, data], null, [data]);
             };
           };
           if (disconnect) disconnectServer(socketId);
@@ -27,8 +27,8 @@ kernel.add('socket', function(proxy) {
     accept: function(args) {
       var clientSocketId = args[1];
       clients[clientSocketId] = servers[args[0]]({
-        write: function(data, callback) {
-          proxy('write', [clientSocketId, data], callback, [data]);
+        send: function(data, callback) {
+          proxy('send', [clientSocketId, data], callback, [data]);
         },
         disconnect: function() {
           proxy('disconnect', [clientSocketId]);
@@ -43,13 +43,13 @@ kernel.add('socket', function(proxy) {
         socketId: clientSocketId
       });
     },
-    read: function(args) {
+    receive: function(args) {
       var callback = clients[args[0]];
       if (typeof callback == 'function')
         callback(args[1]);
     },
-    write: function(args, callback) {
-      write(args[0], args[1], callback);
+    send: function(args, callback) {
+      send(args[0], args[1], callback);
     },
     setNoDelay: function(args, callback) {
       setNoDelay(args[0], args[1], callback);
@@ -85,7 +85,7 @@ kernel.add('socket', function(proxy) {
     }
   };
   
-  var sockets = chrome.sockets, accept, read;
+  var sockets = chrome.sockets, accept, receive;
   
   var listen = function(options, callback) {
     sockets.tcpServer.create({name: options.name}, function(info) {
@@ -95,9 +95,12 @@ kernel.add('socket', function(proxy) {
       });
     });
   };
-  var write = function(socketId, data, callback) {
-    if (!clients[socketId]) return callback && callback();
-    sockets.tcp.send(socketId, data, callback || function() {});
+  var send = function(socketId, data, callback) {
+    if (!clients[socketId]) return callback && callback({resultCode: -1, error: 'Already disconnected'});
+    sockets.tcp.send(socketId, data, function(info) {
+      if (info.resultCode) info.error = chrome.runtime.lastError.message;
+      if (callback) callback(info);
+    });
   };
   var setNoDelay = function(socketId, noDelay, callback) {
     if (!clients[socketId]) return callback && callback('Already disconnected');
@@ -142,8 +145,8 @@ kernel.add('socket', function(proxy) {
             var clientSocketId = info.clientSocketId;
             sockets.tcp.setPaused(clientSocketId, false);
             clients[clientSocketId] = servers[info.socketId]({
-              write: function(data, callback) {
-                write(clientSocketId, data, callback);
+              send: function(data, callback) {
+                send(clientSocketId, data, callback);
               },
               disconnect: function() {
                 disconnect(clientSocketId);
@@ -156,8 +159,8 @@ kernel.add('socket', function(proxy) {
               },
               socketId: clientSocketId
             });
-            if (!read) {
-              sockets.tcp.onReceive.addListener(read = function(info) {
+            if (!receive) {
+              sockets.tcp.onReceive.addListener(receive = function(info) {
                 var callback = clients[info.socketId];
                 if (typeof callback == 'function')
                   callback(info.data);

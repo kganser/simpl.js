@@ -1,6 +1,6 @@
 kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function(o, proxy) {
 
-  var apps = {}, kernel;
+  var apps = {}, clients = [], kernel;
   
   o.database.get('apps', function(apps) {
     if (apps) return;
@@ -29,27 +29,39 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
     });
   });
   
+  var broadcast = function(event, data) {
+    clients.forEach(function(client) {
+      client.send((event ? 'data: '+JSON.stringify({event: event, data: data}) : ': ping')+'\r\n\r\n', null, null, function(info) {
+        if (info.resultCode) clients.splice(clients.indexOf(client), 1);
+      });
+    });
+  };
+  
+  setInterval(function() { broadcast(); }, 60000);
+  
   o.http.serve({port: 8000}, function(request, response) {
     
     if (/^\/(apps|modules)\//.test(request.path)) {
       var path = request.path.substr(1),
           parts = path.split('/'),
-          method = request.method,
-          handler = function() { response.generic(); };
+          method = request.method;
       
       if (parts.length == 2) {
         if (method == 'DELETE')
-          return o.database.delete(path, handler);
+          return o.database.delete(path, function() {
+            broadcast('delete', {app: parts[0] == 'apps', name: decodeURIComponent(parts[1])});
+            response.generic();
+          });
         if (method == 'POST')
           return request.slurp(function(body) {
             var code = o.string.fromUTF8Buffer(body);
             return o.database.put(parts[0] == 'apps' ? path+'/code' : path, code, function(error) {
-              if (!error) return handler();
-              o.database.put(path, {code: code, config: {}}, handler);
+              if (!error) return response.generic();
+              o.database.put(path, {code: code, config: {}}, function() { response.generic(); });
             });
           });
       } else if (parts[2] == 'config') {
-        handler = function() {
+        var handler = function() {
           o.database.get(parts.slice(0, 3).join('/'), function(config) {
             response.end(JSON.stringify(config), {'Content-Type': 'application/json'});
           });
@@ -65,9 +77,15 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
         if (method == 'DELETE')
           return o.database.delete(path, handler);
       }
-      
-    } else if (request.path == '/') {
-    
+    }
+    if (request.path == '/activity') {
+      clients.push(response);
+      return response.send(': ping', {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache'
+      });
+    }
+    if (request.path == '/') {
       if (request.method == 'POST')
         return request.slurp(function(body) {
           try {
@@ -75,6 +93,7 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
             var name = body.app;
             if (body.action == 'stop' && apps[name]) {
               apps[name].terminate();
+              broadcast('stop', {app: name});
               delete apps[name];
               return response.generic();
             }
@@ -91,11 +110,13 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                   if (!app) return response.generic(400);
                   apps[name] = proxy(null, kernel+'var config = '+JSON.stringify(app.config)+';\n'+app.code, function(name, callback) {
                     o.database.get('modules/'+encodeURIComponent(name), callback);
+                  }, function(level, args) {
+                    broadcast('log', {app: name, level: level, message: args});
                   }, function(e) {
-                    // TODO: communicate module error in UI
-                    console.error(e);
+                    broadcast('error', {app: name, message: e.message});
                     delete apps[name];
                   });
+                  broadcast('run', {app: name});
                   response.generic();
                 }
               );
@@ -115,6 +136,7 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
               {head: [
                 {title: 'Browserver'},
                 {meta: {charset: 'utf-8'}},
+                {meta: {name: 'viewport', content: 'width=device-width, initial-scale=1.0, user-scalable=no'}},
                 {link: {rel: 'stylesheet', href: '/codemirror.css'}},
                 {link: {rel: 'stylesheet', href: '/jsonv.css'}},
                 {link: {rel: 'stylesheet', href: '/browserver.css'}}
@@ -127,71 +149,110 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                 {script: {src: '/codemirror.js'}},
                 {script: function(apps, modules) {
                   if (!apps) return [a, m];
+                  Object.keys(apps).forEach(function(name) { apps[name].log = []; });
                   Object.keys(modules).forEach(function(name) { modules[name] = {code: modules[name]}; });
                   kernel.use({html: 0, xhr: 0, jsonv: 0}, function(o) {
-                    var appList, moduleList, tab, selected, code, config;
-                    var entry = function() {
-                      if (selected.indexOf('apps'))
-                        return modules[decodeURIComponent(selected.substr(8))];
-                      return apps[decodeURIComponent(selected.substr(5))];
+                    var appList, moduleList, tab, selected, code, config, log;
+                    new EventSource('/activity').onmessage = function(e) {
+                      var message = JSON.parse(e.data),
+                          event = message.event,
+                          data = message.data;
+                      switch (event) {
+                        case 'log':
+                          var app = apps[data.app],
+                              line = data.message;
+                          if (!app) return;
+                          if (app.log.push(line) > 1000)
+                            app.log.shift();
+                          if (selected.entry == app) {
+                            var scroll = document.body.scrollHeight - document.body.scrollTop == document.documentElement.clientHeight;
+                            log.textContent += line.join(', ')+'\n';
+                            if (scroll) document.body.scrollTop = document.body.scrollHeight;
+                          }
+                          break;
+                        case 'run':
+                        case 'stop':
+                        case 'error':
+                          var app = apps[data.app];
+                          if (!app) return;
+                          app.tab.classList[event == 'run' ? 'add' : 'remove']('running');
+                          if (event == 'run') {
+                            if (selected.entry == app) log.textContent = '';
+                            app.log = [];
+                          }
+                          break;
+                        case 'delete':
+                          var entries = data.app ? apps : modules;
+                              entry = entries[data.name];
+                          if (!entry) return;
+                          delete entries[data.name];
+                          entry.tab.parentNode.removeChild(entry.tab);
+                          break;
+                      }
                     };
-                    var handler = function(action, target, item) {
+                    var handler = function(action, name, app, entry) {
                       return function(e) {
                         e.stopPropagation();
-                        var command = action != 'delete' && {action: action, app: target};
+                        var command = action != 'delete' && {action: action, app: name};
                         if (!command && !confirm('Are you sure you want to delete?')) return;
                         this.disabled = true;
-                        o.xhr(command ? '/' : '/'+target, {
+                        o.xhr(command ? '/' : (app ? '/apps/' : '/modules/')+encodeURIComponent(name), {
                           method: command ? 'POST' : 'DELETE',
                           json: command
                         }, function() {
-                          if (command) {
-                            e.target.disabled = false;
-                            item.classList[action == 'run' ? 'add' : 'remove']('running');
-                          } else {
-                            if (target.indexOf('apps')) delete modules[decodeURIComponent(target.substr(8))];
-                            else delete apps[decodeURIComponent(target.substr(5))];
-                            item.parentNode.removeChild(item);
+                          e.target.disabled = false;
+                          var entry = (app ? apps : modules)[name];
+                          if (!entry) return;
+                          entry.tab.classList[action == 'run' ? 'add' : 'remove']('running');
+                          if (action == 'run') {
+                            entry.log = [];
+                            if (selected.entry == entry) {
+                              toggle(name, true, 'log');
+                              log.textContent = '';
+                            }
                           }
                         });
                       };
                     };
-                    var toggle = function(name, elem, app) {
-                      if (tab) tab.classList.remove('selected');
-                      (tab = elem).classList.add('selected');
-                      selected = (app ? 'apps/' : 'modules/')+encodeURIComponent(name);
-                      var entry = (app ? apps : modules)[name];
-                      code.setValue(entry.code);
-                      config.update(entry.config);
-                      document.body.className = '';
+                    var toggle = function(name, app, panel) {
+                      if (selected.name != name || selected.app != app) {
+                        selected = {name: name, app: app, entry: (app ? apps : modules)[name]};
+                        code.setValue(selected.entry.code);
+                        config.update(selected.entry.config);
+                        log.textContent = selected.entry.log.map(function(line) { return line.join(', '); }).join('\n')+'\n';
+                        if (tab) tab.classList.remove('selected');
+                        (tab = selected.entry.tab).classList.add('selected');
+                      }
+                      document.body.className = panel ? 'show-'+panel : '';
+                      if (panel == 'log') document.body.scrollTop = document.body.scrollHeight;
                       code.refresh();
                     };
                     var li = function(name, app) {
                       var path = (app ? 'apps/' : 'modules/')+encodeURIComponent(name),
-                          data = (app ? apps : modules)[name];
-                      return {li: function(item) {
-                        item.onclick = function(e) {
-                          toggle(name, this, app);
-                          if (e.target.className == 'config')
-                            document.body.className = 'edit-config';
+                          entry = (app ? apps : modules)[name];
+                      return {li: function(elem) {
+                        entry.tab = elem;
+                        elem.onclick = function(e) {
+                          toggle(name, app, {config: 'config', log: 'log'}[e.target.className]);
                         };
-                        if (data.running)
-                          item.classList.add('running');
-                        if (!selected || selected == path) {
-                          selected = path;
-                          (tab = item).classList.add('selected');
+                        if (entry.running)
+                          elem.classList.add('running');
+                        // TODO: remove this
+                        if (!selected || selected.entry.tab == elem) {
+                          selected = {name: name, app: app, entry: entry};
+                          (tab = elem).classList.add('selected');
                         }
-                        // TODO: implement log and docs
+                        // TODO: implement docs
                         return [
                           {div: {className: 'controls', children: app ? [
-                            {button: {className: 'run', title: 'Run', onclick: handler('run', name, item)}},
+                            {button: {className: 'run', title: 'Run', onclick: handler('run', name, app)}},
                             {button: {className: 'config', title: 'Config'}},
-                            {button: {className: 'delete', title: 'Delete', onclick: handler('delete', path, item)}},
-                            //{button: {className: 'log', title: 'Log'}},
-                            {button: {className: 'stop', title: 'Stop', onclick: handler('stop', name, item)}}
+                            {button: {className: 'delete', title: 'Delete', onclick: handler('delete', name, app)}},
+                            {button: {className: 'log', title: 'Log'}},
+                            {button: {className: 'stop', title: 'Stop', onclick: handler('stop', name, app)}}
                           ] : [
                             //{button: {className: 'docs', title: 'Docs'}},
-                            {button: {className: 'delete', title: 'Delete', onclick: handler('delete', path, item)}}
+                            {button: {className: 'delete', title: 'Delete', onclick: handler('delete', name, app)}}
                           ]}},
                           name
                         ];
@@ -210,8 +271,9 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                               field.focus();
                               alert(name ? 'App name taken' : 'Please enter app name');
                             } else {
-                              apps[name] = {code: '', config: {}};
-                              toggle(name, o.html.dom(li(name, true), appList), true);
+                              apps[name] = {code: '', config: {}, log: []};
+                              o.html.dom(li(name, true), appList);
+                              toggle(name, true);
                             }
                           }}}
                         ]}},
@@ -233,7 +295,8 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                               alert(name ? 'Module name taken' : 'Please enter module name');
                             } else {
                               modules[name] = {code: "kernel.add('"+name.replace(/\\/g, '\\').replace(/'/g, "\\'")+"', function() {\n  \n});\n"};
-                              toggle(name, o.html.dom(li(name, false), moduleList), false);
+                              o.html.dom(li(name, false), moduleList);
+                              toggle(name, false);
                             }
                           }}}
                         ]}},
@@ -246,29 +309,34 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                       ]},
                       {div: {id: 'main', children: function(e) {
                         code = CodeMirror(e, {
-                          value: selected ? entry().code : '',
+                          value: selected ? selected.entry.code : '',
                           lineNumbers: true,
                           matchBrackets: true,
                           highlightSelectionMatches: true
                         });
                         CodeMirror.commands.save = function() {
                           if (!selected) return;
-                          o.xhr('/'+selected, {method: 'POST', data: entry().code = code.getValue()});
+                          o.xhr((selected.app ? '/apps/' : '/modules/')+encodeURIComponent(selected.name), {
+                            method: 'POST',
+                            data: selected.entry.code = code.getValue()
+                          });
                         };
-                        return {pre: {id: 'config', className: 'json', children: function(e) {
-                          config = o.jsonv(selected && entry().config, e, function(method, path, data) {
-                            var app = entry();
-                            o.xhr('/'+selected+'/config/'+path, {
-                              method: method,
-                              json: data,
-                              responseType: 'json',
-                              onload: function(e) {
+                        return [
+                          {pre: {id: 'config', className: 'json', children: function(e) {
+                            config = o.jsonv(selected && selected.entry.config, e, function(method, path, data) {
+                              var app = selected.entry;
+                              o.xhr('/apps/'+encodeURIComponent(selected.name)+'/config/'+path, {
+                                method: method,
+                                json: data,
+                                responseType: 'json'
+                              }, function(e) {
                                 if (e.target.status == 200)
                                   app.config = e.target.response;
-                              }
+                              });
                             });
-                          });
-                        }}};
+                          }}},
+                          {pre: {id: 'log', children: function(e) { log = e; }}}
+                        ];
                       }}}
                     ], document.body);
                   });

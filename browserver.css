@@ -77,6 +77,7 @@ nav li {
 }
 button {
   position: relative;
+  text-align: left;
   padding: 0;
   height: 25px;
   width: 30px;
@@ -89,10 +90,15 @@ button {
 }
 button:before {
   font: 26px entypo;
-  display: inline-block;
-  margin-top: -11px;
+  position: absolute;
+  margin-top: -.75em;
+  width: 100%;
+  text-align: center;
 }
-button:hover, button:focus, .edit-config .selected .config {
+button:hover, button:focus,
+.show-config .selected .config,
+.show-log .selected .log,
+.show-docs .selected .docs {
   color: white;
 }
 .run:hover, .run:focus {
@@ -102,9 +108,9 @@ button:hover, button:focus, .edit-config .selected .config {
 .stop:hover, .stop:focus {
   background: #c33;
 }
-.config:hover, .config:focus, .edit-config .selected .config,
-.log:hover, .log:focus,
-.docs:hover, .docs:focus {
+.config:hover, .config:focus, .show-config .selected .config,
+.log:hover, .log:focus, .show-log .selected .log,
+.docs:hover, .docs:focus, .show-docs .selected .docs {
   background: #36c;
 }
 .run:before {
@@ -141,12 +147,12 @@ button:hover, button:focus, .edit-config .selected .config {
   margin-left: 250px;
   height: 100%;
 }
-#config {
+#config, #log {
   padding: 4px 8px;
 }
-#config, .edit-config #main .CodeMirror {
+#config, #log, .show-config .CodeMirror, .show-log .CodeMirror {
   display: none;
 }
-.edit-config #config {
+.show-config #config, .show-log #log {
   display: block;
 }
