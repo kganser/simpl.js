@@ -166,7 +166,7 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                             app.log.shift();
                           if (selected.entry == app) {
                             var scroll = document.body.scrollHeight - document.body.scrollTop == document.documentElement.clientHeight;
-                            log.textContent += line.join(', ')+'\n';
+                            log.innerHTML += line.map(html).join(', ')+'\n';
                             if (scroll) document.body.scrollTop = document.body.scrollHeight;
                           }
                           break;
@@ -177,7 +177,7 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                           if (!app) return;
                           app.tab.classList[event == 'run' ? 'add' : 'remove']('running');
                           if (event == 'run') {
-                            if (selected.entry == app) log.textContent = '';
+                            if (selected.entry == app) log.innerHTML = '';
                             app.log = [];
                           }
                           break;
@@ -189,6 +189,9 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                           entry.tab.parentNode.removeChild(entry.tab);
                           break;
                       }
+                    };
+                    var html = function(str) {
+                      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\b(https?:\/\/[^\s]+)\b/, '<a href="$1" target="_blank">$1</a>');
                     };
                     var handler = function(action, name, app, entry) {
                       return function(e) {
@@ -208,7 +211,7 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                             entry.log = [];
                             if (selected.entry == entry) {
                               toggle(name, true, 'log');
-                              log.textContent = '';
+                              log.innerHTML = '';
                             }
                           }
                         });
@@ -219,7 +222,7 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                         selected = {name: name, app: app, entry: (app ? apps : modules)[name]};
                         code.setValue(selected.entry.code);
                         config.update(selected.entry.config);
-                        log.textContent = selected.entry.log.map(function(line) { return line.join(', '); }).join('\n')+'\n';
+                        log.innerHTML = selected.entry.log.map(function(line) { return line.map(html).join(', '); }).join('\n')+'\n';
                         if (tab) tab.classList.remove('selected');
                         (tab = selected.entry.tab).classList.add('selected');
                       }
