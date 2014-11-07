@@ -97,6 +97,7 @@ kernel.add('http', function(o) {
             if (read) read(buffer.slice(start, end));
             if (!remaining) {
               if (read) read();
+              read = null;
               request = {cookie: {}, slurp: slurp};
             }
             buffer = buffer.slice(end);
