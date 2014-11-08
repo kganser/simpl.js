@@ -147,7 +147,7 @@ button:hover,
 .collapsed .toggle:before {
   content: "▸";
 }
-.config, .stop, .log, .running .run, .selected.running .config, .running .delete {
+.config, .stop, .log, .running .run, .selected.running .config, .running .delete, .collapsed .delete {
   display: none;
 }
 .selected .config, .running .stop, .running .log {
@@ -182,16 +182,11 @@ button:hover,
   border: solid white;
   border-width: 1px 0 1px 1px;
 }
-.collapsed .toggle {
-  background: white;
-}
 .collapsed h2, .collapsed .form, .collapsed nav li, .collapsed .selected:after {
   display: none;
 }
 .collapsed nav {
   width: 30px;
-  padding-right: 0;
-  background: #f7f7f7;
   overflow-y: hidden;
 }
 .collapsed nav li span {
@@ -204,7 +199,10 @@ button:hover,
 }
 .collapsed .selected {
   display: block;
-  padding: 0;
+  position: absolute;
+  left: 0;
+  right: 1px;
+  height: 100%;
   white-space: normal;
 }
 .collapsed #main {
