@@ -222,7 +222,7 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                         selected = {name: name, app: app, entry: (app ? apps : modules)[name]};
                         code.setValue(selected.entry.code);
                         config.update(selected.entry.config);
-                        log.innerHTML = selected.entry.log.map(function(line) { return line.map(html).join(', '); }).join('\n')+'\n';
+                        if (app) log.innerHTML = selected.entry.log.map(function(line) { return line.map(html).join(', ')+'\n'; }).join('');
                         if (tab) tab.classList.remove('selected');
                         (tab = selected.entry.tab).classList.add('selected');
                       }
@@ -248,8 +248,8 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                         // TODO: implement docs
                         return [
                           {div: {className: 'controls', children: app ? [
-                            {button: {className: 'run', title: 'Run', onclick: handler('run', name, app)}},
                             {button: {className: 'config', title: 'Config'}},
+                            {button: {className: 'run', title: 'Run', onclick: handler('run', name, app)}},
                             {button: {className: 'delete', title: 'Delete', onclick: handler('delete', name, app)}},
                             {button: {className: 'log', title: 'Log'}},
                             {button: {className: 'stop', title: 'Stop', onclick: handler('stop', name, app)}}

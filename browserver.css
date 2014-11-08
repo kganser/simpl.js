@@ -15,6 +15,9 @@ html, body, .CodeMirror {
   overflow-x: auto;
   overflow-y: hidden;
 }
+.CodeMirror-gutters {
+  border-right: none;
+}
 pre {
   margin: 0;
 }
@@ -99,22 +102,21 @@ button:before {
   height: 100%;
   text-align: center;
 }
-button:hover, button:focus,
+button:hover,
 .show-config .selected .config,
 .show-log .selected .log,
 .show-docs .selected .docs {
   color: white;
 }
-.run:hover, .run:focus {
+.run:hover {
   background: #3c3;
 }
-.delete:hover, .delete:focus,
-.stop:hover, .stop:focus {
+.delete:hover, .stop:hover {
   background: #c33;
 }
-.config:hover, .config:focus, .show-config .selected .config,
-.log:hover, .log:focus, .show-log .selected .log,
-.docs:hover, .docs:focus, .show-docs .selected .docs {
+.config:hover, .show-config .selected .config,
+.log:hover, .show-log .selected .log,
+.docs:hover, .show-docs .selected .docs {
   background: #36c;
 }
 .run:before {
@@ -154,6 +156,9 @@ button:hover, button:focus,
   height: 13px;
   transform: translate(6px, 6px) rotate(45deg) skew(22.5deg, 22.5deg);
   box-shadow: 0 0 3px rgba(0, 0, 0, .3);
+}
+.show-config .selected:after, .show-log .selected:after {
+  background: white;
 }
 .selected button {
   background: #e0e0e0;
