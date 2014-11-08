@@ -153,7 +153,7 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                   Object.keys(modules).forEach(function(name) { modules[name] = {code: modules[name]}; });
                   kernel.use({html: 0, xhr: 0, jsonv: 0}, function(o) {
                     var appList, moduleList, tab, selected, code, config, log;
-                    new EventSource('/activity').onmessage = function(e) {
+                    if (window.EventSource) new EventSource('/activity').onmessage = function(e) {
                       var message = JSON.parse(e.data),
                           event = message.event,
                           data = message.data;
