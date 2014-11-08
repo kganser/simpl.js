@@ -67,17 +67,18 @@ ul {
   padding: 0;
 }
 nav li {
-  padding: 5px 0 0 10px;
-  height: 20px;
-  position: relative;
-  cursor: pointer;
+  height: 25px;
   margin-bottom: 1px;
+}
+nav li span {
+  display: block;
+  padding: 5px 0 0 10px;
   white-space: nowrap;
   text-overflow: ellipsis;
+  overflow: hidden;
 }
 .controls {
   float: right;
-  margin: -5px 0;
 }
 button {
   vertical-align: top;
@@ -86,7 +87,7 @@ button {
   padding: 0;
   height: 25px;
   width: 30px;
-  margin-left: 1px;
+  margin: 0 0 1px 1px;
   border: none;
   color: #666;
   background: #f7f7f7;
@@ -119,6 +120,9 @@ button:hover,
 .docs:hover, .show-docs .selected .docs {
   background: #36c;
 }
+.toggle:hover, .collapsed .toggle:hover {
+  background: #666;
+}
 .run:before {
   content: "▶";
 }
@@ -137,14 +141,21 @@ button:hover,
 .docs:before {
   content: "ℹ";
 }
-.stop, .log, .running .run, .running .config, .running .delete {
+.toggle:before {
+  content: "◂";
+}
+.collapsed .toggle:before {
+  content: "▸";
+}
+.config, .stop, .log, .running .run, .selected.running .config, .running .delete {
   display: none;
 }
-.running .stop, .running .log {
+.selected .config, .running .stop, .running .log {
   display: inline;
 }
 .selected {
   background: #f7f7f7;
+  position: relative;
 }
 .selected:after {
   content: "";
@@ -162,6 +173,42 @@ button:hover,
 }
 .selected button {
   background: #e0e0e0;
+}
+.toggle {
+  position: absolute;
+  width: 15px;
+  bottom: 50px;
+  right: 0px;
+  border: solid white;
+  border-width: 1px 0 1px 1px;
+}
+.collapsed .toggle {
+  background: white;
+}
+.collapsed h2, .collapsed .form, .collapsed nav li, .collapsed .selected:after {
+  display: none;
+}
+.collapsed nav {
+  width: 30px;
+  padding-right: 0;
+  background: #f7f7f7;
+  overflow-y: hidden;
+}
+.collapsed nav li span {
+  float: left;
+  padding: 8px 10px 0 0;
+  width: 200px;
+  text-align: right;
+  transform: rotate(-90deg) translate(0, -210px);
+  transform-origin: right top 0;
+}
+.collapsed .selected {
+  display: block;
+  padding: 0;
+  white-space: normal;
+}
+.collapsed #main {
+  margin-left: 31px;
 }
 #main {
   margin-left: 250px;

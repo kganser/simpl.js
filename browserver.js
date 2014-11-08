@@ -226,7 +226,8 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                         if (tab) tab.classList.remove('selected');
                         (tab = selected.entry.tab).classList.add('selected');
                       }
-                      document.body.className = panel ? 'show-'+panel : '';
+                      var collapsed = document.body.classList.contains('collapsed') ? ' collapsed' : '';
+                      document.body.className = panel ? 'show-'+panel+collapsed : collapsed;
                       if (panel == 'log') document.body.scrollTop = document.body.scrollHeight;
                       code.refresh();
                     };
@@ -257,7 +258,7 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                             //{button: {className: 'docs', title: 'Docs'}},
                             {button: {className: 'delete', title: 'Delete', onclick: handler('delete', name, app)}}
                           ]}},
-                          name
+                          {span: name}
                         ];
                       }};
                     };
@@ -308,7 +309,11 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                           return Object.keys(modules).map(function(name) {
                             return li(name, false);
                           });
-                        }}
+                        }},
+                        {button: {className: 'toggle', onclick: function() {
+                          document.body.classList.toggle('collapsed');
+                          code.refresh();
+                        }}}
                       ]},
                       {div: {id: 'main', children: function(e) {
                         code = CodeMirror(e, {
