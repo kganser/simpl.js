@@ -90,14 +90,15 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
         return request.slurp(function(body) {
           try {
             body = JSON.parse(o.string.fromUTF8Buffer(body));
-            var name = body.app;
-            if (body.action == 'stop' && apps[name]) {
+            var name = body.app,
+                action = body.action;
+            if ((action == 'stop' || action == 'restart') && apps[name]) {
               apps[name].terminate();
               broadcast('stop', {app: name});
               delete apps[name];
-              return response.generic();
+              if (action == 'stop') return response.generic();
             }
-            if (body.action == 'run' && !apps[name])
+            if ((action == 'run' || action == 'restart') && !apps[name])
               return o.async.join(
                 function(callback) {
                   if (kernel) callback(kernel);
@@ -152,7 +153,7 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                   Object.keys(apps).forEach(function(name) { apps[name].log = []; });
                   Object.keys(modules).forEach(function(name) { modules[name] = {code: modules[name]}; });
                   kernel.use({html: 0, xhr: 0, jsonv: 0}, function(o) {
-                    var appList, moduleList, tab, selected, code, config, log;
+                    var appList, moduleList, selected, code, config, log, docs;
                     if (window.EventSource) new EventSource('/activity').onmessage = function(e) {
                       var message = JSON.parse(e.data),
                           event = message.event,
@@ -160,14 +161,15 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                       switch (event) {
                         case 'log':
                           var app = apps[data.app],
-                              line = data.message;
+                              line = data.message,
+                              body = document.body;
                           if (!app) return;
                           if (app.log.push(line) > 1000)
                             app.log.shift();
-                          if (selected.entry == app) {
-                            var scroll = document.body.scrollHeight - document.body.scrollTop == document.documentElement.clientHeight;
+                          if (selected && selected.entry == app) {
+                            var scroll = body.classList.contains('show-log') && body.scrollHeight - body.scrollTop == document.documentElement.clientHeight;
                             log.innerHTML += line.map(html).join(', ')+'\n';
-                            if (scroll) document.body.scrollTop = document.body.scrollHeight;
+                            if (scroll) body.scrollTop = body.scrollHeight;
                           }
                           break;
                         case 'run':
@@ -177,7 +179,7 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                           if (!app) return;
                           app.tab.classList[event == 'run' ? 'add' : 'remove']('running');
                           if (event == 'run') {
-                            if (selected.entry == app) log.innerHTML = '';
+                            if (selected && selected.entry == app) log.innerHTML = '';
                             app.log = [];
                           }
                           break;
@@ -185,6 +187,7 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                           var entries = data.app ? apps : modules;
                               entry = entries[data.name];
                           if (!entry) return;
+                          if (selected && selected.entry == entry) selected = null;
                           delete entries[data.name];
                           entry.tab.parentNode.removeChild(entry.tab);
                           break;
@@ -205,29 +208,34 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                         }, function() {
                           e.target.disabled = false;
                           var entry = (app ? apps : modules)[name];
-                          if (!entry) return;
+                          if (!entry || action != 'run' && action != 'stop') return;
+                          entry.running = action == 'run';
                           entry.tab.classList[action == 'run' ? 'add' : 'remove']('running');
                           if (action == 'run') {
                             entry.log = [];
-                            if (selected.entry == entry) {
-                              toggle(name, true, 'log');
+                            if (selected && selected.entry == entry) {
                               log.innerHTML = '';
+                              toggle(name, true, 'log');
                             }
                           }
                         });
                       };
                     };
                     var toggle = function(name, app, panel) {
-                      if (selected.name != name || selected.app != app) {
+                      if (!selected || selected.name != name || selected.app != app) {
+                        if (selected) selected.entry.tab.classList.remove('selected');
                         selected = {name: name, app: app, entry: (app ? apps : modules)[name]};
                         code.setValue(selected.entry.code);
                         config.update(selected.entry.config);
                         if (app) log.innerHTML = selected.entry.log.map(function(line) { return line.map(html).join(', ')+'\n'; }).join('');
-                        if (tab) tab.classList.remove('selected');
-                        (tab = selected.entry.tab).classList.add('selected');
+                        else o.html.dom([{h1: name}, {p: 'documentation goes here'}], docs, true);
+                        selected.entry.tab.classList.add('selected');
                       }
-                      var collapsed = document.body.classList.contains('collapsed') ? ' collapsed' : '';
-                      document.body.className = panel ? 'show-'+panel+collapsed : collapsed;
+                      if (!panel) panel = app ? selected.entry.running ? 'log' : 'code' : 'docs';
+                      var next = {config: selected.entry.running ? 'log' : 'code', code: app ? 'config' : 'docs', log: 'code', docs: 'code'}[panel];
+                      document.body.className = document.body.classList.contains('collapsed') ? 'collapsed show-'+panel : 'show-'+panel;
+                      selected.entry.view.className = 'view '+next;
+                      selected.entry.view.title = 'Show '+next[0].toUpperCase()+next.slice(1);
                       if (panel == 'log') document.body.scrollTop = document.body.scrollHeight;
                       code.refresh();
                     };
@@ -237,25 +245,18 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                       return {li: function(elem) {
                         entry.tab = elem;
                         elem.onclick = function(e) {
-                          toggle(name, app, {config: 'config', log: 'log'}[e.target.className]);
+                          toggle(name, app, (e.target == entry.view) && e.target.className.replace(/\s*view\s*/, ''));
                         };
                         if (entry.running)
                           elem.classList.add('running');
-                        // TODO: remove this
-                        if (!selected || selected.entry.tab == elem) {
-                          selected = {name: name, app: app, entry: entry};
-                          (tab = elem).classList.add('selected');
-                        }
-                        // TODO: implement docs
                         return [
-                          {div: {className: 'controls', children: app ? [
-                            {button: {className: 'config', title: 'Config'}},
-                            {button: {className: 'run', title: 'Run', onclick: handler('run', name, app)}},
-                            {button: {className: 'delete', title: 'Delete', onclick: handler('delete', name, app)}},
-                            {button: {className: 'log', title: 'Log'}},
-                            {button: {className: 'stop', title: 'Stop', onclick: handler('stop', name, app)}}
-                          ] : [
-                            //{button: {className: 'docs', title: 'Docs'}},
+                          {div: {className: 'controls', children: [
+                            {button: {className: 'view', children: function(e) { entry.view = e; }}},
+                            app && [
+                              {button: {className: 'run', title: 'Run', onclick: handler('run', name, app)}},
+                              {button: {className: 'restart', title: 'Restart', onclick: handler('restart', name, app)}},
+                              {button: {className: 'stop', title: 'Stop', onclick: handler('stop', name, app)}}
+                            ],
                             {button: {className: 'delete', title: 'Delete', onclick: handler('delete', name, app)}}
                           ]}},
                           {span: name}
@@ -343,7 +344,8 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                               });
                             });
                           }}},
-                          {pre: {id: 'log', children: function(e) { log = e; }}}
+                          {pre: {id: 'log', children: function(e) { log = e; }}},
+                          {div: {id: 'docs', children: function(e) { docs = e; }}}
                         ];
                       }}}
                     ], document.body);
