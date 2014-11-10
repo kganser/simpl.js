@@ -25,7 +25,7 @@ simpl.add('database', function(proxy, self) {
   // TODO: deterministic (alphabetical) ordering of keys in objects
   var db, open = function(callback) {
     var queue = [callback],
-        request = indexedDB.open('browserver');
+        request = indexedDB.open('simpl');
     request.onupgradeneeded = function() {
       db = request.result;
       db.createObjectStore('data', {keyPath: ['parent', 'key']})

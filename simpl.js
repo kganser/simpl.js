@@ -1,6 +1,6 @@
 simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function(o, proxy) {
 
-  var apps = {}, clients = [], simpl;
+  var apps = {}, clients = [], loader;
   
   o.database.get('apps', function(apps) {
     if (apps) return;
@@ -106,15 +106,15 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function
             if ((action == 'run' || action == 'restart') && !apps[name])
               return o.async.join(
                 function(callback) {
-                  if (simpl) callback(simpl);
-                  else o.xhr('/kernel.js', function(e) { callback(simpl = e.target.responseText); });
+                  if (loader) callback(loader);
+                  else o.xhr('/loader.js', function(e) { callback(loader = e.target.responseText); });
                 },
                 function(callback) {
                   o.database.get('apps/'+encodeURIComponent(name), callback);
                 },
-                function(simpl, app) {
+                function(loader, app) {
                   if (!app) return response.generic(400);
-                  apps[name] = proxy(null, simpl+'var config = '+JSON.stringify(app.config)+';\n'+app.code, function(name, callback) {
+                  apps[name] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\n'+app.code, function(name, callback) {
                     o.database.get('modules/'+encodeURIComponent(name), callback);
                   }, function(level, args) {
                     broadcast('log', {app: name, level: level, message: args});
@@ -145,10 +145,10 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function
                 {meta: {name: 'viewport', content: 'width=device-width, initial-scale=1.0, user-scalable=no'}},
                 {link: {rel: 'stylesheet', href: '/codemirror.css'}},
                 {link: {rel: 'stylesheet', href: '/jsonv.css'}},
-                {link: {rel: 'stylesheet', href: '/browserver.css'}}
+                {link: {rel: 'stylesheet', href: '/simpl.css'}}
               ]},
               {body: [
-                {script: {src: '/kernel.js'}},
+                {script: {src: '/loader.js'}},
                 {script: {src: '/html.js'}},
                 {script: {src: '/xhr.js'}},
                 {script: {src: '/jsonv.js'}},

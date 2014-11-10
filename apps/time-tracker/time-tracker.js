@@ -70,7 +70,7 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
             {link: {rel: 'stylesheet', href: '/apps/time-tracker/time-tracker.css'}}
           ]},
           {body: [
-            {script: {src: '/kernel.js'}},
+            {script: {src: '/loader.js'}},
             {script: {src: '/modules/html.js'}},
             {script: {src: '/modules/xhr.js'}},
             {script: {src: '/modules/async.js'}},

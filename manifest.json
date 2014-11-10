@@ -8,7 +8,7 @@
   "permissions": ["unlimitedStorage", "http://*/", "https://*/", "ftp://*/"],
   "app": {
     "background": {
-      "page": "browserver.html"
+      "page": "simpl.html"
     }
   },
   "sockets": {

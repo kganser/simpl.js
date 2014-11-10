@@ -46,7 +46,7 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
         ]},
         {body: [
           {pre: {id: 'value', 'class': 'json', children: JSON.stringify(data, null, 2)}},
-          {script: {src: '/kernel.js'}},
+          {script: {src: '/loader.js'}},
           {script: {src: '/modules/html.js'}},
           {script: {src: '/jsonv.js'}},
           {script: function() {
