@@ -166,15 +166,15 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function
                           data = message.data;
                       switch (event) {
                         case 'log':
-                          var app = apps[data.app],
-                              line = data.message,
-                              body = document.body;
+                          message = {level: data.level, message: data.message};
+                          var app = apps[data.app];
                           if (!app) return;
-                          if (app.log.push(line) > 1000)
+                          if (app.log.push(message) > 1000)
                             app.log.shift();
                           if (selected && selected.entry == app) {
-                            var scroll = body.classList.contains('show-log') && body.scrollHeight - body.scrollTop == document.documentElement.clientHeight;
-                            log.innerHTML += line.map(html).join(', ')+'\n';
+                            var body = document.body,
+                                scroll = body.classList.contains('show-log') && body.scrollHeight - body.scrollTop == document.documentElement.clientHeight;
+                            log.innerHTML += logLine(message);
                             if (scroll) body.scrollTop = body.scrollHeight;
                           }
                           break;
@@ -199,8 +199,8 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function
                           break;
                       }
                     };
-                    var html = function(str) {
-                      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\b(https?:\/\/[^\s]+)\b/, '<a href="$1" target="_blank">$1</a>');
+                    var logLine = function(entry) {
+                      return '<span class="'+entry.level+'">'+entry.message.join(', ').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\b(https?:\/\/[^\s]+)\b/, '<a href="$1" target="_blank">$1</a>')+'</span>\n';
                     };
                     var handler = function(action, name, app, entry) {
                       return function(e) {
@@ -233,16 +233,17 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function
                         selected = {name: name, app: app, entry: (app ? apps : modules)[name]};
                         code.setValue(selected.entry.code);
                         config.update(selected.entry.config);
-                        if (app) log.innerHTML = selected.entry.log.map(function(line) { return line.map(html).join(', ')+'\n'; }).join('');
+                        if (app) log.innerHTML = selected.entry.log.map(logLine).join('');
                         else o.html.dom([{h1: name}, {p: 'documentation goes here'}], docs, true);
                         selected.entry.tab.classList.add('selected');
                       }
                       if (!panel) panel = app ? selected.entry.running ? 'log' : 'code' : 'docs';
-                      var next = {config: selected.entry.running ? 'log' : 'code', code: app ? 'config' : 'docs', log: 'code', docs: 'code'}[panel];
-                      document.body.className = document.body.classList.contains('collapsed') ? 'collapsed show-'+panel : 'show-'+panel;
+                      var next = {config: selected.entry.running ? 'log' : 'code', code: app ? 'config' : 'docs', log: 'code', docs: 'code'}[panel],
+                          body = document.body;
+                      body.className = body.classList.contains('collapsed') ? 'collapsed show-'+panel : 'show-'+panel;
                       selected.entry.view.className = 'view '+next;
                       selected.entry.view.title = 'Show '+next[0].toUpperCase()+next.slice(1);
-                      if (panel == 'log') document.body.scrollTop = document.body.scrollHeight;
+                      if (panel == 'log') body.scrollTop = body.scrollHeight;
                       code.refresh();
                     };
                     var li = function(name, app) {

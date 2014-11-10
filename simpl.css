@@ -215,6 +215,9 @@ button:hover {
 .collapsed #main {
   margin-left: 31px;
 }
+.error, .warn {
+  color: red;
+}
 #main {
   margin-left: 250px;
   height: 100%;

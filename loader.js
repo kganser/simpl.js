@@ -53,7 +53,7 @@ simpl = function(s) {
       inWorker = typeof WorkerGlobalScope != 'undefined';
   
   if (inWorker) self.console = {
-    log: function() { proxy('log', Array.prototype.slice.call(arguments)); },
+    log: function() { proxy('info', Array.prototype.slice.call(arguments)); },
     warn: function() { proxy('warn', Array.prototype.slice.call(arguments)); },
     error: function() { proxy('error', Array.prototype.slice.call(arguments)); },
     info: function() { proxy('info', Array.prototype.slice.call(arguments)); }
