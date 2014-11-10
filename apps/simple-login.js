@@ -105,7 +105,7 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, async: 0, crypto: 0}, funct
     }
     response.generic(404);
   }, function(error) {
-    if (error) return console.error('Error listening on 0.0.0.0:'+config.port+'\n'+error);
-    console.log('Listening at http://localhost:'+config.port);
+    if (error) console.error('Error listening on 0.0.0.0:'+config.port+'\n'+error);
+    else console.log('Listening at http://localhost:'+config.port);
   });
 });

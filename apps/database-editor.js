@@ -26,9 +26,8 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
           });
         case 'DELETE':
           return o.database.delete(path, handler);
-        default:
-          return response.generic(501);
       }
+      return response.generic(501);
     }
     if (request.path.length > 1)
       return o.xhr(location.origin+request.path, {responseType: 'arraybuffer'}, function(e) {
@@ -66,7 +65,7 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
       ]), {'Content-Type': o.http.mimeType('html')});
     });
   }, function(error) {
-    if (error) return console.error('Error listening on 0.0.0.0:'+config.port+'\n'+error);
-    console.log('Listening at http://localhost:'+config.port);
+    if (error) console.error('Error listening on 0.0.0.0:'+config.port+'\n'+error);
+    else console.log('Listening at http://localhost:'+config.port);
   });
 });
