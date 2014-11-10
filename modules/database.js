@@ -1,17 +1,4 @@
-simpl.add('database', function(proxy, self) {
-  proxy = proxy({
-    get: function(args, callback) { self.get(args[0], callback); },
-    put: function(args, callback) { self.put(args[0], args[1], args[2], callback); },
-    append: function(args, callback) { self.append(args[0], args[1], callback); },
-    delete: function(args, callback) { self.delete(args[0], callback); }
-  });
-  
-  if (simpl.worker) return self = {
-    get: function(path, callback) { proxy('get', [path], callback); },
-    put: function(path, value, insert, callback) { proxy('put', [path, value, typeof insert == 'function' ? null : insert], typeof insert == 'function' ? insert : callback); },
-    append: function(path, value, callback) { proxy('append', [path, value], callback); },
-    delete: function(path, callback) { proxy('delete', [path], callback); }
-  };
+simpl.add('database', function() {
 
   // Database entries:
   // {
@@ -23,6 +10,7 @@ simpl.add('database', function(proxy, self) {
 
   // TODO: support separate databases, objectStores
   // TODO: deterministic (alphabetical) ordering of keys in objects
+  var defaultCallback = function(e) { if (e) console.error(e); };
   var db, open = function(callback) {
     var queue = [callback],
         request = indexedDB.open('simpl');
@@ -148,7 +136,7 @@ simpl.add('database', function(proxy, self) {
       cursor.continue();
     }
   };
-  return self = {
+  return {
     // TODO: specify length and depth limit
     get: function(path, callback) {
       open(function() {
@@ -159,11 +147,12 @@ simpl.add('database', function(proxy, self) {
       });
     },
     put: function(path, value, insert, callback) {
-      if (!path) return callback('Cannot replace root object');
       if (typeof insert == 'function') {
         callback = insert;
         insert = false;
       }
+      if (!callback) callback = defaultCallback;
+      if (!path) return callback('Cannot replace root object');
       open(function() {
         var trans = db.transaction('data', 'readwrite'),
             store = trans.objectStore('data');
@@ -226,6 +215,7 @@ simpl.add('database', function(proxy, self) {
       });
     },
     append: function(path, value, callback) {
+      if (!callback) callback = defaultCallback;
       open(function() {
         var trans = db.transaction('data', 'readwrite'),
             store = trans.objectStore('data');
@@ -246,6 +236,7 @@ simpl.add('database', function(proxy, self) {
       });
     },
     delete: function(path, callback) {
+      if (!callback) callback = defaultCallback;
       if (!path) return callback('Cannot delete root object');
       open(function() {
         var trans = db.transaction('data', 'readwrite'),

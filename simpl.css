@@ -137,7 +137,7 @@ button:hover {
   content: "▶";
 }
 .restart:before {
-  content: "🔄";
+  content: "⟳";
 }
 .stop:before {
   content: "■";

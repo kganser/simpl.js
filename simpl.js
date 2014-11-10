@@ -14,7 +14,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function
       o.xhr('/apps/'+app.file+'.js', function(e) {
         data[app.name] = {code: e.target.responseText, config: app.config};
         if (Object.keys(data).length == apps.length)
-          o.database.put('apps', data, function() {});
+          o.database.put('apps', data);
       });
     });
   });
@@ -25,7 +25,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function
       o.xhr('/modules/'+module+'.js', function(e) {
         data[module] = e.target.responseText;
         if (Object.keys(data).length == modules.length)
-          o.database.put('modules', data, function() {});
+          o.database.put('modules', data);
       });
     });
   });
