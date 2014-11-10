@@ -5,12 +5,13 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function
   o.database.get('apps', function(apps) {
     if (apps) return;
     var data = {};
-    [ {name: 'My First App', dir: 'my-first-app', config: {port: 8001}},
-      {name: 'DB Admin', dir: 'db-admin', config: {port: 8002}},
-      {name: 'Simple Login', dir: 'simple-login', config: {port: 8003, sessionKey: 'yabadabadoo'}},
-      {name: 'Time Tracker', dir: 'time-tracker', config: {port: 8004, redmineHost: 'redmine.slytrunk.com'}}
+    [ {name: '1 Hello World', file: 'hello-world', config: {port: 8001}},
+      {name: '2 Web Server', file: 'web-server', config: {port: 8002}},
+      {name: '3 Database Editor', file: 'database-editor', config: {port: 8003}},
+      {name: '4 Simple Login', file: 'simple-login', config: {port: 8004, sessionKey: 'yabadabadoo'}},
+      {name: '5 Time Tracker', file: 'time-tracker', config: {port: 8005, redmineHost: 'redmine.slytrunk.com'}}
     ].forEach(function(app, i, apps) {
-      o.xhr('/apps/'+app.dir+'/'+app.dir+'.js', function(e) {
+      o.xhr('/apps/'+app.file+'.js', function(e) {
         data[app.name] = {code: e.target.responseText, config: app.config};
         if (Object.keys(data).length == apps.length)
           o.database.put('apps', data, function() {});

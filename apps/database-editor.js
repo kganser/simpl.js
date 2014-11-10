@@ -40,7 +40,7 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
       response.end(o.html.markup([
         {'!doctype': {html: null}},
         {head: [
-          {title: 'DB Admin'},
+          {title: 'Database Editor'},
           {meta: {charset: 'utf-8'}},
           {link: {rel: 'stylesheet', href: '/jsonv.css'}}
         ]},

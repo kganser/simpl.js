@@ -67,7 +67,7 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
             {title: 'Time Tracker'},
             {meta: {charset: 'utf-8'}},
             {meta: {name: 'viewport', content: 'width=device-width, initial-scale=1.0, user-scalable=no'}},
-            {link: {rel: 'stylesheet', href: '/apps/time-tracker/time-tracker.css'}}
+            {link: {rel: 'stylesheet', href: '/apps/assets/time-tracker.css'}}
           ]},
           {body: [
             {script: {src: '/loader.js'}},

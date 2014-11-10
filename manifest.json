@@ -8,7 +8,17 @@
   "permissions": ["unlimitedStorage", "http://*/", "https://*/", "ftp://*/"],
   "app": {
     "background": {
-      "page": "simpl.html"
+      "scripts": [
+        "loader.js",
+        "modules/string.js",
+        "modules/socket.js",
+        "modules/http.js",
+        "modules/html.js",
+        "modules/xhr.js",
+        "modules/database.js",
+        "modules/async.js",
+        "simpl.js"
+      ]
     }
   },
   "sockets": {
