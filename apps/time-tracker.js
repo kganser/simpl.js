@@ -241,5 +241,8 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
         return response.generic(404);
       response.end(e.target.response, {'Content-Type': o.http.mimeType((request.path.match(/\.([^.]*)$/) || [])[1])});
     });
+  }, function(error) {
+    if (error) return console.error('Error listening on 0.0.0.0:'+config.port+'\n'+error);
+    console.log('Listening at http://localhost:'+config.port);
   });
 });

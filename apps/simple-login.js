@@ -1,11 +1,16 @@
 simpl.use({http: 0, database: 0, html: 0, string: 0, async: 0, crypto: 0}, function(o) {
+
+  ['sessions', 'users'].forEach(function(path) {
+    o.database.get(path, function(data) {
+      if (!data) o.database.put(path, {});
+    });
+  });
   
   var key = o.crypto.codec.utf8String.toBits(config.sessionKey),
       fromBits = o.crypto.codec.base64.fromBits,
       toBits = o.crypto.codec.base64.toBits;
   
   var sid = function() {
-    // session id can be predictable, so no 'paranoia' necessary
     var data = o.crypto.random.randomWords(6, 0),
         base64 = fromBits(data, true, true);
     return {
@@ -77,7 +82,6 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, async: 0, crypto: 0}, funct
             // TODO: make this transactional with a transaction api in database.js
             o.database.get(path, function(user) {
               if (!user) {
-                // TODO: create empty sessions and users objects if necessary
                 var session = sid(),
                     hash = pbkdf2(body.password);
                 return o.async.join(
@@ -91,17 +95,17 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, async: 0, crypto: 0}, funct
           });
         return render([{form: {method: 'post', action: '/register', children: [
           {label: 'Name: '},
-          {input: {type: 'text', name: 'name'}},
-          {br: null},
+          {input: {type: 'text', name: 'name'}}, {br: null},
           {label: 'Username: '},
-          {input: {type: 'text', name: 'username'}},
-          {br: null},
+          {input: {type: 'text', name: 'username'}}, {br: null},
           {label: 'Password: '},
-          {input: {type: 'password', name: 'password'}},
-          {br: null},
+          {input: {type: 'password', name: 'password'}}, {br: null},
           {input: {type: 'submit', value: 'Register'}}
         ]}}]);
     }
     response.generic(404);
+  }, function(error) {
+    if (error) return console.error('Error listening on 0.0.0.0:'+config.port+'\n'+error);
+    console.log('Listening at http://localhost:'+config.port);
   });
 });
