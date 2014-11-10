@@ -110,7 +110,7 @@ kernel = function(k) {
   
   var channel = function(kernel, module) {
     return function(listeners, code, load, log, error) {
-      var worker, peer = code ? new Worker(URL.createObjectURL(new Blob([code], {type: 'text/javascript'}))) : self;
+      var worker, peer = code ? new Worker(URL.createObjectURL(new Blob([code], {type: 'application/javascript'}))) : self;
       if (kernel || code) peer.onmessage = receive;
       
       if (code != null) {
@@ -145,9 +145,9 @@ kernel = function(k) {
           return module(o, channel(false, name));
         });
       }, name);
-      return load(k.add(name, function() {
+      return k.add(name, function() {
         return module(channel(false, name));
-      }, dependencies));
+      });
     },
     use: function(modules, callback, name) {
       return load(k.use(modules, function(o) {
