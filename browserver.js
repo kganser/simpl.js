@@ -1,6 +1,6 @@
-kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function(o, proxy) {
+simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function(o, proxy) {
 
-  var apps = {}, clients = [], kernel;
+  var apps = {}, clients = [], simpl;
   
   o.database.get('apps', function(apps) {
     if (apps) return;
@@ -106,15 +106,15 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
             if ((action == 'run' || action == 'restart') && !apps[name])
               return o.async.join(
                 function(callback) {
-                  if (kernel) callback(kernel);
-                  else o.xhr('/kernel.js', function(e) { callback(kernel = e.target.responseText); });
+                  if (simpl) callback(simpl);
+                  else o.xhr('/kernel.js', function(e) { callback(simpl = e.target.responseText); });
                 },
                 function(callback) {
                   o.database.get('apps/'+encodeURIComponent(name), callback);
                 },
-                function(kernel, app) {
+                function(simpl, app) {
                   if (!app) return response.generic(400);
-                  apps[name] = proxy(null, kernel+'var config = '+JSON.stringify(app.config)+';\n'+app.code, function(name, callback) {
+                  apps[name] = proxy(null, simpl+'var config = '+JSON.stringify(app.config)+';\n'+app.code, function(name, callback) {
                     o.database.get('modules/'+encodeURIComponent(name), callback);
                   }, function(level, args) {
                     broadcast('log', {app: name, level: level, message: args});
@@ -140,7 +140,7 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
             {'!doctype': {html: null}},
             {html: [
               {head: [
-                {title: 'Browserver'},
+                {title: 'Simpl.js'},
                 {meta: {charset: 'utf-8'}},
                 {meta: {name: 'viewport', content: 'width=device-width, initial-scale=1.0, user-scalable=no'}},
                 {link: {rel: 'stylesheet', href: '/codemirror.css'}},
@@ -157,7 +157,7 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                   if (!apps) return [a, m];
                   Object.keys(apps).forEach(function(name) { apps[name].log = []; });
                   Object.keys(modules).forEach(function(name) { modules[name] = {code: modules[name]}; });
-                  kernel.use({html: 0, xhr: 0, jsonv: 0}, function(o) {
+                  simpl.use({html: 0, xhr: 0, jsonv: 0}, function(o) {
                     var appList, moduleList, selected, code, config, log, docs;
                     if (window.EventSource) new EventSource('/activity').onmessage = function(e) {
                       var message = JSON.parse(e.data),
@@ -304,7 +304,7 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                               field.focus();
                               alert(name ? 'Module name taken' : 'Please enter module name');
                             } else {
-                              modules[name] = {code: "kernel.add('"+name.replace(/\\/g, '\\').replace(/'/g, "\\'")+"', function() {\n  \n});\n"};
+                              modules[name] = {code: "simpl.add('"+name.replace(/\\/g, '\\').replace(/'/g, "\\'")+"', function() {\n  \n});\n"};
                               o.html.dom(li(name, false), moduleList);
                               toggle(name, false);
                             }

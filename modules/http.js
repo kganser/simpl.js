@@ -1,4 +1,4 @@
-kernel.add('http', function(o) {
+simpl.add('http', function(o) {
   
   var self, entity = function(status, headers, body, headersSent, chunk) {
     if (headersSent && (headers || status)) throw 'HTTP headers already sent';

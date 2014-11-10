@@ -1,4 +1,4 @@
-kernel.add('html', function() {
+simpl.add('html', function() {
   var html, attr = function(node, parent) {
     Object.keys(node).forEach(function(k) {
       if (k == 'children') return;

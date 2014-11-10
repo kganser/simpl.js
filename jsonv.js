@@ -1,4 +1,4 @@
-kernel.add('jsonv', function(o) {
+simpl.add('jsonv', function(o) {
   return function(data, element, listener) {
     listener = listener || function() {};
     

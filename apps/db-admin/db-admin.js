@@ -1,4 +1,4 @@
-kernel.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
+simpl.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
   o.http.serve({port: config.port}, function(request, response) {
     if (request.headers.Accept == 'application/json' || request.query.format == 'json') {
       var path = request.path.substr(1),
@@ -50,7 +50,7 @@ kernel.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
           {script: {src: '/modules/html.js'}},
           {script: {src: '/jsonv.js'}},
           {script: function() {
-            kernel.use({jsonv: 0}, function(o) {
+            simpl.use({jsonv: 0}, function(o) {
               var elem = document.getElementById('value');
               o.jsonv(JSON.parse(elem.textContent), elem, function(method, path, data) {
                 console.log(method, path, data);
@@ -63,7 +63,7 @@ kernel.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
             });
           }}
         ]}
-      ]), {'Content-Type': o.http.mime('html')});
+      ]), {'Content-Type': o.http.mimeType('html')});
     });
   });
 });

@@ -1,4 +1,4 @@
-kernel.add('async', function() {
+simpl.add('async', function() {
   return {
     // Executes all but last function(callback) arguments in parallel, then
     // executes last argument function with arguments as provided to callbacks

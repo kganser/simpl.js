@@ -1,4 +1,4 @@
-kernel.add('database', function(proxy, self) {
+simpl.add('database', function(proxy, self) {
   proxy = proxy({
     get: function(args, callback) { self.get(args[0], callback); },
     put: function(args, callback) { self.put(args[0], args[1], args[2], callback); },
@@ -6,7 +6,7 @@ kernel.add('database', function(proxy, self) {
     delete: function(args, callback) { self.delete(args[0], callback); }
   });
   
-  if (kernel.worker) return self = {
+  if (simpl.worker) return self = {
     get: function(path, callback) { proxy('get', [path], callback); },
     put: function(path, value, insert, callback) { proxy('put', [path, value, typeof insert == 'function' ? null : insert], typeof insert == 'function' ? insert : callback); },
     append: function(path, value, callback) { proxy('append', [path, value], callback); },

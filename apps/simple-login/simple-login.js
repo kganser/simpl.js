@@ -1,4 +1,4 @@
-kernel.use({http: 0, database: 0, html: 0, string: 0, async: 0, crypto: 0}, function(o) {
+simpl.use({http: 0, database: 0, html: 0, string: 0, async: 0, crypto: 0}, function(o) {
   
   var key = o.crypto.codec.utf8String.toBits(config.sessionKey),
       fromBits = o.crypto.codec.base64.fromBits,

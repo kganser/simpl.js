@@ -218,6 +218,10 @@ button:hover {
 #main {
   margin-left: 250px;
   height: 100%;
+  background: url(/simpljs.png) no-repeat center center;
+}
+.show-config #main, .show-log #main, .show-docs #main {
+  background: transparent;
 }
 #config, #log, #docs {
   padding: 4px 8px;

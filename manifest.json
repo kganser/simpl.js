@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
-  "name": "browserver",
-  "description": "Web server framework",
+  "name": "Simpl.js",
+  "description": "Simpl isomorphic platform for javascript",
   "offline_enabled": true,
   "version": "2",
   "minimum_chrome_version": "33",

@@ -1,4 +1,4 @@
-var kernel = function(modules, clients) {
+var simpl = function(modules, clients) {
   var dispatch = function(client) {
     //console.log(client ? 'resolving new client' : 'resolving existing clients');
     var requested = [];
@@ -32,8 +32,8 @@ var kernel = function(modules, clients) {
   return {
     add: function(name, module, dependencies) {
       //console.log('adding module '+name, dependencies);
-      if (dependencies) return kernel.use(dependencies, function(o) {
-        kernel.add(name, function() { return module(o); });
+      if (dependencies) return simpl.use(dependencies, function(o) {
+        simpl.add(name, function() { return module(o); });
       }, name);
       if (!modules[name]) {
         modules[name] = {export: module};
@@ -47,8 +47,8 @@ var kernel = function(modules, clients) {
   };
 }({}, []);
 
-// Kernel extension for worker creation, messaging, and dependency loading
-kernel = function(k) {
+// Loader extension for worker creation, messaging, and dependency loading
+simpl = function(s) {
   var id = 0, log = {}, workers = [], moduleListeners = {}, globalListeners, 
       inWorker = typeof WorkerGlobalScope != 'undefined';
   
@@ -69,13 +69,13 @@ kernel = function(k) {
     });
     return modules;
   } : function(modules) { return modules; };
-  var send = function(kernel, peer, module, command, args, callback, transferable) {
+  var send = function(simpl, peer, module, command, args, callback, transferable) {
     // TODO: use a guid?
     var start = id;
     do { id = id == Number.MAX_SAFE_INTEGER ? 0 : id + 1; } while (id in log && id != start);
     if (id == start) throw 'message queue full';
     if (callback) log[id] = callback;
-    peer.postMessage({kernel: kernel, module: module, id: id, command: command, args: args}, transferable);
+    peer.postMessage({simpl: simpl, module: module, id: id, command: command, args: args}, transferable);
   };
   var receive = function(e) {
     var id = e.data.id;
@@ -85,7 +85,7 @@ kernel = function(k) {
     } else {
       var worker = !inWorker && workers.filter(function(o) { return o.worker === e.target; })[0],
           command = e.data.command;
-      if (e.data.kernel) {
+      if (e.data.simpl) {
         if (command == 'load') {
           if (worker.load) worker.load(e.data.args[0], function(code) {
             e.target.postMessage({id: id, result: [code]});
@@ -108,10 +108,10 @@ kernel = function(k) {
     }
   };
   
-  var channel = function(kernel, module) {
+  var channel = function(simpl, module) {
     return function(listeners, code, load, log, error) {
       var worker, peer = code ? new Worker(URL.createObjectURL(new Blob([code], {type: 'application/javascript'}))) : self;
-      if (kernel || code) peer.onmessage = receive;
+      if (simpl || code) peer.onmessage = receive;
       
       if (code != null) {
         peer.onerror = error;
@@ -123,7 +123,7 @@ kernel = function(k) {
       }
       
       var sender = function(command, args, callback, transferable) {
-        send(kernel, peer, module, command, args, callback, transferable);
+        send(simpl, peer, module, command, args, callback, transferable);
       };
       
       return code == null ? sender : {send: sender, terminate: function(i) {
@@ -140,20 +140,20 @@ kernel = function(k) {
   
   return {
     add: function(name, module, dependencies) {
-      if (dependencies) return kernel.use(dependencies, function(o) {
-        kernel.add(name, function() {
+      if (dependencies) return simpl.use(dependencies, function(o) {
+        simpl.add(name, function() {
           return module(o, channel(false, name));
         });
       }, name);
-      return k.add(name, function() {
+      return s.add(name, function() {
         return module(channel(false, name));
       });
     },
     use: function(modules, callback, name) {
-      return load(k.use(modules, function(o) {
+      return load(s.use(modules, function(o) {
         callback(o, channel(false));
       }, name));
     },
     worker: inWorker
   };
-}(kernel);
+}(simpl);

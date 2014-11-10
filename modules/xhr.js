@@ -1,4 +1,4 @@
-kernel.add('xhr', function() {
+simpl.add('xhr', function() {
   return function(url, options, callback) {
     options = options || {};
     if (typeof options == 'function')

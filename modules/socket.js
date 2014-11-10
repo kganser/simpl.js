@@ -1,4 +1,4 @@
-kernel.add('socket', function(proxy) {
+simpl.add('socket', function(proxy) {
   var clients = {}, servers = {};
   
   proxy = proxy({
@@ -68,7 +68,7 @@ kernel.add('socket', function(proxy) {
     },
   });
   
-  if (kernel.worker) return {
+  if (simpl.worker) return {
     listen: function(options, onConnect, callback) {
       proxy('listen', [options], function(error, socketId) {
         if (error) return callback && callback(error);

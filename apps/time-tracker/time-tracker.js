@@ -1,4 +1,4 @@
-kernel.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
+simpl.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
   o.http.serve({port: config.port}, function(request, response) {
     var match;
     if (request.method == 'DELETE' && (match = /^\/(entries\/\d{4}-\d{2}-\d{2})\/([^\/]*)$/.exec(request.path)))
@@ -75,7 +75,7 @@ kernel.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
             {script: {src: '/modules/xhr.js'}},
             {script: {src: '/modules/async.js'}},
             {script: function() {
-              kernel.use({html: 0, xhr: 0, async: 0}, function(o) {
+              simpl.use({html: 0, xhr: 0, async: 0}, function(o) {
                 var issues = {}, issue, hours, dates, entries, add, form, suggest, previous, report,
                     days = 'Sun Mon Tues Wed Thurs Fri Sat'.split(' '),
                     months = 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' '),

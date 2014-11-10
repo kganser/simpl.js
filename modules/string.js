@@ -1,4 +1,4 @@
-kernel.add('string', function() {
+simpl.add('string', function() {
   return {
     toUTF8Buffer: function(string) {
       var c, len = string.length;
