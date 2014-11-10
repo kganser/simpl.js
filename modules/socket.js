@@ -3,25 +3,24 @@ simpl.add('socket', function(proxy) {
   
   proxy = proxy({
     listen: function(args, callback, proxy) {
-      var disconnect;
-      listen(args[0], function(error, socketId) {
+      var disconnectSocket;
+      listen(args[0], function(client) {
+        servers[disconnectSocket].clients[client.socketId] = true;
+        proxy('accept', [disconnectSocket, client.socketId]);
+        return function(data) {
+          // TODO: postMessage does not guarantee ordering
+          proxy('receive', [client.socketId, data], null, [data]);
+        };
+      }, function(error, socketId) {
         if (!error) {
-          servers[socketId] = function(connection) {
-            proxy('accept', [socketId, connection.socketId]);
-            return function(data) {
-              // TODO: postMessage does not guarantee ordering
-              proxy('receive', [connection.socketId, data], null, [data]);
-            };
-          };
-          if (disconnect) disconnectServer(socketId);
-          disconnect = socketId;
+          if (disconnectSocket) disconnectServer(disconnectSocket);
+          disconnectSocket = socketId;
         }
         callback(error, socketId);
       });
       return function() {
-        if (disconnect) disconnectServer(disconnect);
-        disconnect = true;
-        // TODO: disconnect active connections
+        if (disconnectSocket) disconnectServer(disconnectSocket);
+        disconnectSocket = true;
       };
     },
     accept: function(args) {
@@ -76,6 +75,7 @@ simpl.add('socket', function(proxy) {
         if (callback) callback(false, {
           disconnect: function() {
             proxy('disconnectServer', [socketId]);
+            delete servers[socketId];
           },
           getInfo: function(callback) {
             proxy('getServerInfo', [socketId], callback);
@@ -85,12 +85,48 @@ simpl.add('socket', function(proxy) {
     }
   };
   
-  var sockets = chrome.sockets, accept, receive;
+  var sockets = chrome.sockets;
   
-  var listen = function(options, callback) {
+  sockets.tcpServer.onAccept.addListener(function(info) {
+    var serverSocketId = info.socketId,
+        clientSocketId = info.clientSocketId;
+    if (!servers[serverSocketId]) return;
+    sockets.tcp.setPaused(clientSocketId, false);
+    clients[clientSocketId] = {server: serverSocketId, callback: servers[serverSocketId].callback({
+      send: function(data, callback) {
+        send(clientSocketId, data, callback);
+      },
+      disconnect: function() {
+        disconnect(clientSocketId);
+      },
+      setNoDelay: function(noDelay, callback) {
+        setNoDelay(clientSocketId, noDelay, callback);
+      },
+      getInfo: function(callback) {
+        getInfo(clientSocketId, callback);
+      },
+      socketId: clientSocketId
+    })};
+  });
+  sockets.tcpServer.onAcceptError.addListener(function(info) {
+    console.error(chrome.runtime.lastError.message);
+    disconnectServer(info.socketId);
+  });
+  sockets.tcp.onReceive.addListener(function(info) {
+    var client = clients[info.socketId];
+    if (client && client.callback)
+      client.callback(info.data);
+  });
+  sockets.tcp.onReceiveError.addListener(function(info) {
+    disconnect(info.socketId);
+  });
+  
+  var listen = function(options, onConnect, callback) {
     sockets.tcpServer.create({name: options.name}, function(info) {
       var socketId = info.socketId;
       sockets.tcpServer.listen(socketId, options.ip || '0.0.0.0', options.port, options.backlog || 50, function(resultCode) {
+        if (resultCode) sockets.tcpServer.close(socketId);
+        else servers[socketId] = {clients: {}, callback: onConnect};
         callback(resultCode && chrome.runtime.lastError.message, socketId);
       });
     });
@@ -111,9 +147,11 @@ simpl.add('socket', function(proxy) {
     sockets.tcp.getInfo(socketId, callback);
   };
   var disconnect = function(socketId) {
-    if (!clients[socketId]) return;
+    var client = clients[socketId = parseInt(socketId, 10)];
+    if (!client) return;
     sockets.tcp.disconnect(socketId);
     sockets.tcp.close(socketId);
+    delete servers[client.server].clients[socketId];
     delete clients[socketId];
   };
   var getServerInfo = function(socketId, callback) {
@@ -124,15 +162,14 @@ simpl.add('socket', function(proxy) {
     if (!servers[socketId]) return;
     sockets.tcpServer.disconnect(socketId);
     sockets.tcpServer.close(socketId);
+    Object.keys(servers[socketId].clients).forEach(disconnect);
     delete servers[socketId];
   };
   
   return {
     listen: function(options, onConnect, callback) {
-      listen(options, function(error, socketId) {
-        if (error) return callback && callback(error);
-        servers[socketId] = onConnect;
-        if (callback) callback(false, {
+      listen(options, onConnect, function(error, socketId) {
+        if (callback) callback(error, !error && {
           disconnect: function() {
             disconnectServer(socketId);
           },
@@ -140,41 +177,6 @@ simpl.add('socket', function(proxy) {
             getServerInfo(socketId, callback);
           }
         });
-        if (!accept) {
-          sockets.tcpServer.onAccept.addListener(accept = function(info) {
-            var clientSocketId = info.clientSocketId;
-            sockets.tcp.setPaused(clientSocketId, false);
-            clients[clientSocketId] = servers[info.socketId]({
-              send: function(data, callback) {
-                send(clientSocketId, data, callback);
-              },
-              disconnect: function() {
-                disconnect(clientSocketId);
-              },
-              setNoDelay: function(noDelay, callback) {
-                setNoDelay(clientSocketId, noDelay, callback);
-              },
-              getInfo: function(callback) {
-                getInfo(socketId, callback);
-              },
-              socketId: clientSocketId
-            });
-            if (!receive) {
-              sockets.tcp.onReceive.addListener(receive = function(info) {
-                var callback = clients[info.socketId];
-                if (typeof callback == 'function')
-                  callback(info.data);
-              });
-              sockets.tcp.onReceiveError.addListener(function(info) {
-                disconnect(info.socketId);
-              });
-            }
-          });
-          sockets.tcpServer.onAcceptError.addListener(function(info) {
-            console.error(chrome.runtime.lastError.message);
-            disconnectServer(info.socketId);
-          });
-        }
       });
     }
   };
