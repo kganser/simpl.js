@@ -72,6 +72,7 @@ ul {
 nav li {
   height: 25px;
   margin-bottom: 1px;
+  cursor: default;
 }
 nav li span {
   display: block;

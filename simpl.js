@@ -371,5 +371,8 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function
         return response.generic(404);
       response.end(e.target.response, {'Content-Type': o.http.mimeType((request.path.match(/\.([^.]*)$/) || [])[1])});
     });
+  }, function(error, server) {
+    if (error) console.error(error);
+    else chrome.runtime.onSuspend.addListener(server.disconnect);
   });
 });
