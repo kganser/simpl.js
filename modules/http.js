@@ -154,7 +154,6 @@ kernel.add('http', function(o) {
       }[code];
     },
     mimeType: function(ext) {
-      // partial list from nginx mime_types file
       return {
         html: 'text/html',
         css:  'text/css',
@@ -163,7 +162,7 @@ kernel.add('http', function(o) {
         gif:  'text/gif',
         jpg:  'image/jpeg',
         jpeg: 'image/jpeg',
-        js:   'application/x-javascript',
+        js:   'application/javascript',
         json: 'application/json',
         txt:  'text/plain',
         png:  'image/png',

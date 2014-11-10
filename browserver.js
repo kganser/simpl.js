@@ -47,6 +47,11 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
           method = request.method;
       
       if (parts.length == 2) {
+        if (method == 'GET')
+          return o.database.get(path, function(code) {
+            if (code === undefined) return response.generic(404);
+            response.end(code, {'Content-Type': o.http.mimeType('js')});
+          });
         if (method == 'DELETE')
           return o.database.delete(path, function() {
             broadcast('delete', {app: parts[0] == 'apps', name: decodeURIComponent(parts[1])});
@@ -63,7 +68,7 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
       } else if (parts[2] == 'config') {
         var handler = function() {
           o.database.get(parts.slice(0, 3).join('/'), function(config) {
-            response.end(JSON.stringify(config), {'Content-Type': 'application/json'});
+            response.end(JSON.stringify(config), {'Content-Type': o.http.mimeType('json')});
           });
         };
         if (method == 'PUT' || method == 'INSERT')
@@ -144,8 +149,8 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
               ]},
               {body: [
                 {script: {src: '/kernel.js'}},
-                {script: {src: '/modules/html.js'}},
-                {script: {src: '/modules/xhr.js'}},
+                {script: {src: '/html.js'}},
+                {script: {src: '/xhr.js'}},
                 {script: {src: '/jsonv.js'}},
                 {script: {src: '/codemirror.js'}},
                 {script: function(apps, modules) {
@@ -353,11 +358,12 @@ kernel.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, functio
                 }}
               ]}
             ]}
-          ]), {'Content-Type': 'text/html'});
+          ]), {'Content-Type': o.http.mimeType('html')});
         }
       );
     }
-    
+    if (request.path == '/html.js') request.path = '/modules/html.js';
+    if (request.path == '/xhr.js') request.path = '/modules/xhr.js';
     o.xhr(location.origin+request.path, {responseType: 'arraybuffer'}, function(e) {
       if (e.target.status != 200)
         return response.generic(404);

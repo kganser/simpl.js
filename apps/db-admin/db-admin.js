@@ -9,7 +9,7 @@ kernel.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
         case 'GET':
           return o.database.get(path, function(object) {
             if (object === undefined) response.generic(404);
-            response.end(JSON.stringify(object), {'Content-Type': 'application/json'});
+            response.end(JSON.stringify(object), {'Content-Type': o.http.mimeType('json')});
           });
         case 'PUT':
         case 'POST':
@@ -63,7 +63,7 @@ kernel.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
             });
           }}
         ]}
-      ]), {'Content-Type': 'text/html'});
+      ]), {'Content-Type': o.http.mime('html')});
     });
   });
 });

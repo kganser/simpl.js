@@ -26,7 +26,7 @@ kernel.use({http: 0, database: 0, html: 0, string: 0, async: 0, crypto: 0}, func
   
   o.http.serve({port: config.port}, function(request, response) {
     var render = function(body, status) {
-      response.end(o.html.markup({html: [{body: body}]}), {'Content-Type': 'text/html'}, status);
+      response.end(o.html.markup({html: [{body: body}]}), {'Content-Type': o.http.mimeType('html')}, status);
     };
     var logoff = function(cookie, message) {
       if (cookie) return o.database.delete('sessions/'+encodeURIComponent(cookie), function() { logoff(null, message); });

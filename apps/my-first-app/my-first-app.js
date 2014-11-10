@@ -5,7 +5,7 @@ kernel.use({http: 0, html: 0}, function(o) {
       return response.end(o.html.markup([
         {h1: 'My First App'},
         (++count)+' hits'
-      ]), {'Content-Type': 'text/html'});
+      ]), {'Content-Type': o.http.mime('html')});
     response.generic(404);
   });
 });

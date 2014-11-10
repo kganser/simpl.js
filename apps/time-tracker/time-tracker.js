@@ -32,7 +32,7 @@ kernel.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
           e.target.response.issues.forEach(function(issue) {
             issues[issue.id] = {id: issue.id, name: issue.project.name+' - '+issue.subject, url: 'http://'+config.redmineHost+'/issues/'+issue.id};
           });
-          response.end(JSON.stringify(issues), {'Content-Type': 'application/json'});
+          response.end(JSON.stringify(issues), {'Content-Type': o.http.mimeType('json')});
         });
       case '/entries':
         switch (request.method) {
@@ -57,7 +57,7 @@ kernel.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
             });
           case 'GET':
             return o.database.get('entries', function(entries) {
-              response.end(JSON.stringify(entries), {'Content-Type': 'application/json'});
+              response.end(JSON.stringify(entries), {'Content-Type': o.http.mimeType('json')});
             });
         }
         return response.generic(501);
@@ -235,7 +235,7 @@ kernel.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
               });
             }}
           ]}
-        ]}), {'Content-Type': 'text/html'});
+        ]}), {'Content-Type': o.http.mimeType('html')});
       default:
         o.xhr(location.origin+request.path, {responseType: 'arraybuffer'}, function(e) {
           if (e.target.status != 200)
