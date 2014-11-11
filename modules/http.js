@@ -12,8 +12,7 @@ simpl.add('http', function(o) {
     var pre = '';
     if (headers) {
       if (!headers['Content-Type']) headers['Content-Type'] = 'text/plain';
-      if (chunk) headers['Transfer-Encoding'] = 'chunked';
-      else headers['Content-Length'] = body.length;
+      if (!chunk) headers['Content-Length'] = body.length;
       pre += 'HTTP/1.1 '+self.statusMessage(status)+'\r\n'+Object.keys(headers).map(function(header) { return header+': '+headers[header]+'\r\n'; }).join('')+'\r\n';
     }
     

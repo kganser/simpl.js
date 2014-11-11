@@ -183,6 +183,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function
                         case 'error':
                           var app = apps[data.app];
                           if (!app) return;
+                          app.running = event == 'run';
                           app.tab.classList[event == 'run' ? 'add' : 'remove']('running');
                           if (event == 'run') {
                             if (selected && selected.entry == app) log.innerHTML = '';

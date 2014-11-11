@@ -109,7 +109,6 @@ simpl.add('socket', function(proxy) {
     })};
   });
   sockets.tcpServer.onAcceptError.addListener(function(info) {
-    console.error(chrome.runtime.lastError.message);
     disconnectServer(info.socketId);
   });
   sockets.tcp.onReceive.addListener(function(info) {
@@ -160,7 +159,6 @@ simpl.add('socket', function(proxy) {
   };
   var disconnectServer = function(socketId) {
     if (!servers[socketId]) return;
-    sockets.tcpServer.disconnect(socketId);
     sockets.tcpServer.close(socketId);
     Object.keys(servers[socketId].clients).forEach(disconnect);
     delete servers[socketId];
