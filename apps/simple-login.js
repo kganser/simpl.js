@@ -53,7 +53,7 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, async: 0, crypto: 0}, funct
       case '/login':
         if (request.method == 'POST' && (request.headers['Content-Type'] || '').split(';')[0] == 'application/x-www-form-urlencoded')
           return request.slurp(function(body) {
-            body = o.http.parseQuery(o.string.fromAsciiBuffer(body));
+            body = o.http.parseQuery(o.string.fromUTF8Buffer(body));
             o.database.get('users/'+encodeURIComponent(body.username), function(user) {
               if (!user || user.password !== pbkdf2(body.password, user.salt).key)
                 return render(['Invalid login. ', {a: {href: '/login', children: 'Try again'}}], 401);
@@ -77,7 +77,7 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, async: 0, crypto: 0}, funct
       case '/register':
         if (request.method == 'POST' && (request.headers['Content-Type'] || '').split(';')[0] == 'application/x-www-form-urlencoded')
           return request.slurp(function(body) {
-            body = o.http.parseQuery(o.string.fromAsciiBuffer(body));
+            body = o.http.parseQuery(o.string.fromUTF8Buffer(body));
             var path = 'users/'+encodeURIComponent(body.username);
             // TODO: make this transactional with a transaction api in database.js
             o.database.get(path, function(user) {

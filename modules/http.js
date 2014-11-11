@@ -29,7 +29,6 @@ simpl.add('http', function(o) {
   return self = {
     serve: function(options, onRequest, callback) {
       o.socket.listen(options, function(socket) {
-        //console.log('connection established', socket.socketId);
         var slurp = function(callback) {
           var body = new Uint8Array(0);
           read = function(data) {
@@ -46,10 +45,8 @@ simpl.add('http', function(o) {
           do {
             var start = 0, end = buffer.byteLength;
             if (!request.headers) {
-              // headers are ascii
               var split, offset = headers.length;
-              headers += o.string.fromAsciiBuffer(buffer);
-              //console.log(headers.split('\r')[0]+'...', socket.socketId);
+              headers += o.string.fromUTF8Buffer(buffer);
               if ((split = headers.indexOf('\r\n\r\n')) > -1) {
                 headers = headers.substr(0, split).split('\r\n');
                 var line = headers.shift().split(' '),
@@ -107,7 +104,6 @@ simpl.add('http', function(o) {
     statusMessage: function(code) {
       if (!code) return '200 OK';
       if (typeof code != 'number') return code;
-      // from https://developer.mozilla.org/en-US/docs/Web/HTTP/Response_codes
       return code+' '+{
         100: 'Continue',
         101: 'Switching Protocol',

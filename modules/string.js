@@ -58,9 +58,6 @@ simpl.add('string', function() {
                   : n);
       }
       return string;
-    },
-    fromAsciiBuffer: function(buffer) {
-      return String.fromCharCode.apply(null, new Uint8Array(buffer)); // TODO: limit is 65536 characters; use loop
     }
   };
 });
