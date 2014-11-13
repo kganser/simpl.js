@@ -1,7 +1,5 @@
 simpl.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
-  o.database.get('entries', function(entries) {
-    if (!entries) o.database.put('entries', {});
-  });
+  var db = o.database('time-tracker', {entries: {}});
   o.http.serve({port: config.port}, function(request, response) {
     if (request.path == '/issues') {
       try {
@@ -23,6 +21,7 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
         response.end(JSON.stringify(issues), {'Content-Type': o.http.mimeType('json')});
       });
     }
+    var ok = function() { response.generic(); };
     if (request.path == '/entries') {
       if (request.method == 'POST')
         return request.slurp(function(body) {
@@ -30,36 +29,28 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
             var entry = JSON.parse(o.string.fromUTF8Buffer(body));
             if (!entry || !/^\d{4}-\d{2}-\d{2}$/.test(entry.date) || typeof entry.time != 'number')
               return response.generic(400);
-            o.database.get('entries/'+entry.date, function(entries) {
-              if (entries) return o.database.put('entries/'+entry.date+'/'+encodeURIComponent(entry.issue), entry.time, function() {
-                response.generic();
-              });
+            db.get('entries/'+entry.date).then(function(entries) {
+              if (entries) return this.put('entries/'+entry.date+'/'+encodeURIComponent(entry.issue), entry.time).then(ok);
               var e = {}; e[entry.issue] = entry.time;
-              o.database.put('entries/'+entry.date, e, function() {
-                response.generic();
-              });
+              this.put('entries/'+entry.date, e).then(ok);
             });
           } catch (e) {
             response.generic(415);
           }
         });
-      return o.database.get('entries', function(entries) {
+      return db.get('entries').then(function(entries) {
         response.end(JSON.stringify(entries), {'Content-Type': o.http.mimeType('json')});
       });
     }
     var match;
     if (request.method == 'DELETE' && (match = /^\/(entries\/\d{4}-\d{2}-\d{2})\/([^\/]*)$/.exec(request.path)))
-      return o.database.get(match[1], function(date) {
+      return db.get(match[1]).then(function(date) {
         var issues = date && Object.keys(date);
         if (issues && issues.length > 1)
-          return o.database.delete(request.path.substr(1), function() {
-            response.generic();
-          });
+          return this.delete(request.path.substr(1)).then(ok);
         if (!issues || issues[0] != decodeURIComponent(match[2]))
           return response.generic();
-        o.database.delete(match[1], function() {
-          response.generic();
-        });
+        this.delete(match[1]).then(ok);
       });
     if (request.path == '/')
       return response.end(o.html.markup({html: [
@@ -113,7 +104,7 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
                       var date = dateString(new Date(now-(page*14+i)*24*60*60*1000));
                       entries.insert(o.html.model(dates[date] || {}, function(hours, issue, index, items) {
                         return {li: [
-                          {button: {className: 'remove', children: '?', onclick: function(e) {
+                          {button: {className: 'remove', children: '✕', onclick: function(e) {
                             this.disabled = true;
                             o.xhr('/entries/'+date+'/'+encodeURIComponent(issue), {method: 'DELETE'}, function() {
                               items.remove(issue);

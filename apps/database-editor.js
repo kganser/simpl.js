@@ -1,13 +1,14 @@
 simpl.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
+  var db = o.database('simpl');
   o.http.serve({port: config.port}, function(request, response) {
     if (request.headers.Accept == 'application/json' || request.query.format == 'json') {
       var path = request.path.substr(1),
-          handler = function(error) {
+          respond = function(error) {
             response.end(error ? '403 '+error : '200 Success', null, error ? 403 : 200);
           };
       switch (request.method) {
         case 'GET':
-          return o.database.get(path, function(object) {
+          return db.get(path).then(function(object) {
             if (object === undefined) response.generic(404);
             response.end(JSON.stringify(object), {'Content-Type': o.http.mimeType('json')});
           });
@@ -17,15 +18,13 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
           return request.slurp(function(body) {
             try {
               body = JSON.parse(o.string.fromUTF8Buffer(body));
-              if (request.method == 'POST')
-                return o.database.append(path, body, handler);
-              o.database.put(path, body, request.method == 'INSERT', handler);
+              (request.method == 'POST' ? db.append(path, body) : db.put(path, body, request.method == 'INSERT')).then(respond);
             } catch (e) {
               response.generic(415);
             }
           });
         case 'DELETE':
-          return o.database.delete(path, handler);
+          return db.delete(path).then(respond);
       }
       return response.generic(501);
     }
@@ -35,7 +34,7 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
           return response.generic(404);
         response.end(e.target.response, {'Content-Type': o.http.mimeType((request.path.match(/\.([^.]*)$/) || [])[1])});
       });
-    o.database.get('', function(data) {
+    db.get().then(function(data) {
       response.end(o.html.markup([
         {'!doctype': {html: null}},
         {head: [

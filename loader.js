@@ -1,6 +1,5 @@
 var simpl = function(modules, clients) {
   var dispatch = function(client) {
-    //console.log(client ? 'resolving new client' : 'resolving existing clients');
     var requested = [];
     for (var i = client ? clients.push(client)-1 : 0; i < clients.length; i++) {
       client = clients[i];
@@ -15,7 +14,6 @@ var simpl = function(modules, clients) {
           available++;
       });
       if (available == needed.length) {
-        //console.log('dependencies resolved for client '+(client.name || 'in '+location.pathname));
         needed.forEach(function(name) {
           var module = modules[name];
           if (!module.init) {
@@ -31,7 +29,6 @@ var simpl = function(modules, clients) {
   };
   return {
     add: function(name, module, dependencies) {
-      //console.log('adding module '+name, dependencies);
       if (dependencies) return simpl.use(dependencies, function(o) {
         simpl.add(name, function() { return module(o); });
       }, name);
