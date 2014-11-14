@@ -1,5 +1,5 @@
 simpl.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
-  var db = o.database('simpl');
+  var db = o.database(config.database);
   o.http.serve({port: config.port}, function(request, response) {
     if (request.headers.Accept == 'application/json' || request.query.format == 'json') {
       var path = request.path.substr(1),

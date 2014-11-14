@@ -8,7 +8,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function
     var data = {};
     [ {name: '1 Hello World', file: 'hello-world', config: {}},
       {name: '2 Web Server', file: 'web-server', config: {port: 8001}},
-      {name: '3 Database Editor', file: 'database-editor', config: {port: 8002}},
+      {name: '3 Database Editor', file: 'database-editor', config: {port: 8002, database: 'simpl'}},
       {name: '4 Simple Login', file: 'simple-login', config: {port: 8003, sessionKey: 'yabadabadoo'}},
       {name: '5 Time Tracker', file: 'time-tracker', config: {port: 8004, redmineHost: 'redmine.slytrunk.com'}}
     ].forEach(function(app, i, apps) {
