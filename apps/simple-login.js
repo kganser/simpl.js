@@ -26,7 +26,13 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, crypto: 0}, function(o) {
   
   o.http.serve({port: config.port}, function(request, response) {
     var render = function(body, status) {
-      response.end(o.html.markup({html: [{body: body}]}), {'Content-Type': o.http.mimeType('html')}, status);
+      response.end(o.html.markup([
+        {doctype: {html: null}},
+        {html: [
+          {head: [{title: 'Simple Login'}]},
+          {body: body}
+        ]}
+      ]), {'Content-Type': o.http.mimeType('html')}, status);
     };
     var logoff = function(cookie, message) {
       if (cookie) db.delete('sessions/'+encodeURIComponent(cookie)).then(function() { logoff(null, message); });
