@@ -26,6 +26,7 @@ nav {
   width: 249px;
   height: 100%;
   padding-right: 1px;
+  background: white;
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -216,9 +217,6 @@ button:hover {
 .collapsed #main {
   margin-left: 31px;
 }
-.error, .warn {
-  color: red;
-}
 #main {
   margin-left: 250px;
   height: 100%;
@@ -229,6 +227,25 @@ button:hover {
 }
 #config, #log, #docs {
   padding: 4px 8px;
+}
+#log .entry {
+  border-bottom: solid 1px #ececec;
+  padding: 1px 0;
+}
+#log .entry:after {
+  content: "";
+  display: block;
+  clear: both;
+}
+#log .message {
+  float: left;
+}
+#log .location {
+  float: right;
+  color: #999;
+}
+#log .error, #log .warn {
+  color: red;
 }
 .CodeMirror, #config, #log, #docs {
   display: none;

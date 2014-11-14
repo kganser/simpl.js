@@ -1,6 +1,6 @@
-simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function(o, proxy) {
+simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy) {
 
-  var apps = {}, clients = [], loader,
+  var apps = {}, clients = [], loader, lines,
       db = o.database('simpl', {apps: {}, modules: {}});
   
   db.get('apps').then(function(apps) {
@@ -29,6 +29,10 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function
           db.put('modules', data);
       });
     });
+  });
+  o.xhr('/loader.js', function(e) {
+    loader = e.target.responseText;
+    lines = loader.match(/\n/g).length+1;
   });
   
   var broadcast = function(event, data) {
@@ -103,28 +107,19 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function
               if (action == 'stop') return response.generic();
             }
             if ((action == 'run' || action == 'restart') && !apps[name])
-              return o.async.join(
-                function(callback) {
-                  if (loader) callback(loader);
-                  else o.xhr('/loader.js', function(e) { callback(loader = e.target.responseText); });
-                },
-                function(callback) {
-                  db.get('apps/'+encodeURIComponent(name)).then(callback);
-                },
-                function(loader, app) {
-                  if (!app) return response.generic(400);
-                  apps[name] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\n'+app.code, function(name, callback) {
-                    db.get('modules/'+encodeURIComponent(name)).then(callback);
-                  }, function(level, args) {
-                    broadcast('log', {app: name, level: level, message: args});
-                  }, function(e) {
-                    broadcast('error', {app: name, message: e.message});
-                    delete apps[name];
-                  });
-                  broadcast('run', {app: name});
-                  response.generic();
-                }
-              );
+              return db.get('apps/'+encodeURIComponent(name)).then(function(app) {
+                if (!app) return response.generic(400);
+                apps[name] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\n'+app.code, function(name, callback) {
+                  db.get('modules/'+encodeURIComponent(name)).then(callback);
+                }, function(level, args, module, line, column) {
+                  broadcast('log', {app: name, level: level, message: args, module: module, line: line, column: column});
+                }, function(e) {
+                  broadcast('error', {app: name, message: e.message});
+                  delete apps[name];
+                });
+                broadcast('run', {app: name});
+                response.generic();
+              });
           } catch (e) {
             response.generic(415);
           }
@@ -149,8 +144,8 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function
               {script: {src: '/xhr.js'}},
               {script: {src: '/jsonv.js'}},
               {script: {src: '/codemirror.js'}},
-              {script: function(apps, modules) {
-                if (!apps) return [a, m];
+              {script: function(apps, modules, offset) {
+                if (!apps) return [a, m, lines];
                 Object.keys(apps).forEach(function(name) { apps[name].log = []; });
                 Object.keys(modules).forEach(function(name) { modules[name] = {code: modules[name]}; });
                 simpl.use({html: 0, xhr: 0, jsonv: 0}, function(o) {
@@ -161,7 +156,12 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function
                         data = message.data;
                     switch (event) {
                       case 'log':
-                        message = {level: data.level, message: data.message};
+                        message = {
+                          level: data.level == 'log' ? 'debug' : data.level,
+                          message: data.message,
+                          module: data.module || '',
+                          line: data.module ? data.line : data.line-offset
+                        };
                         var app = apps[data.app];
                         if (!app) return;
                         if (app.log.push(message) > 1000)
@@ -169,7 +169,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function
                         if (selected && selected.entry == app) {
                           var body = document.body,
                               scroll = body.classList.contains('show-log') && body.scrollHeight - body.scrollTop == document.documentElement.clientHeight;
-                          log.innerHTML += logLine(message);
+                          o.html.dom(logLine(message), log);
                           if (scroll) body.scrollTop = body.scrollHeight;
                         }
                         break;
@@ -181,7 +181,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function
                         app.running = event == 'run';
                         app.tab.classList[event == 'run' ? 'add' : 'remove']('running');
                         if (event == 'run') {
-                          if (selected && selected.entry == app) log.innerHTML = '';
+                          if (selected && selected.entry == app) log.textContent = '';
                           app.log = [];
                         }
                         break;
@@ -196,7 +196,19 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function
                     }
                   };
                   var logLine = function(entry) {
-                    return '<span class="'+entry.level+'">'+entry.message.join(', ').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/\b(https?:\/\/[^\s]+)\b/, '<a href="$1" target="_blank">$1</a>')+'</span>\n';
+                    var string = entry.message.join(', '),
+                        message = [], link;
+                    while (link = /\b(https?|ftp):\/\/\S+\b/.exec(string)) {
+                      var url = link[0];
+                      if (link.index) message.push(string.substr(0, link.index));
+                      message.push({a: {href: url, target: '_blank', children: url}});
+                      string = string.substr(link.index+url.length);
+                    }
+                    if (string) message.push(string);
+                    return {div: {className: 'entry '+entry.level, children: [
+                      {div: {className: 'location', children: entry.module+':'+entry.line}},
+                      {div: {className: 'message', children: message}}
+                    ]}};
                   };
                   var handler = function(action, name, app, entry) {
                     return function(e) {
@@ -216,7 +228,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function
                         if (entry.running) {
                           entry.log = [];
                           if (selected && selected.entry == entry) {
-                            log.innerHTML = '';
+                            log.textContent = '';
                             toggle(name, true, 'log');
                           }
                         }
@@ -229,7 +241,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function
                       selected = {name: name, app: app, entry: (app ? apps : modules)[name]};
                       code.setValue(selected.entry.code);
                       config.update(selected.entry.config);
-                      if (app) log.innerHTML = selected.entry.log.map(logLine).join('');
+                      if (app) o.html.dom(selected.entry.log.map(logLine), log, true);
                       else o.html.dom([{h1: name}, {p: 'documentation goes here'}], docs, true);
                       selected.entry.tab.classList.add('selected');
                     }

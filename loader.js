@@ -46,26 +46,40 @@ var simpl = function(modules, clients) {
 
 // Loader extension for worker creation, messaging, and dependency loading
 simpl = function(s) {
-  var id = 0, log = {}, workers = [], moduleListeners = {}, globalListeners, 
+  var id = 0, log = {}, workers = [], blobs = {}, moduleListeners = {}, globalListeners,
       inWorker = typeof WorkerGlobalScope != 'undefined';
   
-  if (inWorker) self.console = {
-    log: function() { proxy('info', Array.prototype.slice.call(arguments)); },
-    warn: function() { proxy('warn', Array.prototype.slice.call(arguments)); },
-    error: function() { proxy('error', Array.prototype.slice.call(arguments)); },
-    info: function() { proxy('info', Array.prototype.slice.call(arguments)); }
-  };
+  if (inWorker) {
+    var console = function(level) {
+      return function() {
+        var loc = new Error().stack.split('\n')[2].match(/at (.+):(\d+):(\d+)$/);
+        proxy('log', {
+          level: level,
+          args: Array.prototype.slice.call(arguments),
+          module: blobs[loc[1]],
+          line: loc[2],
+          column: loc[3]
+        });
+      };
+    };
+    self.console = {};
+    'log warn error info'.split(' ').forEach(function(level) {
+      self.console[level] = console(level);
+    });
+  }
   
-  var load = inWorker ? function(modules) {
+  var load = !inWorker ? function(m) { return m; } : function(modules) {
     var remaining = modules.length;
     modules.forEach(function(module, i) {
       proxy('load', [module], function(code) {
         modules[i] = URL.createObjectURL(new Blob([code || ''], {type: 'text/javascript'}));
+        // TODO: URL.revokeObjectURL
+        blobs[modules[i]] = module;
         if (!--remaining) importScripts.apply(null, modules);
       });
     });
     return modules;
-  } : function(modules) { return modules; };
+  };
   var send = function(simpl, peer, module, command, args, callback, transferable) {
     // TODO: use a guid?
     var start = id;
@@ -81,20 +95,21 @@ simpl = function(s) {
       delete log[id];
     } else {
       var worker = !inWorker && workers.filter(function(o) { return o.worker === e.target; })[0],
-          command = e.data.command;
+          command = e.data.command,
+          args = e.data.args;
       if (e.data.simpl) {
         if (command == 'load') {
-          if (worker.load) worker.load(e.data.args[0], function(code) {
+          if (worker.load) worker.load(args[0], function(code) {
             e.target.postMessage({id: id, result: [code]});
           });
         } else if (worker.log) {
-          worker.log(command, e.data.args);
+          worker.log(args.level, args.args, args.module, args.line, args.column);
         }
       } else {
         var module = e.data.module,
             listener = module == null ? worker ? worker.listeners[command] : globalListeners[command] : (moduleListeners[module] || {})[command];
         if (!listener) return console.error('no listener for command '+command+(module ? ' (module '+module+')' : ''));
-        var destruct = listener(e.data.args, function() {
+        var destruct = listener(args, function() {
           e.target.postMessage({id: id, result: Array.prototype.slice.call(arguments)});
         }, function(command, args, callback, transferable) {
           send(false, e.target, e.data.module, command, args, callback, transferable);
@@ -107,12 +122,13 @@ simpl = function(s) {
   
   var channel = function(simpl, module) {
     return function(listeners, code, load, log, error) {
-      var worker, peer = code ? new Worker(URL.createObjectURL(new Blob([code], {type: 'application/javascript'}))) : self;
+      var url = code != null && URL.createObjectURL(new Blob([code], {type: 'application/javascript'})),
+          peer = url ? new Worker(url) : self;
       if (simpl || code) peer.onmessage = receive;
       
       if (code != null) {
         peer.onerror = error;
-        workers.push(worker = {worker: peer, listeners: listeners || {}, load: load, log: log, destructors: []});
+        workers.push(peer = {worker: peer, listeners: listeners || {}, load: load, log: log, destructors: []});
       } else if (module != null) {
         moduleListeners[module] = listeners;
       } else {
@@ -123,13 +139,14 @@ simpl = function(s) {
         send(simpl, peer, module, command, args, callback, transferable);
       };
       
-      return code == null ? sender : {send: sender, terminate: function(i) {
-        if (~(i = workers.indexOf(worker))) {
-          worker.destructors.forEach(function(d) { d(); });
-          worker.worker.terminate();
+      return url ? {send: sender, terminate: function(i) {
+        if (~(i = workers.indexOf(peer))) {
+          peer.destructors.forEach(function(d) { d(); });
+          peer.worker.terminate();
+          URL.revokeObjectURL(url);
           workers.splice(i, 1);
         }
-      }};
+      }} : sender;
     };
   };
   
