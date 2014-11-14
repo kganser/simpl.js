@@ -4,7 +4,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function
       db = o.database('simpl', {apps: {}, modules: {}});
   
   db.get('apps').then(function(apps) {
-    //if (apps) return;
+    if (apps) return;
     var data = {};
     [ {name: '1 Hello World', file: 'hello-world', config: {}},
       {name: '2 Web Server', file: 'web-server', config: {port: 8001}},
@@ -20,7 +20,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, async: 0}, function
     });
   });
   db.get('modules').then(function(modules) {
-    //if (modules) return;
+    if (modules) return;
     var data = {};
     'async crypto database html http socket string xhr'.split(' ').forEach(function(module, i, modules) {
       o.xhr('/modules/'+module+'.js', function(e) {
