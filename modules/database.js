@@ -73,95 +73,36 @@ simpl.add('database', function() {
       }(result, makePath(key), callback);
     };
   };
-  var putElement = function(store, key, value) {
+  var put = function(store, key, value, callback) {
     var type = Array.isArray(value) ? 'array' : typeof value == 'object' ? value ? 'object' : 'null' : typeof value,
-        record = {parent: key[0], key: key[1], type: type, value: typeof value == 'object' ? null : value};
-    store.put(record);
-    return record;
-  };
-  var put = function(store, key, value) {
-    var type = putElement(store, key, value).type,
-        parent = makePath(key);
+        parent = makePath(key),
+        pending = 1,
+        cb = function() { if (!--pending) callback(); };
+    store.put({parent: key[0], key: key[1], type: type, value: typeof value == 'object' ? null : value}).onsuccess = cb;
     if (type == 'array') {
       value.forEach(function(value, i) {
-        put(store, [parent, i], value);
+        pending++;
+        put(store, [parent, i], value, cb);
       });
     } else if (type == 'object') {
       Object.keys(value).forEach(function(key) {
-        put(store, [parent, key], value[key]);
+        pending++;
+        put(store, [parent, key], value[key], cb);
       });
     }
   };
-  var putImpl = function(store, path, value, insert, callback) {
-    getPath(store, path, function(path, position) {
-      var parentPath = path.slice(0, -1);
-      store.get(makeKey(parentPath)).onsuccess = function(e) {
-        var parent = e.target.result,
-            root = path.length < 2 && !path[0],
-            key = root ? '' : path[path.length-1];
-        if (!parent && !root)
-          return callback('Parent resource does not exist');
-        if (insert && (root || parent.type != 'array'))
-          return callback('Parent resource is not an array');
-        if (parent && parent.type != 'object' && parent.type != 'array')
-          return callback('Parent resource is not an object or array');
-        if (parent && parent.type == 'array' && typeof key != 'number')
-          return callback('Invalid index to array resource');
-        parentPath = root ? 0 : parentPath.join('/');
-        if (insert) {
-          var i = 0, realKey = 0, lastShiftKey = -1,
-              index = store.index('parent');
-          index.openCursor(parentPath).onsuccess = function(e) {
-            var cursor = e.target.result;
-            if (cursor && i < position) {
-              // before desired position, track real key as previous key + 1
-              realKey = cursor.value.key+1;
-              cursor.continue();
-            } else if (cursor && cursor.value.key == realKey+i-position) {
-              // all contiguous keys after desired position must be shifted by one
-              lastShiftKey = cursor.value.key;
-              cursor.continue();
-            } else if (lastShiftKey >= 0) {
-              // shift subsequent elements' keys
-              index.openCursor(parentPath, 'prev').onsuccess = function(e) {
-                var cursor = e.target.result,
-                    element = cursor.value,
-                    key = element.key;
-                if (key < realKey) return put(store, [parentPath, realKey], value);
-                if (key > lastShiftKey) return cursor.continue();
-                get(store, [parentPath, key], function(result) {
-                  deleteChildren(store, parentPath+'/'+key, function() {
-                    put(store, [parentPath, key+1], result);
-                    cursor.continue();
-                  });
-                });
-              };
-            } else {
-              // didn't need to shift anything
-              put(store, [parentPath, realKey], value);
-            }
-            i++;
-          };
-        } else {
-          deleteChildren(store, path.join('/'), function() {
-            put(store, [parentPath, decodeURIComponent(key)], value);
-          });
-        }
-      };
-    });
-  };
   var deleteChildren = function(store, path, callback) {
-    var pending = 1;
+    var pending = 1,
+        cb = function() { if (!--pending) callback(); };
     store.index('parent').openCursor(path).onsuccess = function(e) {
       var cursor = e.target.result;
-      if (!cursor) return --pending || callback && callback();
-      var result = cursor.value,
-          next = function() { if (!--pending && callback) callback(); };
+      if (!cursor) return cb();
+      var result = cursor.value;
       pending++;
-      store.delete([result.parent, result.key]).onsuccess = next;
+      store.delete([result.parent, result.key]).onsuccess = cb;
       if (result.type == 'object' || result.type == 'array') {
         pending++;
-        deleteChildren(store, makePath([result.parent, result.key]), next);
+        deleteChildren(store, makePath([result.parent, result.key]), cb);
       }
       cursor.continue();
     }
@@ -169,7 +110,7 @@ simpl.add('database', function() {
   
   return function(database, upgrade, version) {
     var self, db, queue, open = function(stores, callback) {
-      if (db) return callback(db);
+      if (db) return callback();
       if (queue) return queue.push(callback);
       queue = [callback];
       var request = indexedDB.open(database, version || 1);
@@ -189,7 +130,7 @@ simpl.add('database', function() {
               throw 'objectStore already exists';
             var store = db.createObjectStore(name, {keyPath: ['parent', 'key']});
             store.createIndex('parent', 'parent');
-            putImpl(store, '', data === undefined ? {} : data, false, function() {});
+            put(store, makeKey([]), data === undefined ? {} : data, function() {});
             return self;
           },
           deleteObjectStore: function(name) {
@@ -201,53 +142,111 @@ simpl.add('database', function() {
       };
       request.onsuccess = function(e) {
         db = e.target.result;
-        while (callback = queue.shift()) callback(db);
+        while (callback = queue.shift()) callback();
       };
     };
     var transaction = function(type, stores, callback) {
-      var trans, self = {
+      var trans, pending = 0, values = [], self = {
         // TODO: cursor interface
         get: function(store, path, callback) {
-          getPath(store = trans.objectStore(store), path, function(path) {
-            get(store, makeKey(path), callback);
-          });
+          get(store, makeKey(path), callback);
         },
-        put: function(store, path, value, insert, callback) {
-          putImpl(trans.objectStore(store), path, value, insert, callback);
-        },
-        append: function(store, path, value, callback) {
-          getPath(store = trans.objectStore(store), path, function(path) {
-            store.get(makeKey(path)).onsuccess = function(e) {
-              var parent = e.target.result;
-              if (!parent)
-                return callback('Parent resource does not exist');
-              if (parent.type != 'array')
-                return callback('Parent resource is not an array');
-              store.index('parent').openCursor(path = path.join('/'), 'prev').onsuccess = function(e) {
+        put: function(store, path, callback, value, position, insert) {
+          var parentPath = path.slice(0, -1);
+          store.get(makeKey(parentPath)).onsuccess = function(e) {
+            var parent = e.target.result,
+                root = path.length < 2 && !path[0],
+                key = path[path.length-1];
+            if (!parent && !root)
+              return callback('Parent resource does not exist');
+            if (insert && (root || parent.type != 'array'))
+              return callback('Parent resource is not an array');
+            if (parent && parent.type != 'object' && parent.type != 'array')
+              return callback('Parent resource is not an object or array');
+            if (parent && parent.type == 'array' && typeof key != 'number')
+              return callback('Invalid index to array resource');
+            parentPath = root ? 0 : parentPath.join('/');
+            if (insert) {
+              var i = 0, realKey = 0, lastShiftKey = -1,
+                  index = store.index('parent');
+              index.openCursor(parentPath).onsuccess = function(e) {
                 var cursor = e.target.result;
-                put(store, [path, cursor ? cursor.value.key+1 : 0], value);
+                if (cursor && i < position) {
+                  // before desired position, track real key as previous key + 1
+                  realKey = cursor.value.key+1;
+                  cursor.continue();
+                } else if (cursor && cursor.value.key == realKey+i-position) {
+                  // all contiguous keys after desired position must be shifted by one
+                  lastShiftKey = cursor.value.key;
+                  cursor.continue();
+                } else if (lastShiftKey >= 0) {
+                  // shift subsequent elements' keys
+                  var pending = 1,
+                      cb = function() { if (!--pending) callback(); };
+                  index.openCursor(parentPath, 'prev').onsuccess = function(e) {
+                    var cursor = e.target.result,
+                        element = cursor.value,
+                        key = element.key;
+                    if (key < realKey) return put(store, [parentPath, realKey], value, cb);
+                    if (key > lastShiftKey) return cursor.continue();
+                    pending++;
+                    get(store, [parentPath, key], function(result) {
+                      deleteChildren(store, parentPath+'/'+key, function() {
+                        put(store, [parentPath, key+1], result, cb);
+                        cursor.continue();
+                      });
+                    });
+                  };
+                } else {
+                  // didn't need to shift anything
+                  put(store, [parentPath, realKey], value, callback);
+                }
+                i++;
               };
-            };
-          });
+            } else {
+              deleteChildren(store, path.join('/'), function() {
+                put(store, [parentPath, decodeURIComponent(key)], value, callback);
+              });
+            }
+          };
         },
-        delete: function(store, path) {
-          getPath(store = trans.objectStore(store), path, function(path) {
-            store.delete(makeKey(path));
-            deleteChildren(store, path.join('/'));
-          });
+        append: function(store, path, callback, value) {
+          store.get(makeKey(path)).onsuccess = function(e) {
+            var parent = e.target.result;
+            if (!parent)
+              return callback('Parent resource does not exist');
+            if (parent.type != 'array')
+              return callback('Parent resource is not an array');
+            store.index('parent').openCursor(path = path.join('/'), 'prev').onsuccess = function(e) {
+              var cursor = e.target.result;
+              put(store, [path, cursor ? cursor.value.key+1 : 0], value, callback);
+            };
+          };
+        },
+        delete: function(store, path, callback) {
+          store.delete(makeKey(path));
+          deleteChildren(store, path.join('/'), callback);
         }
       };
       Object.keys(self).forEach(function(name) {
         var method = self[name];
-        self[name] = function() {
-          var args = arguments;
-          if (trans) method.apply(null, args);
-          else open(stores, function(db) {
-            if (!trans) {
-              trans = db.transaction(stores, type);
-              trans.oncomplete = callback;
-            }
-            method.apply(null, args);
+        var wrapped = function(store, path, value, insert) {
+          var i = values.push(pending++)-1;
+          getPath(store = trans.objectStore(store), path, function(path, position) {
+            method(store, path, function(value) {
+              values[i] = value;
+              if (!--pending) {
+                callback.apply(null, values);
+                values = [];
+              }
+            }, value, position, insert);
+          });
+        };
+        self[name] = function(store, path, value, insert) {
+          if (trans) return wrapped(store, path, value, insert);
+          open(stores, function() {
+            if (!trans) trans = db.transaction(stores, type);
+            wrapped(store, path, value, insert);
           });
         };
       });
@@ -256,37 +255,25 @@ simpl.add('database', function() {
     return self = {
       transaction: function(type, stores) {
         if (stores == null) stores = 'data';
-        var cb, values = [], trans = transaction(type, stores, function() {
-          var v = values;
-          values = [];
-          if (cb) cb.apply(self, v);
+        var cb, trans = transaction(type, stores, function() {
+          if (cb) cb.apply(self, arguments);
         });
         var self = {
           objectStore: function(store) {
             return {
               get: function(path) {
-                var i = values.push(undefined)-1;
-                trans.get(store, path, function(value) {
-                  values[i] = value;
-                });
+                trans.get(store, path);
                 return self;
               },
               put: function(path, value, insert) {
-                var i = values.push(undefined)-1;
-                trans.put(store, path, value, insert, function(error) {
-                  values[i] = error;
-                });
+                trans.put(store, path, value, insert);
                 return self;
               },
               append: function(path, value) {
-                var i = values.push(undefined)-1;
-                trans.append(store, path, value, function(error) {
-                  values[i] = error;
-                });
+                trans.append(store, path, value);
                 return self;
               },
               delete: function(path) {
-                values.push(undefined);
                 trans.delete(store, path);
                 return self;
               },

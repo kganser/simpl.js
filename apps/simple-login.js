@@ -74,7 +74,7 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, crypto: 0}, function(o) {
           return request.slurp(function(body) {
             body = o.http.parseQuery(o.string.fromUTF8Buffer(body));
             var path = 'users/'+encodeURIComponent(body.username);
-            db.get(path, function(user) {
+            db.transaction('readwrite').get(path).then(function(user) {
               if (user) return render(['Username '+body.username+' is already taken. ', {a: {href: '/register', children: 'Try again'}}], 401);
               var session = sid(),
                   hash = pbkdf2(body.password);
