@@ -236,8 +236,9 @@ simpl.add('database', function() {
             method(store, path, function(value) {
               values[i] = value;
               if (!--pending) {
-                callback.apply(null, values);
+                var v = values;
                 values = [];
+                callback.apply(null, v);
               }
             }, value, position, insert);
           });

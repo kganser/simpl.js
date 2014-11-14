@@ -49,11 +49,11 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, crypto: 0}, function(o) {
         if (request.method == 'POST' && (request.headers['Content-Type'] || '').split(';')[0] == 'application/x-www-form-urlencoded')
           return request.slurp(function(body) {
             body = o.http.parseQuery(o.string.fromUTF8Buffer(body));
-            db.get('users/'+encodeURIComponent(body.username)).then(function(user) {
+            db.transaction('readwrite').get('users/'+encodeURIComponent(body.username)).then(function(user) {
               if (!user || user.password !== pbkdf2(body.password, user.salt).key)
                 return render(['Invalid login. ', {a: {href: '/login', children: 'Try again'}}], 401);
               var session = sid();
-              this.put('sessions/'+session.unsigned, body.username, function() {
+              this.put('sessions/'+session.unsigned, body.username).then(function() {
                 response.end('Login successful', {'Set-Cookie': 'sid='+session.signed, Location: '/'}, 303);
               });
             });
