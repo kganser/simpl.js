@@ -11,10 +11,6 @@ body {
 html, body, .CodeMirror {
   height: 100%;
 }
-.CodeMirror-scroll {
-  overflow-x: auto;
-  overflow-y: hidden;
-}
 .CodeMirror-gutters {
   border-right: none;
 }

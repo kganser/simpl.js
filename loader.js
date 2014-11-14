@@ -57,8 +57,8 @@ simpl = function(s) {
           level: level,
           args: Array.prototype.slice.call(arguments),
           module: blobs[loc[1]],
-          line: loc[2],
-          column: loc[3]
+          line: parseInt(loc[2], 10),
+          column: parseInt(loc[3], 10)
         });
       };
     };
