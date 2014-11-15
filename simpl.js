@@ -149,7 +149,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                 Object.keys(apps).forEach(function(name) { apps[name].log = []; });
                 Object.keys(modules).forEach(function(name) { modules[name] = {code: modules[name]}; });
                 simpl.use({html: 0, xhr: 0, jsonv: 0}, function(o) {
-                  var appList, moduleList, selected, code, config, log, docs;
+                  var appList, moduleList, selected, code, config, log, docs, line;
                   if (window.EventSource) new EventSource('/activity').onmessage = function(e) {
                     var message = JSON.parse(e.data),
                         event = message.event,
@@ -235,10 +235,11 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                       });
                     };
                   };
-                  var toggle = function(name, app, panel) {
+                  var toggle = function(name, app, panel, ln, ch) {
                     if (!selected || selected.name != name || selected.app != app) {
                       if (selected) selected.entry.tab.classList.remove('selected');
                       selected = {name: name, app: app, entry: (app ? apps : modules)[name]};
+                      line = null;
                       code.setValue(selected.entry.code);
                       config.update(selected.entry.config);
                       if (app) o.html.dom(selected.entry.log.map(logLine), log, true);
@@ -251,7 +252,13 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                     body.className = body.classList.contains('collapsed') ? 'collapsed show-'+panel : 'show-'+panel;
                     selected.entry.view.className = 'view '+next;
                     selected.entry.view.title = 'Show '+next[0].toUpperCase()+next.slice(1);
-                    if (panel == 'log') body.scrollTop = body.scrollHeight;
+                    if (panel == 'code' && ln != undefined) {
+                      code.scrollIntoView({line: ln, ch: ch});
+                      if (line) code.removeLineClass(line, 'background', 'current');
+                      line = code.addLineClass(ln-1, 'background', 'current');
+                    } else if (panel == 'log') {
+                      body.scrollTop = body.scrollHeight;
+                    }
                     code.refresh();
                   };
                   var li = function(name, app) {
@@ -359,7 +366,12 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                             });
                           });
                         }}},
-                        {pre: {id: 'log', children: function(e) { log = e; }}},
+                        {pre: {id: 'log', children: function(e) { log = e; }, onclick: function(e) {
+                          if (e.target.className == 'location') {
+                            var ref = e.target.textContent.split(':');
+                            toggle(ref[0] || selected.name, !ref[0], 'code', ref[1], 0);
+                          }
+                        }}},
                         {div: {id: 'docs', children: function(e) { docs = e; }}}
                       ];
                     }}}
