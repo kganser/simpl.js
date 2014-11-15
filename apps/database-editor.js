@@ -1,4 +1,4 @@
-simpl.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
+simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
   var db = o.database(config.database);
   o.http.serve({port: config.port}, function(request, response) {
     if (request.headers.Accept == 'application/json' || request.query.format == 'json') {
@@ -16,13 +16,9 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, xhr: 0}, function(o) {
         case 'POST':
         case 'INSERT':
           return request.slurp(function(body) {
-            try {
-              body = JSON.parse(o.string.fromUTF8Buffer(body));
-              (request.method == 'POST' ? db.append(path, body) : db.put(path, body, request.method == 'INSERT')).then(respond);
-            } catch (e) {
-              response.generic(415);
-            }
-          });
+            if (body === undefined) return response.generic(415);
+            (request.method == 'POST' ? db.append(path, body) : db.put(path, body, request.method == 'INSERT')).then(respond);
+          }, 'json');
         case 'DELETE':
           return db.delete(path).then(respond);
       }

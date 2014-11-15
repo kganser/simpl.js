@@ -1,4 +1,4 @@
-simpl.use({http: 0, database: 0, html: 0, string: 0, crypto: 0}, function(o) {
+simpl.use({http: 0, database: 0, html: 0, crypto: 0}, function(o) {
   
   var db = o.database('simple-login', {sessions: {}, users: {}}),
       key = o.crypto.codec.utf8String.toBits(config.sessionKey),
@@ -54,7 +54,6 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, crypto: 0}, function(o) {
       case '/login':
         if (request.method == 'POST' && (request.headers['Content-Type'] || '').split(';')[0] == 'application/x-www-form-urlencoded')
           return request.slurp(function(body) {
-            body = o.http.parseQuery(o.string.fromUTF8Buffer(body));
             db.transaction('readwrite').get('users/'+encodeURIComponent(body.username)).then(function(user) {
               if (!user || user.password !== pbkdf2(body.password, user.salt).key)
                 return render(['Invalid login. ', {a: {href: '/login', children: 'Try again'}}], 401);
@@ -63,7 +62,7 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, crypto: 0}, function(o) {
                 response.end('Login successful', {'Set-Cookie': 'sid='+session.signed, Location: '/'}, 303);
               });
             });
-          });
+          }, 'url');
         return render([{form: {method: 'post', action: '/login', children: [
           {label: 'Username: '},
           {input: {type: 'text', name: 'username'}},
@@ -78,7 +77,6 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, crypto: 0}, function(o) {
       case '/register':
         if (request.method == 'POST' && (request.headers['Content-Type'] || '').split(';')[0] == 'application/x-www-form-urlencoded')
           return request.slurp(function(body) {
-            body = o.http.parseQuery(o.string.fromUTF8Buffer(body));
             var path = 'users/'+encodeURIComponent(body.username);
             db.transaction('readwrite').get(path).then(function(user) {
               if (user) return render(['Username '+body.username+' is already taken. ', {a: {href: '/register', children: 'Try again'}}], 401);
@@ -88,7 +86,7 @@ simpl.use({http: 0, database: 0, html: 0, string: 0, crypto: 0}, function(o) {
                   .put('sessions/'+session.unsigned, body.username)
                   .then(function() { response.end('User created', {'Set-Cookie': 'sid='+session.signed, Location: '/'}, 303); });
             });
-          });
+          }, 'url');
         return render([{form: {method: 'post', action: '/register', children: [
           {label: 'Name: '},
           {input: {type: 'text', name: 'name'}}, {br: null},

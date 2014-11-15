@@ -29,10 +29,19 @@ simpl.add('http', function(o) {
   return self = {
     serve: function(options, onRequest, callback) {
       o.socket.listen(options, function(socket) {
-        var slurp = function(callback) {
+        var slurp = function(callback, format) {
           var body = new Uint8Array(0);
           read = function(data) {
-            if (!data) return callback(body);
+            if (!data) {
+              if (format == 'utf8' || format == 'url' || format == 'json')
+                body = o.string.fromUTF8Buffer(body);
+              if (format == 'url')
+                return callback(self.parseQuery(body));
+              if (format == 'json')
+                try { body = JSON.parse(body); }
+                catch (e) { body = undefined; }
+              return callback(body);
+            }
             var b = new Uint8Array(body.byteLength + data.byteLength);
             b.set(new Uint8Array(body), 0);
             b.set(new Uint8Array(data), body.byteLength);
