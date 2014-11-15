@@ -252,9 +252,9 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                     body.className = body.classList.contains('collapsed') ? 'collapsed show-'+panel : 'show-'+panel;
                     selected.entry.view.className = 'view '+next;
                     selected.entry.view.title = 'Show '+next[0].toUpperCase()+next.slice(1);
+                    if (line) code.removeLineClass(line, 'background', 'current');
                     if (panel == 'code' && ln != undefined) {
                       code.scrollIntoView({line: ln, ch: ch});
-                      if (line) code.removeLineClass(line, 'background', 'current');
                       line = code.addLineClass(ln-1, 'background', 'current');
                     } else if (panel == 'log') {
                       body.scrollTop = body.scrollHeight;
