@@ -64,13 +64,12 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
             response.generic();
           });
         if (method == 'POST')
-          return request.slurp(function(body) {
-            var code = o.string.fromUTF8Buffer(body);
-            return db.put(parts[0] == 'apps' ? path+'/code' : path, code).then(function(error) {
+          return request.slurp(function(code) {
+            db.put(parts[0] == 'apps' ? path+'/code' : path, code).then(function(error) {
               if (!error) return response.generic();
-              db.put(path, {code: code, config: {}}).then(function() { response.generic(); });
+              this.put(path, {code: code, config: {}}).then(function() { response.generic(); });
             });
-          });
+          }, 'utf8');
       } else if (parts[2] == 'config') {
         var handler = function() {
           db.get(parts.slice(0, 3).join('/')).then(function(config) {
@@ -79,12 +78,9 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
         };
         if (method == 'PUT' || method == 'INSERT')
           return request.slurp(function(body) {
-            try {
-              db.put(path, JSON.parse(o.string.fromUTF8Buffer(body)), method == 'INSERT').then(handler);
-            } catch (e) {
-              response.generic(415);
-            }
-          });
+            if (body === undefined) return response.generic(415);
+            db.put(path, body, method == 'INSERT').then(handler);
+          }, 'json');
         if (method == 'DELETE')
           return db.delete(path).then(handler);
       }
@@ -96,35 +92,31 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
     if (request.path == '/') {
       if (request.method == 'POST')
         return request.slurp(function(body) {
-          try {
-            body = JSON.parse(o.string.fromUTF8Buffer(body));
-            var name = body.app,
-                action = body.action;
-            if ((action == 'stop' || action == 'restart') && apps[name]) {
-              apps[name].terminate();
-              broadcast('stop', {app: name});
-              delete apps[name];
-              if (action == 'stop') return response.generic();
-            }
-            if ((action == 'run' || action == 'restart') && !apps[name])
-              return db.get('apps/'+encodeURIComponent(name)).then(function(app) {
-                if (!app) return response.generic(400);
-                apps[name] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\n'+app.code, function(name, callback) {
-                  db.get('modules/'+encodeURIComponent(name)).then(callback);
-                }, function(level, args, module, line, column) {
-                  broadcast('log', {app: name, level: level, message: args, module: module, line: line, column: column});
-                }, function(e) {
-                  broadcast('error', {app: name, message: e.message});
-                  delete apps[name];
-                });
-                broadcast('run', {app: name});
-                response.generic();
-              });
-          } catch (e) {
-            response.generic(415);
+          if (body === undefined) return response.generic(415);
+          var name = body.app,
+              action = body.action;
+          if ((action == 'stop' || action == 'restart') && apps[name]) {
+            apps[name].terminate();
+            broadcast('stop', {app: name});
+            delete apps[name];
+            if (action == 'stop') return response.generic();
           }
+          if ((action == 'run' || action == 'restart') && !apps[name])
+            return db.get('apps/'+encodeURIComponent(name)).then(function(app) {
+              if (!app) return response.generic(400);
+              apps[name] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\n'+app.code, function(name, callback) {
+                db.get('modules/'+encodeURIComponent(name)).then(callback);
+              }, function(level, args, module, line, column) {
+                broadcast('log', {app: name, level: level, message: args, module: module, line: line, column: column});
+              }, function(e) {
+                broadcast('error', {app: name, message: e.message});
+                delete apps[name];
+              });
+              broadcast('run', {app: name});
+              response.generic();
+            });
           response.generic(400);
-        });
+        }, 'json');
       return db.get('apps').get('modules').then(function(a, m) {
         Object.keys(a).forEach(function(name) { a[name].running = !!apps[name]; });
         response.end(o.html.markup([
@@ -149,7 +141,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                 Object.keys(apps).forEach(function(name) { apps[name].log = []; });
                 Object.keys(modules).forEach(function(name) { modules[name] = {code: modules[name]}; });
                 simpl.use({html: 0, xhr: 0, jsonv: 0}, function(o) {
-                  var appList, moduleList, selected, code, config, log, docs, line;
+                  var appList, moduleList, selected, code, config, log, docs, line, status;
                   if (window.EventSource) new EventSource('/activity').onmessage = function(e) {
                     var message = JSON.parse(e.data),
                         event = message.event,
@@ -238,13 +230,14 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                   var toggle = function(name, app, panel, ln, ch) {
                     if (!selected || selected.name != name || selected.app != app) {
                       if (selected) selected.entry.tab.classList.remove('selected');
-                      selected = {name: name, app: app, entry: (app ? apps : modules)[name]};
-                      line = null;
-                      code.setValue(selected.entry.code);
-                      config.update(selected.entry.config);
-                      if (app) o.html.dom(selected.entry.log.map(logLine), log, true);
+                      var entry = (app ? apps : modules)[name];
+                      selected = line = null;
+                      code.setValue(entry.code);
+                      selected = {name: name, app: app, entry: entry};
+                      config.update(entry.config);
+                      if (app) o.html.dom(entry.log.map(logLine), log, true);
                       else o.html.dom([{h1: name}, {p: 'documentation goes here'}], docs, true);
-                      selected.entry.tab.classList.add('selected');
+                      entry.tab.classList.add('selected');
                     }
                     if (!panel) panel = app ? selected.entry.running ? 'log' : 'code' : 'docs';
                     var next = {config: selected.entry.running ? 'log' : 'code', code: app ? 'config' : 'docs', log: 'code', docs: 'code'}[panel],
@@ -345,24 +338,37 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                         matchBrackets: true,
                         highlightSelectionMatches: true
                       });
-                      CodeMirror.commands.save = function() {
+                      code.on('changes', function() {
                         if (!selected) return;
+                        selected.entry.dirty = true;
+                        selected.entry.tab.lastChild.textContent = '* '+selected.name;
+                      });
+                      CodeMirror.commands.save = function() {
+                        if (!selected || !selected.entry.dirty) return;
+                        var current = selected;
+                        status('info', 'Saving...');
                         o.xhr((selected.app ? '/apps/' : '/modules/')+encodeURIComponent(selected.name), {
                           method: 'POST',
                           data: selected.entry.code = code.getValue()
+                        }, function(e) {
+                          if (e = e.target.status == 200)
+                            current.entry.tab.lastChild.textContent = current.name;
+                          status(e ? 'success' : 'failure', e ? 'Saved' : 'Error');
                         });
                       };
                       return [
                         {pre: {id: 'config', className: 'json', children: function(e) {
                           config = o.jsonv(selected && selected.entry.config, e, function(method, path, data) {
                             var app = selected.entry;
+                            status('info', 'Saving...');
                             o.xhr('/apps/'+encodeURIComponent(selected.name)+'/config/'+path, {
                               method: method,
                               json: data,
                               responseType: 'json'
-                            }, function(e) {
-                              if (e.target.status == 200)
+                            }, function(e, ok) {
+                              if (ok = e.target.status == 200)
                                 app.config = e.target.response;
+                              status(ok ? 'success' : 'failure', ok ? 'Saved' : 'Error');
                             });
                           });
                         }}},
@@ -372,7 +378,19 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                             toggle(ref[0] || selected.name, !ref[0], 'code', ref[1], 0);
                           }
                         }}},
-                        {div: {id: 'docs', children: function(e) { docs = e; }}}
+                        {div: {id: 'docs', children: function(e) { docs = e; }}},
+                        {div: {id: 'status', children: function(e) {
+                          var i = 0; clear = function() {
+                            if (!--i) e.style.display = 'none';
+                          };
+                          status = function(type, text) {
+                            e.style.display = 'block';
+                            e.className = type;
+                            e.textContent = text;
+                            setTimeout(clear, 2000);
+                            i++;
+                          };
+                        }}}
                       ];
                     }}}
                   ], document.body);

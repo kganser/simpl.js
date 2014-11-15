@@ -88,8 +88,8 @@ simpl.add('http', function(o) {
                   end: function(body, headers, status, callback) {
                     socket.send(entity(status, headers, body, headersSent, headersSent), callback);
                   },
-                  generic: function(status, callback) {
-                    response.end(self.statusMessage(status), callback);
+                  generic: function(status) {
+                    response.end(self.statusMessage(status), null, status || 200);
                   }
                 }, socket);
                 if (!read && typeof r == 'function') read = r;

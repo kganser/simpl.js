@@ -110,13 +110,13 @@ button:before {
 button:hover {
   color: white;
 }
-.run:hover, .restart:hover {
+.run:hover, .restart:hover, #status.success {
   background: #3c3;
 }
-.delete:hover, .stop:hover {
+.delete:hover, .stop:hover, #status.failure {
   background: #c33;
 }
-.code:hover, .config:hover, .log:hover, .docs:hover {
+.code:hover, .config:hover, .log:hover, .docs:hover, #status.info {
   background: #36c;
 }
 .toggle:hover, .show-code .toggle:hover {
@@ -220,6 +220,15 @@ button:hover {
   margin-left: 250px;
   height: 100%;
   background: url(/simpl.png) no-repeat center center;
+}
+#status {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 6;
+  display: none;
+  color: white;
+  padding: 3px 8px;
 }
 .CodeMirror-gutters {
   border-right: none;

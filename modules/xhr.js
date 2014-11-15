@@ -11,8 +11,8 @@ simpl.add('xhr', function() {
     xhr.responseType = options.responseType || '';
     
     xhr.onload = callback || options.onload;
-    xhr.onerror = options.onerror;
-    xhr.ontimeout = options.ontimeout;
+    xhr.onerror = callback || options.onerror;
+    xhr.ontimeout = callback || options.ontimeout;
     xhr.onreadystatechange = options.onreadystatechange;
     
     var headers = options.headers || {};
