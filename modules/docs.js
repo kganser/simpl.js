@@ -15,45 +15,45 @@ simpl.add('docs', function(o) {
   };
   var self, parse = o.parser.generate({
     named_value_nodefault: [
-      [['id', ':', 'types'], function(values) { return {name: values[0], type: values[2]}; }]
+      'id', ':', 'types', function(values) { return {name: values[0], type: values[2]}; }
     ],
     named_value: [
-      [['id', '=', 'literal', ':', 'types'], function(values) { return {name: values[0], default: values[2], type: values[4]}; }],
-      [['named_value_nodefault'], pass]
+      'id', '=', 'literal', ':', 'types', function(values) { return {name: values[0], default: values[2], type: values[4]}; },
+      'named_value_nodefault', pass
     ],
     named_values: [
-      [['named_value', ',', 'named_values'], collect],
-      [['named_value'], pass]
+      'named_value', ',', 'named_values', collect,
+      'named_value', pass
     ],
     value: [
-      [['named_value'], pass],
-      [['types'], function(values) { return {type: values[0]}; }],
-      [['...'], pass] // limit these?
+      'named_value', pass,
+      'types', function(values) { return {type: values[0]}; },
+      '...', pass // limit these?
     ],
     values: [
-      [['value', ',', 'values'], collect],
-      [['value'], pass]
+      'value', ',', 'values', collect,
+      'value', pass
     ],
     type: [
-      [['id'], pass],
-      [['function'], pass],
-      [['function', '(', 'values', ')'], function(values) { return {function: {args: values[2]}}; }],
-      [['{', 'named_values', '}'], function(values) { return {object: values[1]}; }],
-      [['[', 'values', ']'], function(values) { return {array: values[1]}; }]
+      'id', pass,
+      'function', pass,
+      'function', '(', 'values', ')', function(values) { return {function: {args: values[2]}}; },
+      '{', 'named_values', '}', function(values) { return {object: values[1]}; },
+      '[', 'values', ']', function(values) { return {array: values[1]}; }
     ],
     types: [
-      [['type', '|', 'types'], collect],
-      [['function', '(', 'values', ')', '->', 'types'], function(values) { return {function: {args: values[2], returns: values[5]}}; }],
-      [['type'], pass]
+      'type', '|', 'types', collect,
+      'function', '(', 'values', ')', '->', 'types', function(values) { return {function: {args: values[2], returns: values[5]}}; },
+      'type', pass
     ],
     literal: [
-      [['null'], pass],
-      [['undefined'], pass],
-      [['true'], pass],
-      [['false'], pass],
-      [['string'], pass],
-      [['number'], pass],
-      [['code'], pass],
+      'null', pass,
+      'undefined', pass,
+      'true', pass,
+      'false', pass,
+      'string', pass,
+      'number', pass,
+      'code', pass
     ]
   }, 'named_value_nodefault', tokens);
   

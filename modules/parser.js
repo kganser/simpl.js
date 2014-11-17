@@ -22,12 +22,25 @@ simpl.add('parser', function() {
   
   return {
     generate: function(grammar, start, tokens) {
-      var symbols = {}, states = [], tokens_ = {};
+      var symbols = {}, states = [], tokens_ = {}, nonterminals = Object.keys(grammar);
       
       Object.keys(tokens || {}).forEach(function(token) {
         tokens_[token] = new RegExp(tokens[token].source.replace(/^\^?/, '^(?:')+')', tokens[token].ignoreCase ? 'i' : '');
       });
       tokens = tokens_;
+      
+      nonterminals.forEach(function(nonterminal) {
+        var productions = [], production = [];
+        grammar[nonterminal].forEach(function(elem) {
+          if (typeof elem == 'function') {
+            productions.push([production, elem]);
+            production = [];
+          } else {
+            production.push(elem);
+          }
+        });
+        grammar[nonterminal] = productions;
+      });
       
       if (Array.isArray(start)) {
       
@@ -51,7 +64,7 @@ simpl.add('parser', function() {
       
       } else {
       
-        var nonterminals = Object.keys(grammar), firsts = {}, oldStart = start, done;
+        var firsts = {}, oldStart = start, done;
         
         var getFirsts = function(production, start) {
           var symbol, current = {'': 1};
