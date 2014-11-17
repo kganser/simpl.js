@@ -9,7 +9,7 @@ simpl.add('docs', function(o) {
   var tokens = {
     id: /[a-zA-Z_]+/,
     number: /[0-9]+/,
-    string: /'[^']+'|"[^"]+"/,
+    string: /'[^']*'|"[^"]*"/,
     code: /`[^`]+`/,
     '': /\s+/
   };

@@ -27,7 +27,7 @@ simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
         return request.slurp(function(entry) {
           if (!entry || !/^\d{4}-\d{2}-\d{2}$/.test(entry.date) || typeof entry.time != 'number')
             return response.generic(400);
-          db.transaction('readwrite').get('entries/'+entry.date).then(function(entries) {
+          db.get('entries/'+entry.date, true).then(function(entries) {
             if (entries) return this.put('entries/'+entry.date+'/'+encodeURIComponent(entry.issue), entry.time).then(ok);
             var e = {}; e[entry.issue] = entry.time;
             this.put('entries/'+entry.date, e).then(ok);
@@ -39,7 +39,7 @@ simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
     }
     var match;
     if (request.method == 'DELETE' && (match = /^\/(entries\/\d{4}-\d{2}-\d{2})\/([^\/]*)$/.exec(request.path)))
-      return db.transaction('readwrite').get(match[1]).then(function(date) {
+      return db.get(match[1], true).then(function(date) {
         var issues = date && Object.keys(date);
         if (issues && issues.length > 1)
           return this.delete(request.path.substr(1)).then(ok);

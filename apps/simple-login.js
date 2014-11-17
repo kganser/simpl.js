@@ -54,7 +54,7 @@ simpl.use({http: 0, database: 0, html: 0, crypto: 0}, function(o) {
       case '/login':
         if (request.method == 'POST' && (request.headers['Content-Type'] || '').split(';')[0] == 'application/x-www-form-urlencoded')
           return request.slurp(function(body) {
-            db.transaction('readwrite').get('users/'+encodeURIComponent(body.username)).then(function(user) {
+            db.get('users/'+encodeURIComponent(body.username), true).then(function(user) {
               if (!user || user.password !== pbkdf2(body.password, user.salt).key)
                 return render(['Invalid login. ', {a: {href: '/login', children: 'Try again'}}], 401);
               var session = sid();
@@ -78,7 +78,7 @@ simpl.use({http: 0, database: 0, html: 0, crypto: 0}, function(o) {
         if (request.method == 'POST' && (request.headers['Content-Type'] || '').split(';')[0] == 'application/x-www-form-urlencoded')
           return request.slurp(function(body) {
             var path = 'users/'+encodeURIComponent(body.username);
-            db.transaction('readwrite').get(path).then(function(user) {
+            db.get(path, true).then(function(user) {
               if (user) return render(['Username '+body.username+' is already taken. ', {a: {href: '/register', children: 'Try again'}}], 401);
               var session = sid(),
                   hash = pbkdf2(body.password);
