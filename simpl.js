@@ -1,7 +1,7 @@
 simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy) {
 
   var apps = {}, clients = [], loader, lines,
-      db = o.database('simpl', {apps: {}, modules: {}});
+      db = o.database.open('simpl', {apps: {}, modules: {}});
   
   db.get('apps').then(function(apps) {
     if (apps) return;
@@ -135,12 +135,14 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
               {script: {src: '/html.js'}},
               {script: {src: '/xhr.js'}},
               {script: {src: '/jsonv.js'}},
+              {script: {src: '/parser.js'}},
+              {script: {src: '/docs.js'}},
               {script: {src: '/codemirror.js'}},
               {script: function(apps, modules, offset) {
                 if (!apps) return [a, m, lines];
                 Object.keys(apps).forEach(function(name) { apps[name].log = []; });
                 Object.keys(modules).forEach(function(name) { modules[name] = {code: modules[name]}; });
-                simpl.use({html: 0, xhr: 0, jsonv: 0}, function(o) {
+                simpl.use({html: 0, xhr: 0, jsonv: 0, docs: 0}, function(o) {
                   var appList, moduleList, selected, code, config, log, docs, line, status;
                   if (window.EventSource) new EventSource('/activity').onmessage = function(e) {
                     var message = JSON.parse(e.data),
@@ -202,6 +204,16 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                       {div: {className: 'message', children: message}}
                     ]}};
                   };
+                  var doc = function(name, code) {
+                    o.html.dom([{h1: name}, o.docs.generate(code).map(function(block) {
+                      return [
+                        block.spec && {pre: o.docs.stringifySpec(block.spec)},
+                        block.text.map(function(text) {
+                          return {p: text};
+                        })
+                      ];
+                    })], docs, true);
+                  };
                   var handler = function(action, name, app, entry) {
                     return function(e) {
                       e.stopPropagation();
@@ -229,15 +241,18 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                   };
                   var toggle = function(name, app, panel, ln, ch) {
                     if (!selected || selected.name != name || selected.app != app) {
-                      if (selected) selected.entry.tab.classList.remove('selected');
-                      var entry = (app ? apps : modules)[name];
+                      if (selected) {
+                        selected.entry.tab.classList.remove('selected');
+                        selected.entry.code = code.getValue();
+                      }
                       selected = line = null;
+                      var entry = (app ? apps : modules)[name];
                       code.setValue(entry.code);
-                      selected = {name: name, app: app, entry: entry};
                       config.update(entry.config);
                       if (app) o.html.dom(entry.log.map(logLine), log, true);
-                      else o.html.dom([{h1: name}, {p: 'documentation goes here'}], docs, true);
+                      else doc(name, entry.code);
                       entry.tab.classList.add('selected');
+                      selected = {name: name, app: app, entry: entry};
                     }
                     if (!panel) panel = app ? selected.entry.running ? 'log' : 'code' : 'docs';
                     var next = {config: selected.entry.running ? 'log' : 'code', code: app ? 'config' : 'docs', log: 'code', docs: 'code'}[panel],
@@ -350,10 +365,13 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                         o.xhr((selected.app ? '/apps/' : '/modules/')+encodeURIComponent(selected.name), {
                           method: 'POST',
                           data: selected.entry.code = code.getValue()
-                        }, function(e) {
-                          if (e = e.target.status == 200)
-                            current.entry.tab.lastChild.textContent = current.name;
-                          status(e ? 'success' : 'failure', e ? 'Saved' : 'Error');
+                        }, function(e, ok) {
+                          var ok = e.target.status == 200;
+                          if (ok && selected == current) {
+                            selected.entry.tab.lastChild.textContent = selected.name;
+                            doc(selected.name, selected.entry.code);
+                          }
+                          status(ok ? 'success' : 'failure', ok ? 'Saved' : 'Error');
                         });
                       };
                       return [
@@ -401,8 +419,8 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
         ]), {'Content-Type': o.http.mimeType('html')});
       });
     }
-    if (request.path == '/html.js') request.path = '/modules/html.js';
-    if (request.path == '/xhr.js') request.path = '/modules/xhr.js';
+    if (/^\/(html|xhr|parser|docs)\.js$/.test(request.path))
+      request.path = '/modules'+request.path;
     o.xhr(location.origin+request.path, {responseType: 'arraybuffer'}, function(e) {
       if (e.target.status != 200)
         return response.generic(404);

@@ -1,5 +1,5 @@
 simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
-  var db = o.database('time-tracker', {entries: {}});
+  var db = o.database.open('time-tracker', {entries: {}});
   o.http.serve({port: config.port}, function(request, response) {
     if (request.path == '/issues') {
       try {

@@ -1,6 +1,6 @@
 simpl.use({http: 0, database: 0, html: 0, crypto: 0}, function(o) {
   
-  var db = o.database('simple-login', {sessions: {}, users: {}}),
+  var db = o.database.open('simple-login', {sessions: {}, users: {}}),
       key = o.crypto.codec.utf8String.toBits(config.sessionKey),
       fromBits = o.crypto.codec.base64.fromBits,
       toBits = o.crypto.codec.base64.toBits;

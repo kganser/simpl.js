@@ -263,6 +263,12 @@ button:hover {
 #log .error, #log .warn {
   color: red;
 }
+#docs pre {
+  overflow: auto;
+  margin: 1em 0;
+  background: #f7f7f7;
+  padding: 5px 10px;
+}
 .CodeMirror, #config, #log, #docs {
   display: none;
 }
