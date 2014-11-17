@@ -22,12 +22,13 @@ simpl.add('parser', function() {
   
   return {
     generate: function(grammar, start, tokens) {
-      var symbols = {}, states = [];
+      var symbols = {}, states = [], tokens_ = {};
       
-      Object.keys(tokens = tokens || {}).forEach(function(token) {
-        tokens[token] = new RegExp(tokens[token].source.replace(/^\^?/, '^(?:')+')', tokens[token].ignoreCase ? 'i' : '');
+      Object.keys(tokens || {}).forEach(function(token) {
+        tokens_[token] = new RegExp(tokens[token].source.replace(/^\^?/, '^(?:')+')', tokens[token].ignoreCase ? 'i' : '');
       });
-    
+      tokens = tokens_;
+      
       if (Array.isArray(start)) {
       
         start[0].forEach(function(symbol) { symbols[symbol] = 1; });

@@ -22,7 +22,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
   db.get('modules').then(function(modules) {
     if (modules) return;
     var data = {};
-    'async crypto database html http socket string xhr'.split(' ').forEach(function(module, i, modules) {
+    'async crypto database docs html http parser socket string xhr'.split(' ').forEach(function(module, i, modules) {
       o.xhr('/modules/'+module+'.js', function(e) {
         data[module] = e.target.responseText;
         if (Object.keys(data).length == modules.length)

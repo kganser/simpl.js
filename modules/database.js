@@ -272,9 +272,9 @@ simpl.add('database', function() {
             delete: function(path:string|undefined) -> ScopedTransaction
           }
           
-          Calling `transaction` returns a `Transaction` if `stores` is an array, and a `ScopedTransaction` if it is a string.
-          `get`, `put`, `append`, and `delete` are convenience methods that initiate and return a `ScopedTransaction`. `get`
-          returns a read-only transaction by default. */
+          Calling `transaction` returns a `Transaction` if `stores` is an array, and a `ScopedTransaction` if it is a
+          string. `get`, `put`, `append`, and `delete` are convenience methods that initiate and return a
+          `ScopedTransaction`. `get` returns a read-only transaction by default. */
       return self = {
         transaction: function(writable, stores) {
           if (stores == null) stores = 'data';
@@ -286,7 +286,8 @@ simpl.add('database', function() {
                   objectStore: function(store:string) -> ScopedTransaction
                 }
                 
-                When a transaction acts on multiple data stores, operations must first be scoped to one of these data stores. */
+                When a transaction acts on multiple data stores, operations must first be scoped to one of these data
+                stores. */
             objectStore: function(store) {
               /** ScopedTransaction: {
                     get: function(path='':string) -> ScopedTransaction,
@@ -296,11 +297,11 @@ simpl.add('database', function() {
                     then: function(callback:function(this:ScopedTransaction, json|undefined, ...))
                   }
                   
-                  All methods except `then` are chainable and execute on the same ScopedTransaction in parallel. When all pending
-                  operations complete, `callback` is called with the result of each queued operation in order. More operations
-                  can be queued on to the same transaction at that time using `this`. Results from `put`, `append`, and `delete`
-                  are error strings or undefined if successful. `get` results are json data or undefined if no value exists at
-                  the requested path.*/
+                  All methods except `then` are chainable and execute on the same ScopedTransaction in parallel. When
+                  all pending operations complete, `callback` is called with the result of each queued operation in
+                  order. More operations can be queued on to the same transaction at that time using `this`. Results
+                  from `put`, `append`, and `delete` are error strings or undefined if successful. `get` results are
+                  json data or undefined if no value exists at the requested path.*/
               return {
                 get: function(path) {
                   trans.get(store, path);

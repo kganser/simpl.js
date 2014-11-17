@@ -56,22 +56,42 @@ simpl.add('docs', function(o) {
     ]
   }, 'named_value_nodefault', tokens);
   
+  /** docs: {
+        generate: function(code:string) -> [Block, ...],
+        stringify: function(code:string, breakLimit=1:number) -> string,
+        stringifySpec: function(spec:Value|Type, breakLimit=1:number, depth=0:number, type=false:boolean) -> string
+      }
+      
+      Documentation is parsed from comments in `code` beginning with `/**`, which are split into blocks separated by
+      one or more empty lines. The first block is parsed using the doc spec grammar. If the parse succeeds, the result
+      is returned in `spec`. Otherwise, `spec` is null, `error` is set to the parser module's ParseError, and the block
+      is parsed as `text` along with subsequent blocks.
+      
+      `stringify` returns a plain-text version of the doc structure returned by `generate`, and `stringifySpec` does
+      the same for the `spec` structure within `Block`. `breakLimit` sets the `depth` at which nested object properties
+      stop being separated by line breaks. */
+      
+  /** Block: {spec:Value|null, error:ParseError|undefined, text:[[string|{code:string}, ...], ...]} */
+  /** Value: [Value, ...]|string|{name:string|undefined, default:string|undefined, type:Type} */
+  /** Type: [Type, ...]|string|{function:{args:Value, returns:Type|undefined}}|{object:Value}|{array:Value} */
   return self = {
     generate: function(code) {
-      return (code.match(/\/\*\*[\s\S]*?\*\//g) || []).map(function(comment) {
-        comment = comment.substring(3, comment.length-2).split(/\n\s*\n/);
-        var spec = comment.shift();
+      return (code.match(/\/\*\*\s*[\s\S]+?\s*\*\//g) || []).map(function(comment) {
+        comment = comment.substring(3, comment.length-2).trim().split(/\s*\n\s*\n\s*/);
+        var spec = comment.shift(), error;
         try {
           spec = parse(spec);
         } catch (e) {
           comment.unshift(spec);
           spec = null;
+          error = e;
         }
         return {
           spec: spec,
+          error: error,
           text: comment.map(function(block) {
             var chunks = [], code;
-            while (code = /`[^`]+`/.exec(block)) {
+            while (code = tokens.code.exec(block)) {
               if (code.index) chunks.push(block.substr(0, code.index));
               chunks.push({code: code[0].substring(1, code[0].length-1)});
               block = block.substr(code.index+code[0].length);
@@ -82,36 +102,40 @@ simpl.add('docs', function(o) {
         };
       });
     },
-    stringify: function(code) {
+    stringify: function(code, breakLimit) {
       return self.generate(code).map(function(block) {
-        return stringifySpec(block.spec)+block.text.map(function(chunks) {
-          return '\n\n'+chunks.map(function(chunk) {
+        var spec = self.stringifySpec(block.spec, breakLimit);
+        return (spec ? [spec] : []).concat(block.text.map(function(chunks) {
+          return chunks.map(function(chunk) {
             if (typeof chunk == 'string')
               return chunk.replace(/(^|\n)\s*/g, '');
             return '`'+chunk.code+'`';
           }).join('');
-        }).join('\n\n');
+        })).join('\n\n');
       }).join('\n\n');
     },
-    stringifySpec: function stringify(node, depth, type) {
+    stringifySpec: function stringify(node, breakLimit, depth, type) {
+      if (typeof node != 'string' && !(typeof node == 'object' && node)) return;
+      if (breakLimit == null) breakLimit = 1;
       depth = depth || 0;
+      var indent = new Array(depth).join('  ');
       if (type) {
         if (Array.isArray(node))
-          return node.map(function(node) { return stringify(node, depth, true); }).join('|');
+          return node.map(function(node) { return stringify(node, breakLimit, depth, true); }).join('|');
         if (typeof node == 'string')
           return node;
         node = node[type = Object.keys(node)[0]];
         if (type == 'function')
-          return type+'('+stringify(node.args, depth+1)+')'+(node.returns ? ' → '+stringify(node.returns, depth, true) : '');
+          return type+'('+stringify(node.args, 0, depth+1)+')'+(node.returns ? ' → '+stringify(node.returns, 0, depth+1, true) : '');
         if (type == 'object')
-          return depth ? '{'+stringify(node, depth)+'}' : '{\n  '+stringify(node, depth)+'\n}';
-        return '['+stringify(node, depth+1)+']';
+          return depth >= breakLimit ? '{'+stringify(node, breakLimit, depth+1)+'}' : '{\n  '+indent+stringify(node, breakLimit, depth+1)+'\n'+indent+'}';
+        return '['+stringify(node, 0, depth+1)+']';
       }
       if (Array.isArray(node))
-        return node.map(function(node) { return stringify(node, depth); }).join(depth ? ', ' : ',\n  ');
+        return node.map(function(node) { return stringify(node, breakLimit, depth); }).join(depth > breakLimit ? ', ' : ',\n  '+indent);
       if (typeof node == 'string')
         return node;
-      return (node.name ? node.name+(node.default ? '='+node.default : '')+': ' : '')+stringify(node.type, depth, true);
+      return (node.name ? node.name+(node.default ? '='+node.default : '')+': ' : '')+stringify(node.type, breakLimit, depth, true);
     }
   };
 }, {parser: 0});
