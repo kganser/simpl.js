@@ -207,7 +207,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                   var doc = function(name, code) {
                     o.html.dom([{h1: name}, o.docs.generate(code).map(function(block) {
                       return [
-                        block.spec && {pre: o.docs.stringifySpec(block.spec)},
+                        {pre: block.spec ? o.docs.stringifySpec(block.spec) : block.error.toString()},
                         block.text.map(function(text) {
                           return {p: text};
                         })

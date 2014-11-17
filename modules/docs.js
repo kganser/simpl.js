@@ -7,7 +7,7 @@ simpl.add('docs', function(o) {
     return [values[0]].concat(Array.isArray(values[2]) ? values[2] : [values[2]]);
   };
   var tokens = {
-    id: /[a-zA-Z_]+/,
+    id: /[a-zA-Z_$][a-zA-Z0-9_$]*/,
     number: /[0-9]+/,
     string: /'[^']*'|"[^"]*"/,
     code: /`[^`]+`/,
@@ -36,6 +36,7 @@ simpl.add('docs', function(o) {
     ],
     type: [
       [['id'], pass],
+      [['function'], pass],
       [['function', '(', 'values', ')'], function(values) { return {function: {args: values[2]}}; }],
       [['{', 'named_values', '}'], function(values) { return {object: values[1]}; }],
       [['[', 'values', ']'], function(values) { return {array: values[1]}; }]

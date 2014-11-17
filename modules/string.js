@@ -1,4 +1,10 @@
 simpl.add('string', function() {
+  /** string: {
+        toUTF8Buffer: function(string:string) -> Uint8Array,
+        fromUTF8Buffer: function(buffer:ArrayBuffer) -> string
+      }
+      
+      Converts between utf8-encoded binary ArrayBuffers and javascript strings. */
   return {
     toUTF8Buffer: function(string) {
       var c, len = string.length;

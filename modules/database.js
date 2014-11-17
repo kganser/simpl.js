@@ -110,10 +110,10 @@ simpl.add('database', function() {
           open: function(database:string, upgrade=`{}`:json|function(UpgradeTransaction), version=1:number) -> Database
         }
         
-        An upgrade transaction runs if the database version is less than the requested version or does not exist. If
-        `upgrade` is a json value, the data store in the first `ScopedTransaction` operation on this `Database` will be
-        populated with this value on an upgrade event. Otherwise, an upgrade will be handled by the given function via
-        `UpgradeTransaction`. */
+        Database is backed by `indexedDB`. An upgrade transaction runs if the database version is less than the
+        requested version or does not exist. If `upgrade` is a json value, the data stores in the first transaction
+        operation on this `Database` will be populated with this value on an upgrade event. Otherwise, an upgrade will
+        be handled by the given function via `UpgradeTransaction`. */
       var self, db, queue, open = function(stores, callback) {
         if (db) return callback();
         if (queue) return queue.push(callback);
@@ -278,54 +278,83 @@ simpl.add('database', function() {
       return self = {
         transaction: function(writable, stores) {
           if (stores == null) stores = 'data';
-          var cb, trans = transaction(writable ? 'readwrite' : 'readonly', stores, function() {
+          var self, cb, trans = transaction(writable ? 'readwrite' : 'readonly', stores, function() {
             if (cb) cb.apply(self, arguments);
           });
-          var self = {
-            /** Transaction: {
-                  objectStore: function(store:string) -> ScopedTransaction
-                }
-                
-                When a transaction acts on multiple data stores, operations must first be scoped to one of these data
-                stores. */
-            objectStore: function(store) {
-              /** ScopedTransaction: {
-                    get: function(path='':string) -> ScopedTransaction,
-                    put: function(path:string, value:json, insert=false:boolean) -> ScopedTransaction,
-                    append: function(path:string, value:json) -> ScopedTransaction,
-                    delete: function(path='':string) -> ScopedTransaction,
-                    then: function(callback:function(this:ScopedTransaction, json|undefined, ...))
-                  }
-                  
-                  All methods except `then` are chainable and execute on the same ScopedTransaction in parallel. When
-                  all pending operations complete, `callback` is called with the result of each queued operation in
-                  order. More operations can be queued on to the same transaction at that time using `this`. Results
-                  from `put`, `append`, and `delete` are error strings or undefined if successful. `get` results are
-                  json data or undefined if no value exists at the requested path.*/
-              return {
-                get: function(path) {
-                  trans.get(store, path);
-                  return self;
-                },
-                put: function(path, value, insert) {
-                  trans.put(store, path, value, insert);
-                  return self;
-                },
-                append: function(path, value) {
-                  trans.append(store, path, value);
-                  return self;
-                },
-                delete: function(path) {
-                  trans.delete(store, path);
-                  return self;
-                },
-                then: function(callback) {
-                  cb = callback;
-                }
-              };
+          /** Transaction: {
+                get: function(store:string, path='':string) -> Transaction,
+                put: null|function(store:string, path:string, value:json, insert=false:boolean) -> Transaction,
+                append: null|function(store:string, path:string, value:json) -> Transaction,
+                delete: null|function(store:string, path='':string) -> Transaction,
+                then: function(callback:function(this:Transaction, json|undefined, ...))
+              }
+              
+              A `Transaction` acting on multiple data stores must specify a data store as the first argument to every
+              operation. */
+              
+          /** ScopedTransaction: {
+                get: function(path='':string) -> ScopedTransaction,
+                put: null|function(path:string, value:json, insert=false:boolean) -> ScopedTransaction,
+                append: null|function(path:string, value:json) -> ScopedTransaction,
+                delete: null|function(path='':string) -> ScopedTransaction,
+                then: function(callback:function(this:ScopedTransaction, json|undefined, ...))
+              }
+              
+              All methods except `then` are chainable and execute on the same transaction in parallel. If the
+              transaction is not writable, `put`, `append`, and `delete` are null. When all pending operations
+              complete, `callback` is called with the result of each queued operation in order. More operations can be
+              queued onto the same transaction at that time via `this`.
+              
+              Results from `put`, `append`, and `delete` are error strings or undefined if successful. `get` results
+              are json data or undefined if no value exists at the requested path.
+              
+              `path` is a `/`-separated string of array indices and `encodeURIComponent`-encoded object keys denoting
+              the path to the desired element within the object store's json data structure; E.g.
+              `'users/123/firstName'`.
+              
+              Setting `insert` to true on `put` will splice the given `value` into the parent array at the specified
+              position, shifting any subsequent elements forward. */
+          return self = Array.isArray(stores) ? {
+            get: function(store, path) {
+              trans.get(store, path);
+              return self;
+            },
+            put: !writable ? null : function(store, path, value, insert) {
+              trans.put(store, path, value, insert);
+              return self;
+            },
+            append: !writable ? null : function(store, path, value) {
+              trans.append(store, path, value);
+              return self;
+            },
+            delete: !writable ? null : function(store, store, path) {
+              trans.delete(store, store, path);
+              return self;
+            },
+            then: function(callback) {
+              cb = callback;
+            }
+          } : {
+            get: function(path) {
+              trans.get(stores, path);
+              return self;
+            },
+            put: !writable ? null : function(path, value, insert) {
+              trans.put(stores, path, value, insert);
+              return self;
+            },
+            append: !writable ? null : function(path, value) {
+              trans.append(stores, path, value);
+              return self;
+            },
+            delete: !writable ? null : function(path) {
+              trans.delete(stores, path);
+              return self;
+            },
+            then: function(callback) {
+              cb = callback;
             }
           };
-          return Array.isArray(stores) ? self : self = self.objectStore(stores);
         },
         get: function(path, writable) {
           return self.transaction(writable).get(path);
