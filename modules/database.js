@@ -309,7 +309,7 @@ simpl.add('database', function() {
               are json data or undefined if no value exists at the requested path.
               
               `path` is a `/`-separated string of array indices and `encodeURIComponent`-encoded object keys denoting
-              the path to the desired element within the object store's json data structure; E.g.
+              the path to the desired element within the object store's json data structure; e.g.
               `'users/123/firstName'`.
               
               Setting `insert` to true on `put` will splice the given `value` into the parent array at the specified

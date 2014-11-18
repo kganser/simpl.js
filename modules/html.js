@@ -16,7 +16,7 @@ simpl.add('html', function() {
     param: 1,
     source: 1,
     track: 1,
-    wbr:1
+    wbr: 1
   };
   var attr = function(node, parent) {
     Object.keys(node).forEach(function(k) {
@@ -38,6 +38,43 @@ simpl.add('html', function() {
       builds a DOM structure using the client browser API, and `model` synchronizes the client's DOM view to an
       underlying data structure. */
   return self = {
+    /** markup: function(node:any) -> string
+        
+        In `markup`, `node` represents an HTML node. An object is translated to an element using its first key and
+        value as the tag name and content, respectively:
+
+        `{div: 'hello world'}` → `<div>hello world</div>`
+        
+        If the value is itself an object, it is interpreted as the element's attributes:
+        
+        `{label: {for: 'name'}}` → `<label for="name"></label>`
+        
+        Inside an attributes object, the `children` key is interpreted as a `node`:
+        
+        `{label: {for: 'name', children: 'Name'}}` → `<label for='name'>Name</label>`
+
+        If `node` is an array, `markup` is recursively called on its elements:
+        
+        `{ul: [{li: 'first'}, {li: 'second'}]}` → `<ul><li>first</li><li>second</li></ul>`
+        
+        If `node` is a function, it is output as a self-invoking function `'('+node+'('+node()+'));'`*. This allows
+        client-side scripts to be inlined into markup generated on the server and run on the client with any needed
+        json data passed in:
+
+        `var data = [1,2,3]; markup({script: function(numbers) { if (!numbers) return data; console.log(numbers); }});`
+        
+        becomes
+        
+        `<script>(function(numbers) { if (!numbers) return data; console.log(numbers); }([1,2,3]));</script>`
+        
+        Here, `return data;` only executes in the server's closure context, where `data` is defined, and `console.log`
+        only runs in the client browser.
+        
+        If `node` is a number, it is treated as a string. Other data types return '', so boolean operators can be used
+        to toggle sections of markup. Within elements in the markup, `&` and `<` are encoded as `&amp;` and `&gt;`, and
+        within element attributes, `&` and `"` are encoded as `&amp;` and `&quot;`.
+        
+        * `node()` is actually `((node = node()) !== undefined ? Array.isArray(node) ? node : [node] : []).map(function(arg) { return JSON.stringify(arg); }).join(',')` */
     markup: function(node) {
       switch (typeof node) {
         case 'object':
@@ -51,11 +88,8 @@ simpl.add('html', function() {
             return attr == 'children' ? '' : ' '+attr+(value[attr] == null ? '' : '="'+value[attr].replace(/&/g, '&amp;').replace(/"/g, '&quot;')+'"');
           }).join('')+'>'+self.markup(object ? value.children : value)+(selfClosing[tag] ? '' : '</'+tag+'>');
         case 'function':
-          return '('+node+')('+(node.length
-            ? node.length == 1
-              ? JSON.stringify(node())
-              : node().map(function(node) { return JSON.stringify(node); }).join(',')
-            : '')+');';
+          return ('('+node+'('+((node = node()) !== undefined ? Array.isArray(node) ? node : [node] : [])
+            .map(function(arg) { return JSON.stringify(arg); }).join(',')+'));').replace(/<\/(script)>/ig, '<\\/$1>');
         case 'string':
           return node.replace(/&/g, '&amp;').replace(/</g, '&lt;');
         case 'number':
@@ -63,6 +97,25 @@ simpl.add('html', function() {
       }
       return '';
     },
+    /** dom: function(node:any, parent=null:DOMElement, clear=false:boolean) -> DOMNode|undefined
+        
+        `dom` represents HTML the same way as `markup`, but operates on the DOM API, generating and attaching DOM
+        elements and text nodes rather than concatenating strings. Hence, attributes can be applied recursively however
+        the client DOM API allows:
+        
+        `{div: {style: {display: 'block'}}}` ↔ `document.createElement('div').style.display = 'block';`
+        
+        This also allows event handlers to be attached as attributes:
+
+        `{div: {onclick: function(event) { alert('clicked!'); }}}`
+        
+        If `node` is a function (in contrast to its treatment in `markup`) it is invoked with the parent `DOMElement`
+        as its first argument, and `dom` continues to operate on its return value as a `node` substructure. This way,
+        references to elements can be intercepted for later use as the `node` structure is constructed.
+        
+        If `parent` is a `DOMElement`, the structure is appended to it. If `clear` is true, `dom` first removes all
+        children of `parent` (if set). `dom` returns the DOMNode corresponding to the top level of `node` created, or
+        `parent` if `node` is an array. */
     dom: function(node, parent, clear) {
       if (clear) while (parent.firstChild) parent.removeChild(parent.firstChild);
       switch (typeof node) {
@@ -86,6 +139,16 @@ simpl.add('html', function() {
           return parent ? parent.appendChild(node) : node;
       }
     },
+    /** model: function(data:object|array, insert:function(value:any, key:number|string, index:number, model:Model) -> any) -> Model
+        
+        `model` returns a `Model` object that supports modification of both the underlying `data` and corresponding DOM
+        view using the given `insert` function. `insert` should return a `node` structure as interpreted by the `dom`
+        method given the `value` to be inserted to `data` at `key` and `index` (note: `key === index` if `data` is an
+        array.
+        
+        The `view` property of the returned `Model` object can be used inside a `node` structure parsed by the `dom`
+        method to embed this managed view into a larger DOM structure. */
+        
     /** Model: {
           get: function(key=null:number|string) -> any,
           remove: function(key:number|string) -> Model,
@@ -147,7 +210,7 @@ simpl.add('html', function() {
           }
           return model;
         },
-        sort: function(compare) { // keep compare function if object?
+        sort: function(compare) { // persist sort order?
           // TODO
           return model;
         },
