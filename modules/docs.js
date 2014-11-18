@@ -65,8 +65,8 @@ simpl.add('docs', function(o) {
       
       Documentation is parsed from comments in `code` beginning with `/**`, which are split into blocks separated by
       one or more empty lines. The first block is parsed using the doc spec grammar. If the parse succeeds, the result
-      is returned in `spec`. Otherwise, `spec` is null, `error` is set to the parser module's ParseError, and the block
-      is parsed as `text` along with subsequent blocks.
+      is returned in `spec`. Otherwise, `spec` is null, `error` is set to the `parser` module's `ParseError`, and the
+      block is parsed as `text` along with subsequent blocks.
       
       `stringify` returns a plain-text version of the doc structure returned by `generate`, and `stringifySpec` does
       the same for the `spec` structure within `Block`. `breakLimit` sets the `depth` at which nested object properties

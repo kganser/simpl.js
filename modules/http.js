@@ -25,7 +25,49 @@ simpl.add('http', function(o) {
     
     return data.buffer;
   };
+  /** http: {
+        serve: function(options:ListenOptions, onRequest:RequestCallback, callback:ListenCallback),
+        statusMessage: function(code:number) -> string,
+        mimeType: function(extension:string) -> string,
+        parseQuery: function(query:string) -> object
+      }
+      
+      HTTP/1.1 server and utilities. `serve` uses `ListenOptions`, `ListenCallback`, and `Socket` from the `socket`
+      module. */
+      
+  /** RequestCallback: function(request:Request, response:Response, socket:Socket) -> function(data:ArrayBuffer)|null
+      
+      If a function is returned, it is called with data received in the body of the request. To buffer the request
+      body, use `request.slurp`. */
   
+  /** Request: {
+        slurp: function(callback:function(body:ArrayBuffer|string|object|json), format=null:string),
+        protocol: string,
+        method: string,
+        uri: string,
+        path: string,
+        query: object,
+        headers: object,
+        cookie: object
+      }
+      
+      `slurp` buffers the request body and issues `callback` when complete. If format is `'utf8'`, `'url'`, or
+      `'json'`, the body is converted to a string, flat object, or json structure, respectively. Otherwise, `body`
+      is an `ArrayBuffer`. */
+      
+  /** Response: {
+        send: function(body='':ArrayBuffer|string, headers=`{}`:object, status=200:number, callback:function(error:string|undefined)),
+        end: function(body='':ArrayBuffer|string, headers=`{}`:object, status=200:number, callback:function(error:string|undefined)),
+        generic: function(status=200:number),
+        ok: function,
+        error: function
+      }
+      
+      The first call to `send` will send headers and initiate a chunked HTTP response, after which `headers` and
+      `status` default to (and must be) null in calls to `send` and `end`. A response initiated with `send` must be
+      completed with a call to `end`. `generic` is a convenience method that calls
+      `end(statusMessage(status), null, status || 200)`. `ok` and `error` are nullary convenience methods that call
+      `generic()` and `generic(400)`, respectively. */
   return self = {
     serve: function(options, onRequest, callback) {
       o.socket.listen(options, function(socket) {
@@ -90,6 +132,12 @@ simpl.add('http', function(o) {
                   },
                   generic: function(status) {
                     response.end(self.statusMessage(status), null, status || 200);
+                  },
+                  ok: function() {
+                    response.generic();
+                  },
+                  error: function() {
+                    response.generic(400);
                   }
                 }, socket);
                 if (!read && typeof r == 'function') read = r;
@@ -157,7 +205,7 @@ simpl.add('http', function(o) {
         505: 'HTTP Version Not Supported'
       }[code];
     },
-    mimeType: function(ext) {
+    mimeType: function(extension) {
       return {
         html: 'text/html',
         css:  'text/css',
@@ -182,7 +230,7 @@ simpl.add('http', function(o) {
         avi:  'video/x-msvideo',
         wmv:  'video/x-ms-wmv',
         woff: 'application/font-woff'
-      }[ext];
+      }[extension];
     },
     parseQuery: function(query) {
       var o = {};

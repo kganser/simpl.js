@@ -20,6 +20,31 @@ simpl.add('parser', function() {
     }).join('')+(item[2] == item[1].length ? '•' : '');
   };
   
+  /** parser: {
+        generate: function(grammar:Grammar, start:string|array, tokens=`{}`:object) -> function(input=null:string) -> any
+      }
+      
+      LALR(1) parser generator. If `start` is a string, it must be a key in the `Grammar` object representing the start
+      symbol. If the returned parse function is called without an `input` string, it returns a json representation of
+      the state machine generated for this grammar, which can be fed back to `generate` as `start` to generate the same
+      parse function.
+      
+      `tokens` is an optional mapping of symbols to regular expressions. It is used when tokenizing `input` during a
+      call to the parse function. `tokens['']`, if present, denotes sequences to ignore; e.g. `/\s+/` for white space.
+      When scanning for tokens, the longest match wins, followed by literal tokens (i.e. those not matched by a regular
+      expression in `tokens`. */
+      
+  /** Grammar: {
+        nonterminal: [string|function(values: array) -> any, ...]
+      }
+      
+      A `Grammar` object has nonterminal strings as keys. Its values are sequences of symbol strings (terminals and/or
+      nonterminals representing a production to which this `nonterminal` can expand) followed by a reduce function that
+      is called with an array of values corresponding to the symbols in the preceding production whenever the
+      production is reduced during a parse.
+      
+      Terminal symbols are symbols not appearing as keys in the `Grammar` object. They are either interpreted literally
+      during a parse or mapped to a regular expression using the `tokens` object in `generate`. */
   return {
     generate: function(grammar, start, tokens) {
       var symbols = {}, states = [], tokens_ = {}, nonterminals = Object.keys(grammar);
@@ -239,7 +264,7 @@ simpl.add('parser', function() {
       
       return function(string) {
       
-        if (string == undefined) {
+        if (string == null) {
           var s = Object.keys(symbols);
           return [s].concat(states.map(function(state) {
             var transitions = {},

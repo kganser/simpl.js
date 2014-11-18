@@ -61,13 +61,13 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
         if (method == 'DELETE')
           return db.delete(path).then(function() {
             broadcast('delete', {app: parts[0] == 'apps', name: decodeURIComponent(parts[1])});
-            response.generic();
+            response.ok();
           });
         if (method == 'POST')
           return request.slurp(function(code) {
             db.put(parts[0] == 'apps' ? path+'/code' : path, code).then(function(error) {
-              if (!error) return response.generic();
-              this.put(path, {code: code, config: {}}).then(function() { response.generic(); });
+              if (!error) return response.ok();
+              this.put(path, {code: code, config: {}}).then(response.ok);
             });
           }, 'utf8');
       } else if (parts[2] == 'config') {
@@ -99,11 +99,11 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
             apps[name].terminate();
             broadcast('stop', {app: name});
             delete apps[name];
-            if (action == 'stop') return response.generic();
+            if (action == 'stop') return response.ok();
           }
           if ((action == 'run' || action == 'restart') && !apps[name])
             return db.get('apps/'+encodeURIComponent(name)).then(function(app) {
-              if (!app) return response.generic(400);
+              if (!app) return response.error();
               apps[name] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\n'+app.code, function(name, callback) {
                 db.get('modules/'+encodeURIComponent(name)).then(callback);
               }, function(level, args, module, line, column) {
@@ -113,9 +113,9 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                 delete apps[name];
               });
               broadcast('run', {app: name});
-              response.generic();
+              response.ok();
             });
-          response.generic(400);
+          response.error();
         }, 'json');
       return db.get('apps').get('modules').then(function(a, m) {
         Object.keys(a).forEach(function(name) { a[name].running = !!apps[name]; });

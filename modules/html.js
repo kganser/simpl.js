@@ -51,7 +51,7 @@ simpl.add('html', function() {
         
         Inside an attributes object, the `children` key is interpreted as a `node`:
         
-        `{label: {for: 'name', children: 'Name'}}` → `<label for='name'>Name</label>`
+        `{label: {for: 'name', children: 'Name'}}` → `<label for="name">Name</label>`
 
         If `node` is an array, `markup` is recursively called on its elements:
         
@@ -74,7 +74,7 @@ simpl.add('html', function() {
         to toggle sections of markup. Within elements in the markup, `&` and `<` are encoded as `&amp;` and `&gt;`, and
         within element attributes, `&` and `"` are encoded as `&amp;` and `&quot;`.
         
-        * `node()` is actually `((node = node()) !== undefined ? Array.isArray(node) ? node : [node] : []).map(function(arg) { return JSON.stringify(arg); }).join(',')` */
+        * `node()` is actually `(node.length && (node = node()) !== undefined ? Array.isArray(node) ? node : [node] : []).map(function(arg) { return JSON.stringify(arg); }).join(',')` */
     markup: function(node) {
       switch (typeof node) {
         case 'object':
@@ -88,7 +88,7 @@ simpl.add('html', function() {
             return attr == 'children' ? '' : ' '+attr+(value[attr] == null ? '' : '="'+value[attr].replace(/&/g, '&amp;').replace(/"/g, '&quot;')+'"');
           }).join('')+'>'+self.markup(object ? value.children : value)+(selfClosing[tag] ? '' : '</'+tag+'>');
         case 'function':
-          return ('('+node+'('+((node = node()) !== undefined ? Array.isArray(node) ? node : [node] : [])
+          return ('('+node+'('+(node.length && (node = node()) !== undefined ? Array.isArray(node) ? node : [node] : [])
             .map(function(arg) { return JSON.stringify(arg); }).join(',')+'));').replace(/<\/(script)>/ig, '<\\/$1>');
         case 'string':
           return node.replace(/&/g, '&amp;').replace(/</g, '&lt;');
