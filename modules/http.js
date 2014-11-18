@@ -32,10 +32,10 @@ simpl.add('http', function(o) {
         parseQuery: function(query:string) -> object
       }
       
-      HTTP/1.1 server and utilities. `serve` uses `ListenOptions`, `ListenCallback`, and `Socket` from the `socket`
-      module. */
+      HTTP/1.1 server and utilities. `serve` uses `ListenOptions`, `ListenCallback`, and `ClientSocket` from the
+      `socket` module. */
       
-  /** RequestCallback: function(request:Request, response:Response, socket:Socket) -> function(data:ArrayBuffer)|null
+  /** RequestCallback: function(request:Request, response:Response, socket:ClientSocket) -> function(data:ArrayBuffer)|null
       
       If a function is returned, it is called with data received in the body of the request. To buffer the request
       body, use `request.slurp`. */

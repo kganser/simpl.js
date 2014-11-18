@@ -164,6 +164,45 @@ simpl.add('socket', function(proxy) {
     delete servers[socketId];
   };
   
+  /** socket: {
+        listen: function(options:ListenOptions, onConnect:function(ClientSocket) -> function(data:ArrayBuffer), callback:function(error:string|null, server:ServerSocket|false))
+      }
+      
+      TCP server. `callback` receives either an `error` string or `server`, and `onConnect` is executed with every
+      accepted connection, returning a reader function. */
+  
+  /** ListenOptions: {
+        ip='0.0.0.0': string,
+        port: number,
+        backlog=50: number,
+        name=undefined: string
+      } */
+  /** ClientSocket: {
+        send: function(data:ArrayBuffer, callback:function({error:string|undefined, bytesSent:number|undefined})),
+        disconnect: function,
+        setNoDelay: function(noDelay:boolean, callback:function(error:string|number)),
+        getInfo: function(callback:function(ClientSocketInfo)),
+        socketId: number
+      } */
+  /** ClientSocketInfo: {
+        socketId: number,
+        name: string|undefined,
+        connected: boolean,
+        localAddress: string,
+        localPort: number,
+        peerAddress: string,
+        peerPort: number
+      } */
+  /** ServerSocket: {
+        disconnect: function,
+        getInfo: function(callback:function(ServerSocketInfo))
+      } */
+  /** ServerSocketInfo: {
+        socketId: number,
+        name: string|undefined,
+        peerAddress: string,
+        peerPort: number
+      } */
   return {
     listen: function(options, onConnect, callback) {
       listen(options, onConnect, function(error, socketId) {
