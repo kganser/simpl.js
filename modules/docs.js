@@ -115,28 +115,28 @@ simpl.add('docs', function(o) {
         })).join('\n\n');
       }).join('\n\n');
     },
-    stringifySpec: function stringify(node, breakLimit, depth, type) {
+    stringifySpec: function spec(node, breakLimit, depth, type) {
       if (typeof node != 'string' && !(typeof node == 'object' && node)) return;
       if (breakLimit == null) breakLimit = 1;
       depth = depth || 0;
       var indent = new Array(depth).join('  ');
       if (type) {
         if (Array.isArray(node))
-          return node.map(function(node) { return stringify(node, breakLimit, depth, true); }).join('|');
+          return node.map(function(node) { return spec(node, breakLimit, depth, true); }).join('|');
         if (typeof node == 'string')
           return node;
         node = node[type = Object.keys(node)[0]];
         if (type == 'function')
-          return type+'('+stringify(node.args, 0, depth+1)+')'+(node.returns ? ' → '+stringify(node.returns, 0, depth+1, true) : '');
+          return type+'('+spec(node.args, 0, depth+1)+')'+(node.returns ? ' → '+spec(node.returns, breakLimit, depth, true) : '');
         if (type == 'object')
-          return depth >= breakLimit ? '{'+stringify(node, breakLimit, depth+1)+'}' : '{\n  '+indent+stringify(node, breakLimit, depth+1)+'\n'+indent+'}';
-        return '['+stringify(node, 0, depth+1)+']';
+          return depth > breakLimit ? '{'+spec(node, breakLimit, depth)+'}' : '{\n  '+indent+spec(node, breakLimit, depth)+'\n'+indent+'}';
+        return '['+spec(node, 0, depth)+']';
       }
       if (Array.isArray(node))
-        return node.map(function(node) { return stringify(node, breakLimit, depth); }).join(depth > breakLimit ? ', ' : ',\n  '+indent);
+        return node.map(function(node) { return spec(node, breakLimit, depth+1); }).join(depth > breakLimit ? ', ' : ',\n  '+indent);
       if (typeof node == 'string')
         return node;
-      return (node.name ? node.name+(node.default ? '='+node.default : '')+': ' : '')+stringify(node.type, breakLimit, depth, true);
+      return (node.name ? node.name+(node.default ? '='+node.default : '')+': ' : '')+spec(node.type, breakLimit, depth+1, true);
     }
   };
 }, {parser: 0});

@@ -331,7 +331,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                           } else {
                             modules[name] = {code: "simpl.add('"+name.replace(/\\/g, '\\').replace(/'/g, "\\'")+"', function() {\n  \n});\n"};
                             o.html.dom(li(name, false), moduleList);
-                            toggle(name, false);
+                            toggle(name, false, 'code');
                           }
                         }}}
                       ]}},

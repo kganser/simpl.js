@@ -38,7 +38,7 @@ simpl.add('http', function(o) {
   /** RequestCallback: function(request:Request, response:Response, socket:ClientSocket) -> function(data:ArrayBuffer)|null
       
       If a function is returned, it is called with data received in the body of the request. To buffer the request
-      body, use `request.slurp`. */
+      body, use `request.slurp` instead. */
   
   /** Request: {
         slurp: function(callback:function(body:ArrayBuffer|string|object|json), format=null:string),

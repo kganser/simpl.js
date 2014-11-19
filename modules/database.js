@@ -36,33 +36,47 @@ simpl.add('database', function() {
       };
     })(1);
   };
-  var get = function(store, key, callback) {
-    var empty = true;
+  var get = function(store, key, callback, range) {
+    var next;
+    if (typeof range != 'function') range = function() {}; 
     store.get(key).onsuccess = function(e) {
       var result = e.target.result;
-      if (!result) return empty && callback();
-      empty = function next(parent, path, callback) {
-        var value = parent.value,
-            type = parent.type,
+      if (!result) return next || callback();
+      (next = function(result, parent, path, callback) {
+        var value = result.value,
+            type = result.type,
             pending = 1;
-        if (type == 'object' || type == 'array') {
-          value = type == 'object' ? {} : [];
-          store.index('parent').openCursor(path).onsuccess = function(e) {
-            var cursor = e.target.result;
-            if (!cursor) return --pending || callback(value);
-            var result = cursor.value,
-                index = type == 'object' ? result.key : pending-1;
-            value[index] = pending++;
-            next(result, makePath([result.parent, result.key]), function(child) {
-              value[index] = child;
+        if (type != 'object' && type != 'array')
+          return callback(value);
+        var array = type == 'array',
+            params = range(path, array);
+        value = array ? [] : {};
+        if (params === false) return callback(value);
+        if (!params || typeof params != 'object') params = {action: params || {}};
+        if (typeof params.action != 'function') params.action = function() {};
+        var order = params.descending ? 'prev' : 'next';
+        (params.lowerBound == null
+          ? params.upperBound == null
+            ? store.index('parent').openCursor(parent, order)
+            : store.openCursor(IDBKeyRange.upperBound([parent, params.upperBound], params.upperExclusive), order)
+          : params.upperBound == null
+            ? store.openCursor(IDBKeyRange.lowerBound([parent, params.lowerBound], params.lowerExclusive), order)
+            : store.openCursor(IDBKeyRange.bound([parent, params.lowerBound], [parent, params.upperBound], params.lowerExclusive, params.upperExclusive), order)).onsuccess = function(e) {
+          var cursor = e.target.result;
+          if (!cursor) return --pending || callback(value);
+          var result = cursor.value,
+              key = array ? pending-1 : result.key,
+              action = params.action(key);
+          if (action != 'skip' && action != 'stop') {
+            value[key] = pending++;
+            next(result, makePath([result.parent, result.key]), path.concat([key]), function(child) {
+              value[key] = child;
               if (!--pending) callback(value);
             });
-            cursor.continue();
-          };
-        } else {
-          callback(value);
-        }
-      }(result, makePath(key), callback);
+          }
+          if (action != 'stop') cursor.continue();
+        };
+      })(result, makePath(key), [], callback);
     };
   };
   var put = function(store, key, value, callback) {
@@ -107,11 +121,12 @@ simpl.add('database', function() {
   return {
     open: function(database, upgrade, version) {
     /** database: {
-          open: function(database:string, upgrade=`{}`:json|function(UpgradeTransaction), version=1:number) -> Database
+          open: function(database:string, upgrade=`{}`:json|function(UpgradeTransaction), version=1:number) -> Database,
+          delete: function(database:string, callback:function(error:undefined|DOMError))
         }
         
-        Database is backed by `indexedDB`. An upgrade transaction runs if the database version is less than the
-        requested version or does not exist. If `upgrade` is a json value, the data stores in the first transaction
+        Database is backed by `indexedDB`. An upgrade transaction runs on `open` if the database version is less than
+        the requested version or does not exist. If `upgrade` is a json value, the data stores in the first transaction
         operation on this `Database` will be populated with this value on an upgrade event. Otherwise, an upgrade will
         be handled by the given function via `UpgradeTransaction`. */
       var self, db, queue, open = function(stores, callback) {
@@ -159,10 +174,10 @@ simpl.add('database', function() {
       var transaction = function(type, stores, callback) {
         var trans, pending = 0, values = [], self = {
           // TODO: cursor interface
-          get: function(store, path, callback) {
-            get(store, makeKey(path), callback);
+          get: function(store, path, callback, cursor) {
+            get(store, makeKey(path), callback, cursor);
           },
-          put: function(store, path, callback, value, position, insert) {
+          put: function(store, path, callback, value, insert, position) {
             var parentPath = path.slice(0, -1);
             store.get(makeKey(parentPath)).onsuccess = function(e) {
               var parent = e.target.result,
@@ -251,7 +266,7 @@ simpl.add('database', function() {
                   values = [];
                   callback.apply(null, v);
                 }
-              }, value, position, insert);
+              }, value, insert, position);
             });
           };
           self[name] = function(store, path, value, insert) {
@@ -266,15 +281,15 @@ simpl.add('database', function() {
       };
       /** Database: {
             transaction: function(writable=false:boolean, stores='data':[string, ...]|string) -> Transaction|ScopedTransaction,
-            get: function(path:string|undefined, writable=true:boolean) -> ScopedTransaction,
-            put: function(path:string, value:json, insert=false:boolean) -> ScopedTransaction,
-            append: function(path:string, value:json) -> ScopedTransaction,
-            delete: function(path:string|undefined) -> ScopedTransaction
+            get: function(path='':string, writable=false:boolean, cursor=undefined:Cursor, store='data':string) -> Transaction|ScopedTransaction,
+            put: function(path='':string, value:json, insert=false:boolean, store='data':string) -> Transaction|ScopedTransaction,
+            append: function(path='':string, value:json, store='data':string) -> Transaction|ScopedTransaction,
+            delete: function(path='':string, store='data':string) -> Transaction|ScopedTransaction
           }
           
-          Calling `transaction` returns a `Transaction` if `stores` is an array, and a `ScopedTransaction` if it is a
-          string. `get`, `put`, `append`, and `delete` are convenience methods that initiate and return a
-          `ScopedTransaction`. `get` returns a read-only transaction by default. */
+          Calling any of these methods returns a `Transaction` if `stores` is an array, or a `ScopedTransaction` if it
+          is a string (the default). `get`, `put`, `append`, and `delete` are convenience methods that operate through
+          `transaction`. `get` initiates a read-only transaction by default. */
       return self = {
         transaction: function(writable, stores) {
           if (stores == null) stores = 'data';
@@ -282,41 +297,63 @@ simpl.add('database', function() {
             if (cb) cb.apply(self, arguments);
           });
           /** Transaction: {
-                get: function(store:string, path='':string) -> Transaction,
-                put: null|function(store:string, path:string, value:json, insert=false:boolean) -> Transaction,
-                append: null|function(store:string, path:string, value:json) -> Transaction,
+                get: function(store:string, path='':string, cursor=undefined:Cursor) -> Transaction,
+                put: null|function(store:string, path='':string, value:json, insert=false:boolean) -> Transaction,
+                append: null|function(store:string, path='':string, value:json) -> Transaction,
                 delete: null|function(store:string, path='':string) -> Transaction,
                 then: function(callback:function(this:Transaction, json|undefined, ...))
               }
               
               A `Transaction` acting on multiple data stores must specify a data store as the first argument to every
-              operation. */
+              operation. Otherwise, these methods correspond to `ScopedTransaction` methods. */
               
           /** ScopedTransaction: {
-                get: function(path='':string) -> ScopedTransaction,
-                put: null|function(path:string, value:json, insert=false:boolean) -> ScopedTransaction,
-                append: null|function(path:string, value:json) -> ScopedTransaction,
+                get: function(path='':string, cursor=undefined:Cursor) -> ScopedTransaction,
+                put: null|function(path='':string, value:json, insert=false:boolean) -> ScopedTransaction,
+                append: null|function(path='':string, value:json) -> ScopedTransaction,
                 delete: null|function(path='':string) -> ScopedTransaction,
                 then: function(callback:function(this:ScopedTransaction, json|undefined, ...))
               }
               
               All methods except `then` are chainable and execute on the same transaction in parallel. If the
-              transaction is not writable, `put`, `append`, and `delete` are null. When all pending operations
-              complete, `callback` is called with the result of each queued operation in order. More operations can be
-              queued onto the same transaction at that time via `this`.
-              
-              Results from `put`, `append`, and `delete` are error strings or undefined if successful. `get` results
-              are json data or undefined if no value exists at the requested path.
+              transaction is not writable, `put`, `append`, and `delete` are null.
               
               `path` is a `/`-separated string of array indices and `encodeURIComponent`-encoded object keys denoting
               the path to the desired element within the object store's json data structure; e.g.
-              `'users/123/firstName'`.
+              `'users/123/firstName'`. If undefined, `cursor` buffers all data at the requested path as the result of a
+              `get` operation. Setting `insert` to true on `put` will splice the given `value` into the parent array at
+              the specified position, shifting any subsequent elements forward.
               
-              Setting `insert` to true on `put` will splice the given `value` into the parent array at the specified
-              position, shifting any subsequent elements forward. */
+              When all pending operations complete, `callback` is called with the result of each queued operation in
+              order. More operations can be queued onto the same transaction at that time via `this`.
+              
+              Results from `put`, `append`, and `delete` are error strings or undefined if successful. `get` results
+              are json data or undefined if no value exists at the requested path. */
+              
+          /** Cursor: function(path:[string|number, ...], array:boolean) -> boolean|Action|{
+                lowerBound=null: string|number,
+                lowerExclusive=false: boolean,
+                upperBound=null: string|number,
+                upperExclusive=false: boolean,
+                descending=false: boolean,
+                action: Action
+              } */
+          /** Action:function(key:string|number) -> undefined|string
+              
+              `Cursor` is a function called for each array or object encountered in the requested json structure. It is
+              called with a `path` array (of strings and/or numeric indices) relative to the requested path (i.e. `[]`
+              represents the path as requested in `get`) and an `array` boolean that is true if the substructure is an
+              array. It returns an `Action` callback or object with a range and `action`, or false to prevent
+              recursion into the structure. `lowerBound` and `upperBound` restrict the keys/indices traversed for this
+              object/array, and the `Action` function is called with each `key` in the requested range, in order. The
+              `Action` callback can optionally return either `'skip'` or `'stop'` to exclude the element at the given
+              key from the structure or to exclude and stop iterating, respectively.
+              
+              For example, the following `ScopedTransaction` call uses a cursor to fetch only the immediate members of
+              the object at the requested path: `get('path/to/object', function(path) { return !path.length; })` */
           return self = Array.isArray(stores) ? {
-            get: function(store, path) {
-              trans.get(store, path);
+            get: function(store, path, cursor) {
+              trans.get(store, path, cursor);
               return self;
             },
             put: !writable ? null : function(store, path, value, insert) {
@@ -335,8 +372,8 @@ simpl.add('database', function() {
               cb = callback;
             }
           } : {
-            get: function(path) {
-              trans.get(stores, path);
+            get: function(path, cursor) {
+              trans.get(stores, path, cursor);
               return self;
             },
             put: !writable ? null : function(path, value, insert) {
@@ -356,18 +393,24 @@ simpl.add('database', function() {
             }
           };
         },
-        get: function(path, writable) {
-          return self.transaction(writable).get(path);
+        get: function(path, writable, cursor, store) {
+          return self.transaction(writable, store).get(path, cursor);
         },
-        put: function(path, value, insert) {
-          return self.transaction(true).put(path, value, insert);
+        put: function(path, value, insert, store) {
+          return self.transaction(true, store).put(path, value, insert);
         },
-        append: function(path, value) {
-          return self.transaction(true).append(path, value);
+        append: function(path, value, store) {
+          return self.transaction(true, store).append(path, value);
         },
-        delete: function(path) {
-          return self.transaction(true).delete(path);
+        delete: function(path, store) {
+          return self.transaction(true, store).delete(path);
         }
+      };
+    },
+    delete: function(database, callback) {
+      var request = indexedDB.deleteDatabase(database);
+      request.onsuccess = request.onerror = function(e) {
+        callback(e.result && e.result.error);
       };
     }
   };
