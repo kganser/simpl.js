@@ -1,11 +1,5 @@
 simpl.add('docs', function(o) {
-  
-  var pass = function(values) {
-    return values[0];
-  };
-  var collect = function(values) {
-    return [values[0]].concat(Array.isArray(values[2]) ? values[2] : [values[2]]);
-  };
+
   var tokens = {
     id: /[a-zA-Z_$][a-zA-Z0-9_$]*/,
     number: /[0-9]+/,
