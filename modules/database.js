@@ -54,14 +54,13 @@ simpl.add('database', function() {
         if (params === false) return callback(value);
         if (!params || typeof params != 'object') params = {action: params || {}};
         if (typeof params.action != 'function') params.action = function() {};
-        var order = params.descending ? 'prev' : 'next';
-        (params.lowerBound == null
-          ? params.upperBound == null
-            ? store.index('parent').openCursor(parent, order)
-            : store.openCursor(IDBKeyRange.upperBound([parent, params.upperBound], params.upperExclusive), order)
-          : params.upperBound == null
-            ? store.openCursor(IDBKeyRange.lowerBound([parent, params.lowerBound], params.lowerExclusive), order)
-            : store.openCursor(IDBKeyRange.bound([parent, params.lowerBound], [parent, params.upperBound], params.lowerExclusive, params.upperExclusive), order)).onsuccess = function(e) {
+        var order = params.descending ? 'prev' : 'next',
+            l = params.lowerBound != null && [parent, params.lowerBound],
+            u = params.upperBound != null && [parent, params.upperBound],
+            le = params.lowerExclusive,
+            ue = params.upperExclusive,
+            bound = l ? u ? IDBKeyRange.bound(l, u, le, ue) : IDBKeyRange.lowerBound(l, le) : u && IDBKeyRange.upperBound(u, ue);
+        (bound ? store.openCursor(bound, order) : store.index('parent').openCursor(parent, order)).onsuccess = function(e) {
           var cursor = e.target.result;
           if (!cursor) return --pending || callback(value);
           var result = cursor.value,
