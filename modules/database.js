@@ -172,7 +172,6 @@ simpl.add('database', function() {
       };
       var transaction = function(type, stores, callback) {
         var trans, pending = 0, values = [], self = {
-          // TODO: cursor interface
           get: function(store, path, callback, cursor) {
             get(store, makeKey(path), callback, cursor);
           },

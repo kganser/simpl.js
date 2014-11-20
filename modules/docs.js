@@ -15,45 +15,45 @@ simpl.add('docs', function(o) {
   };
   var self, parse = o.parser.generate({
     named_value_nodefault: [
-      'id', ':', 'types', function(values) { return {name: values[0], type: values[2]}; }
+      'id', ':', 'types', {name: 0, type: 2}
     ],
     named_value: [
-      'id', '=', 'literal', ':', 'types', function(values) { return {name: values[0], default: values[2], type: values[4]}; },
-      'named_value_nodefault', pass
+      'id', '=', 'literal', ':', 'types', {name: 0, default: 2, type: 4},
+      'named_value_nodefault', 0
     ],
     named_values: [
-      'named_value', ',', 'named_values', collect,
-      'named_value', pass
+      'named_value', ',', 'named_values', [0, 2],
+      'named_value', 0
     ],
     value: [
-      'named_value', pass,
-      'types', function(values) { return {type: values[0]}; },
-      '...', pass // limit these?
+      'named_value', 0,
+      'types', {type: 0},
+      '...', 0 // limit these?
     ],
     values: [
-      'value', ',', 'values', collect,
-      'value', pass
+      'value', ',', 'values', [0, 2],
+      'value', 0
     ],
     type: [
-      'id', pass,
-      'function', pass,
-      'function', '(', 'values', ')', function(values) { return {function: {args: values[2]}}; },
-      '{', 'named_values', '}', function(values) { return {object: values[1]}; },
-      '[', 'values', ']', function(values) { return {array: values[1]}; }
+      'id', 0,
+      'function', 0,
+      'function', '(', 'values', ')', {function: {args: 2}},
+      '{', 'named_values', '}', {object: 1},
+      '[', 'values', ']', {array: 1}
     ],
     types: [
-      'type', '|', 'types', collect,
-      'function', '(', 'values', ')', '->', 'types', function(values) { return {function: {args: values[2], returns: values[5]}}; },
-      'type', pass
+      'type', '|', 'types', [0, 2],
+      'function', '(', 'values', ')', '->', 'types', {function: {args: 2, returns: 5}},
+      'type', 0
     ],
     literal: [
-      'null', pass,
-      'undefined', pass,
-      'true', pass,
-      'false', pass,
-      'string', pass,
-      'number', pass,
-      'code', pass
+      'null', 0,
+      'undefined', 0,
+      'true', 0,
+      'false', 0,
+      'string', 0,
+      'number', 0,
+      'code', 0
     ]
   }, 'named_value_nodefault', tokens);
   

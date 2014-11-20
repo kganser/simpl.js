@@ -35,13 +35,17 @@ simpl.add('parser', function() {
       expression in `tokens`. */
       
   /** Grammar: {
-        nonterminal: [string|function(values: array) -> any, ...]
+        nonterminal: [string|json|function(values: array) -> any, ...]
       }
       
-      A `Grammar` object has nonterminal strings as keys. Its values are sequences of symbol strings (terminals and/or
-      nonterminals representing a production to which this `nonterminal` can expand) followed by a reduce function that
-      is called with an array of values corresponding to the symbols in the preceding production whenever the
-      production is reduced during a parse.
+      A `Grammar` object has nonterminal strings as keys. Its values are sequences of nonempty symbol strings
+      (terminals and/or nonterminals representing a production to which this `nonterminal` can expand) followed by a
+      non-string reduce term. If the reduce term is a function, it is called when reducing the immediately preceding
+      string sequence (i.e. production) with an array of values corresponding to the symbols in the production, and is
+      expected to return a new value representing `nonterminal` for this production. If the reduce term is json, it
+      serves as a function that returns a copy of the json structure with any internal integer values between `0` and
+      `values.length-1` replaced by the corresponding symbol value. If a symbol with an array value is placed directly
+      inside another array, it is first unwrapped to aid in list construction.
       
       Terminal symbols are symbols not appearing as keys in the `Grammar` object. They are either interpreted literally
       during a parse or mapped to a regular expression using the `tokens` object in `generate`. */
@@ -57,11 +61,31 @@ simpl.add('parser', function() {
       nonterminals.forEach(function(nonterminal) {
         var productions = [], production = [];
         grammar[nonterminal].forEach(function(elem) {
-          if (typeof elem == 'function') {
-            productions.push([production, elem]);
-            production = [];
-          } else {
+          var type = typeof elem;
+          if (type == 'string') {
             production.push(elem);
+          } else {
+            productions.push([production, type == 'function' ? elem : function(values) {
+              return function copy(elem) {
+                var type = typeof elem;
+                if (type != 'object' || !elem)
+                  return type == 'number' && elem >= 0 && elem < values.length && !(elem % 1)
+                    ? values[elem] : elem;
+                var value = {};
+                if (Array.isArray(elem)) {
+                  value = [];
+                  elem.forEach(function(elem) {
+                    value = value.concat(Array.isArray(elem = copy(elem)) ? elem : [elem]);
+                  });
+                } else {
+                  Object.keys(elem).forEach(function(key) {
+                    value[key] = copy(elem[key]);
+                  });
+                }
+                return value;
+              }(elem);
+            }]);
+            production = [];
           }
         });
         grammar_[nonterminal] = productions;
