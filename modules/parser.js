@@ -32,7 +32,10 @@ simpl.add('parser', function() {
       `tokens` is an optional mapping of symbols to regular expressions. It is used when tokenizing `input` during a
       call to the parse function. `tokens['']`, if present, denotes sequences to ignore; e.g. `/\s+/` for white space.
       When scanning for tokens, the longest match wins, followed by literal tokens (i.e. those not matched by a regular
-      expression in `tokens`. */
+      expression in `tokens`.
+      
+      The parse function returned by `generate` will throw a `ParseError` object on string inputs not recognized by the
+      grammar. */
       
   /** Grammar: {
         nonterminal: [string|json|function(values: array) -> any, ...]
@@ -49,6 +52,15 @@ simpl.add('parser', function() {
       
       Terminal symbols are symbols not appearing as keys in the `Grammar` object. They are either interpreted literally
       during a parse or mapped to a regular expression using the `tokens` object in `generate`. */
+  
+  /** ParseError: {
+        message: string,
+        index: number,
+        line: string,
+        row: number,
+        column: number,
+        toString: function -> string
+      } */
   return {
     generate: function(grammar, start, tokens) {
       var symbols = {}, states = [], tokens_ = {}, grammar_ = {}, nonterminals = Object.keys(grammar);

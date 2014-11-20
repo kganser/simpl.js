@@ -37,6 +37,7 @@ simpl.add('docs', function(o) {
     ],
     types: [
       'type', '|', 'types', [0, 2],
+      'function', '->', 'types', {function: {returns: 2}},
       'function', '(', 'values', ')', '->', 'types', {function: {args: 2, returns: 5}},
       'type', 0
     ],
@@ -121,7 +122,7 @@ simpl.add('docs', function(o) {
           return node;
         node = node[type = Object.keys(node)[0]];
         if (type == 'function')
-          return type+'('+spec(node.args, 0, depth+1)+')'+(node.returns ? ' → '+spec(node.returns, breakLimit, depth, true) : '');
+          return type+(node.args ? '('+spec(node.args, 0, depth+1)+')' : '')+(node.returns ? ' → '+spec(node.returns, breakLimit, depth, true) : '');
         if (type == 'object')
           return depth > breakLimit ? '{'+spec(node, breakLimit, depth)+'}' : '{\n  '+indent+spec(node, breakLimit, depth)+'\n'+indent+'}';
         return '['+spec(node, 0, depth)+']';
