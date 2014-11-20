@@ -41,7 +41,7 @@ simpl.add('http', function(o) {
       body, use `request.slurp` instead. */
   
   /** Request: {
-        slurp: function(callback:function(body:ArrayBuffer|string|object|json), format=null:string),
+        slurp: function(callback:function(body:ArrayBuffer|string|object|json), format=null:string, maxSize=4096:number),
         protocol: string,
         method: string,
         uri: string,
@@ -51,9 +51,10 @@ simpl.add('http', function(o) {
         cookie: object
       }
       
-      `slurp` buffers the request body and issues `callback` when complete. If format is `'utf8'`, `'url'`, or
-      `'json'`, the body is converted to a string, flat object, or json structure, respectively. Otherwise, `body`
-      is an `ArrayBuffer`. */
+      `slurp` buffers the request body (up to `maxSize` bytes) and issues `callback` when complete. If format is
+      `'utf8'`, `'url'`, or `'json'`, the body is converted to a string, flat object, or json structure, respectively.
+      Otherwise, `body` is an `ArrayBuffer`. If the max size is exceeded, `callback` is not issued and the server
+      responds with a generic `413 Request Entity Too Large`. */
       
   /** Response: {
         send: function(body='':ArrayBuffer|string, headers=`{}`:object, status=200:number, callback:function(error:string|undefined)),
@@ -71,7 +72,7 @@ simpl.add('http', function(o) {
   return self = {
     serve: function(options, onRequest, callback) {
       o.socket.listen(options, function(socket) {
-        var slurp = function(callback, format) {
+        var slurp = function(callback, format, maxSize) {
           var body = new Uint8Array(0);
           read = function(data) {
             if (!data) {
@@ -84,7 +85,12 @@ simpl.add('http', function(o) {
                 catch (e) { body = undefined; }
               return callback(body);
             }
-            var b = new Uint8Array(body.byteLength + data.byteLength);
+            var length = body.byteLength + data.byteLength;
+            if (length > (maxSize || 4096)) {
+              read = null;
+              return response.generic(413);
+            }
+            var b = new Uint8Array(length);
             b.set(new Uint8Array(body), 0);
             b.set(new Uint8Array(data), body.byteLength);
             body = b.buffer;

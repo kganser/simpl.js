@@ -43,7 +43,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
     });
   };
   
-  setInterval(function() { broadcast(); }, 15000);
+  setInterval(function() { broadcast(); }, 15000); // TODO: use TCP keep-alive
   
   o.http.serve({port: 8000}, function(request, response) {
     
@@ -69,10 +69,10 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
               if (!error) return response.ok();
               this.put(path, {code: code, config: {}}).then(response.ok);
             });
-          }, 'utf8');
+          }, 'utf8', 65536);
       } else if (parts[2] == 'config') {
         var handler = function() {
-          db.get(parts.slice(0, 3).join('/')).then(function(config) {
+          this.get(parts.slice(0, 3).join('/')).then(function(config) {
             response.end(JSON.stringify(config), {'Content-Type': o.http.mimeType('json')});
           });
         };
