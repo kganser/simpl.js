@@ -47,7 +47,7 @@ simpl.add('parser', function() {
       during a parse or mapped to a regular expression using the `tokens` object in `generate`. */
   return {
     generate: function(grammar, start, tokens) {
-      var symbols = {}, states = [], tokens_ = {}, nonterminals = Object.keys(grammar);
+      var symbols = {}, states = [], tokens_ = {}, grammar_ = {}, nonterminals = Object.keys(grammar);
       
       Object.keys(tokens || {}).forEach(function(token) {
         tokens_[token] = new RegExp(tokens[token].source.replace(/^\^?/, '^(?:')+')', tokens[token].ignoreCase ? 'i' : '');
@@ -64,8 +64,9 @@ simpl.add('parser', function() {
             production.push(elem);
           }
         });
-        grammar[nonterminal] = productions;
+        grammar_[nonterminal] = productions;
       });
+      grammar = grammar_;
       
       if (Array.isArray(start)) {
       
