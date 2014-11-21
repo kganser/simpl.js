@@ -69,13 +69,15 @@ simpl = function(s) {
   }
   
   var load = !inWorker ? function(m) { return m; } : function(modules) {
-    var remaining = modules.length;
-    modules.forEach(function(module, i) {
-      proxy('load', [module], function(code) {
-        modules[i] = URL.createObjectURL(new Blob([code || ''], {type: 'text/javascript'}));
-        // TODO: URL.revokeObjectURL
-        blobs[modules[i]] = module;
-        if (!--remaining) importScripts.apply(null, modules);
+    var remaining = modules.length, urls = [];
+    modules.forEach(function(module) {
+      proxy('load', [module], function(url) {
+        if (url) {
+          urls.push(url);
+          blobs[url] = module;
+        }
+        if (!--remaining && urls.length)
+          importScripts.apply(null, urls);
       });
     });
     return modules;
@@ -100,7 +102,9 @@ simpl = function(s) {
       if (e.data.simpl) {
         if (command == 'load') {
           if (worker.load) worker.load(args[0], function(code) {
-            e.target.postMessage({id: id, result: [code]});
+            var url = code && URL.createObjectURL(new Blob([code], {type: 'text/javascript'}));
+            if (url) worker.urls.push(url);
+            e.target.postMessage({id: id, result: [url]});
           });
         } else if (worker.log) {
           worker.log(args.level, args.args, args.module, args.line, args.column);
@@ -128,7 +132,7 @@ simpl = function(s) {
       
       if (code != null) {
         peer.onerror = error;
-        workers.push(peer = {worker: peer, listeners: listeners || {}, load: load, log: log, destructors: []});
+        workers.push(peer = {worker: peer, listeners: listeners || {}, load: load, log: log, urls: [], destructors: []});
       } else if (module != null) {
         moduleListeners[module] = listeners;
       } else {
@@ -144,6 +148,7 @@ simpl = function(s) {
           peer.destructors.forEach(function(d) { d(); });
           peer.worker.terminate();
           URL.revokeObjectURL(url);
+          workers[i].urls.forEach(function(url) { URL.revokeObjectURL(url); });
           workers.splice(i, 1);
         }
       }} : sender;
