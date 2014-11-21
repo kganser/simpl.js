@@ -45,7 +45,8 @@ simpl.add('database', function() {
       (next = function(result, parent, path, callback) {
         var value = result.value,
             type = result.type,
-            pending = 1;
+            pending = 1,
+            index = 0;
         if (type != 'object' && type != 'array')
           return callback(value);
         var array = type == 'array',
@@ -64,7 +65,7 @@ simpl.add('database', function() {
           var cursor = e.target.result;
           if (!cursor) return --pending || callback(value);
           var result = cursor.value,
-              key = array ? pending-1 : result.key,
+              key = array ? index++ : result.key,
               action = params.action(key);
           if (action != 'skip' && action != 'stop') {
             value[key] = pending++;
@@ -121,14 +122,15 @@ simpl.add('database', function() {
     open: function(database, upgrade, version) {
     /** database: {
           open: function(database:string, upgrade=`{}`:json|function(UpgradeTransaction), version=1:number) -> Database,
-          delete: function(database:string, callback:function(error:undefined|DOMError))
+          delete: function(database:string, callback:function(error:undefined|DOMError)),
+          list: function(callback:function(DOMStringList))
         }
         
         Database is backed by `indexedDB`. An upgrade transaction runs on `open` if the database version is less than
         the requested version or does not exist. If `upgrade` is a json value, the data stores in the first transaction
         operation on this `Database` will be populated with this value on an upgrade event. Otherwise, an upgrade will
         be handled by the given function via `UpgradeTransaction`. */
-      var self, db, queue, open = function(stores, callback) {
+      var self, db, queue, close, open = function(stores, callback) {
         if (db) return callback();
         if (queue) return queue.push(callback);
         queue = [callback];
@@ -168,6 +170,10 @@ simpl.add('database', function() {
         request.onsuccess = function(e) {
           db = e.target.result;
           while (callback = queue.shift()) callback();
+          if (close) {
+            db.close();
+            close = null;
+          }
         };
       };
       var transaction = function(type, stores, callback) {
@@ -191,7 +197,7 @@ simpl.add('database', function() {
                 return callback('Invalid index to array resource');
               parentPath = root ? 0 : parentPath.join('/');
               if (insert) {
-                var i = 0, realKey = 0, lastShiftKey = -1,
+                var i = 0, realKey = 0, lastShiftKey,
                     index = store.index('parent');
                 index.openCursor(parentPath).onsuccess = function(e) {
                   var cursor = e.target.result;
@@ -203,7 +209,7 @@ simpl.add('database', function() {
                     // all contiguous keys after desired position must be shifted by one
                     lastShiftKey = cursor.value.key;
                     cursor.continue();
-                  } else if (lastShiftKey >= 0) {
+                  } else if (lastShiftKey != null) {
                     // shift subsequent elements' keys
                     var pending = 1,
                         cb = function() { if (!--pending) callback(); };
@@ -229,7 +235,7 @@ simpl.add('database', function() {
                 };
               } else {
                 deleteChildren(store, path.join('/'), function() {
-                  put(store, [parentPath, decodeURIComponent(key)], value, callback);
+                  put(store, [parentPath, key], value, callback);
                 });
               }
             };
@@ -282,11 +288,12 @@ simpl.add('database', function() {
             get: function(path='':string, writable=false:boolean, cursor=undefined:Cursor, store='data':string) -> Transaction|ScopedTransaction,
             put: function(path='':string, value:json, insert=false:boolean, store='data':string) -> Transaction|ScopedTransaction,
             append: function(path='':string, value:json, store='data':string) -> Transaction|ScopedTransaction,
-            delete: function(path='':string, store='data':string) -> Transaction|ScopedTransaction
+            delete: function(path='':string, store='data':string) -> Transaction|ScopedTransaction,
+            close: function
           }
           
-          Calling any of these methods returns a `Transaction` if `stores` is an array, or a `ScopedTransaction` if it
-          is a string (the default). `get`, `put`, `append`, and `delete` are convenience methods that operate through
+          All methods except `close` return a `Transaction` if `stores` is an array, or a `ScopedTransaction` if it is
+          a string (the default). `get`, `put`, `append`, and `delete` are convenience methods that operate through
           `transaction`. `get` initiates a read-only transaction by default. */
       return self = {
         transaction: function(writable, stores) {
@@ -336,6 +343,7 @@ simpl.add('database', function() {
                 descending=false: boolean,
                 action: Action
               } */
+              
           /** Action:function(key:string|number) -> undefined|string
               
               `Cursor` is a function called for each array or object encountered in the requested json structure. It is
@@ -348,7 +356,11 @@ simpl.add('database', function() {
               key from the structure or to exclude and stop iterating, respectively.
               
               For example, the following `ScopedTransaction` call uses a cursor to fetch only the immediate members of
-              the object at the requested path: `get('path/to/object', function(path) { return !path.length; })` */
+              the object at the requested path:
+              
+             `get('path/to/object', function(path) {
+                return !path.length;
+              });` */
           return self = Array.isArray(stores) ? {
             get: function(store, path, cursor) {
               trans.get(store, path, cursor);
@@ -402,6 +414,14 @@ simpl.add('database', function() {
         },
         delete: function(path, store) {
           return self.transaction(true, store).delete(path);
+        },
+        close: function() {
+          if (db) {
+            db.close();
+            db = null;
+          } else {
+            close = true;
+          }
         }
       };
     },
@@ -409,6 +429,11 @@ simpl.add('database', function() {
       var request = indexedDB.deleteDatabase(database);
       request.onsuccess = request.onerror = function(e) {
         callback(e.result && e.result.error);
+      };
+    },
+    list: function(callback) {
+      indexedDB.webkitGetDatabaseNames().onsuccess = function(e) {
+        callback(e.target.result);
       };
     }
   };

@@ -260,7 +260,7 @@ button:hover {
   color: #999;
   cursor: pointer;
 }
-#log .error, #log .warn {
+#log .error, #log .warn, #docs .error {
   color: red;
 }
 #docs pre {
@@ -268,6 +268,11 @@ button:hover {
   margin: 1em 0;
   background: #f7f7f7;
   padding: 5px 10px;
+}
+#docs .spec {
+  background: transparent;
+  padding: 4px 9px;
+  border: solid 1px #e0e0e0;
 }
 .CodeMirror, #config, #log, #docs {
   display: none;

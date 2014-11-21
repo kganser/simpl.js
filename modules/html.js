@@ -43,29 +43,36 @@ simpl.add('html', function() {
         In `markup`, `node` represents an HTML node. An object is translated to an element using its first key and
         value as the tag name and content, respectively:
 
-        `{div: 'hello world'}` → `<div>hello world</div>`
+        `{div: 'hello world'} → <div>hello world</div>`
         
         If the value is itself an object, it is interpreted as the element's attributes:
         
-        `{label: {for: 'name'}}` → `<label for="name"></label>`
+        `{label: {for: 'name'}} → <label for="name"></label>`
         
         Inside an attributes object, the `children` key is interpreted as a `node`:
         
-        `{label: {for: 'name', children: 'Name'}}` → `<label for="name">Name</label>`
+        `{label: {for: 'name', children: 'Name'}} → <label for="name">Name</label>`
 
         If `node` is an array, `markup` is recursively called on its elements:
         
-        `{ul: [{li: 'first'}, {li: 'second'}]}` → `<ul><li>first</li><li>second</li></ul>`
+        `{ul: [{li: 'first'}, {li: 'second'}]} → <ul><li>first</li><li>second</li></ul>`
         
         If `node` is a function, it is output as a self-invoking function `'('+node+'('+node()+'));'`*. This allows
         client-side scripts to be inlined into markup generated on the server and run on the client with any needed
         json data passed in:
 
-        `var data = [1,2,3]; markup({script: function(numbers) { if (!numbers) return data; console.log(numbers); }});`
+       `var data = [1,2,3];
+        markup({script: function(numbers) {
+          if (!numbers) return data;
+          console.log(numbers);
+        }});`
         
         becomes
         
-        `<script>(function(numbers) { if (!numbers) return data; console.log(numbers); }([1,2,3]));</script>`
+       `<script>(function(numbers) {
+          if (!numbers) return data;
+          console.log(numbers);
+        }([1,2,3]));</script>`
         
         Here, `return data;` only executes in the server's closure context, where `data` is defined, and `console.log`
         only runs in the client browser.
@@ -74,7 +81,11 @@ simpl.add('html', function() {
         to toggle sections of markup. Within elements in the markup, `&` and `<` are encoded as `&amp;` and `&gt;`, and
         within element attributes, `&` and `"` are encoded as `&amp;` and `&quot;`.
         
-        * `node()` is actually `(node.length && (node = node()) !== undefined ? Array.isArray(node) ? node : [node] : []).map(function(arg) { return JSON.stringify(arg); }).join(',')` */
+        * `node()` is actually evaluated as follows:
+        
+       `(node.length && (node = node()) !== undefined ? Array.isArray(node) ? node : [node] : []).map(function(arg) {
+          return JSON.stringify(arg);
+        }).join(',')` */
     markup: function(node) {
       switch (typeof node) {
         case 'object':
@@ -103,7 +114,7 @@ simpl.add('html', function() {
         elements and text nodes rather than concatenating strings. Hence, attributes can be applied recursively however
         the client DOM API allows:
         
-        `{div: {style: {display: 'block'}}}` ↔ `document.createElement('div').style.display = 'block';`
+        `{div: {style: {display: 'block'}}} ↔ document.createElement('div').style.display = 'block';`
         
         This also allows event handlers to be attached as attributes:
 

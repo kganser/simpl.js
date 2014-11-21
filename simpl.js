@@ -10,7 +10,8 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
       {name: '2 Web Server', file: 'web-server', config: {port: 8001}},
       {name: '3 Database Editor', file: 'database-editor', config: {port: 8002, database: 'simpl'}},
       {name: '4 Simple Login', file: 'simple-login', config: {port: 8003, sessionKey: 'yabadabadoo'}},
-      {name: '5 Time Tracker', file: 'time-tracker', config: {port: 8004, redmineHost: 'redmine.slytrunk.com'}}
+      {name: '5 Unit Tests', file: 'unit-tests', config: {}},
+      {name: '6 Time Tracker', file: 'time-tracker', config: {port: 8004, redmineHost: 'redmine.slytrunk.com'}}
     ].forEach(function(app, i, apps) {
       o.xhr('/apps/'+app.file+'.js', function(e) {
         data[app.name] = {code: e.target.responseText, config: app.config};
@@ -154,7 +155,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                           level: data.level == 'log' ? 'debug' : data.level,
                           message: data.message,
                           module: data.module || '',
-                          line: data.module ? data.line : data.line-offset
+                          line: data.line ? data.module ? data.line : data.line-offset : null
                         };
                         var app = apps[data.app];
                         if (!app) return;
@@ -177,6 +178,8 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                         if (event == 'run') {
                           if (selected && selected.entry == app) log.textContent = '';
                           app.log = [];
+                        } else if (event == 'error') {
+                          alert(data.message);
                         }
                         break;
                       case 'delete':
@@ -200,16 +203,18 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                     }
                     if (string) message.push(string);
                     return {div: {className: 'entry '+entry.level, children: [
-                      {div: {className: 'location', children: entry.module+':'+entry.line}},
+                      {div: {className: 'location', children: entry.line && entry.module+':'+entry.line}},
                       {div: {className: 'message', children: message}}
                     ]}};
                   };
                   var doc = function(name, code) {
                     o.html.dom([{h1: name}, o.docs.generate(code).map(function(block) {
                       return [
-                        {pre: block.spec ? o.docs.stringifySpec(block.spec) : block.error.toString()},
+                        {pre: block.spec
+                          ? {className: 'spec', children: o.docs.stringifySpec(block.spec)}
+                          : {className: 'spec error', children: block.error.toString()}},
                         block.text.map(function(text) {
-                          return {p: text};
+                          return text.pre ? text : {p: text};
                         })
                       ];
                     })], docs, true);
@@ -261,13 +266,15 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                     selected.entry.view.className = 'view '+next;
                     selected.entry.view.title = 'Show '+next[0].toUpperCase()+next.slice(1);
                     if (line) code.removeLineClass(line, 'background', 'current');
-                    if (panel == 'code' && ln != undefined) {
-                      code.scrollIntoView({line: ln, ch: ch});
-                      line = code.addLineClass(ln-1, 'background', 'current');
+                    if (panel == 'code') {
+                      code.refresh();
+                      if (ln != null) {
+                        line = code.addLineClass(ln-1, 'background', 'current');
+                        code.scrollIntoView({line: ln, ch: ch});
+                      }
                     } else if (panel == 'log') {
                       body.scrollTop = body.scrollHeight;
                     }
-                    code.refresh();
                   };
                   var li = function(name, app) {
                     var path = (app ? 'apps/' : 'modules/')+encodeURIComponent(name),

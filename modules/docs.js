@@ -8,12 +8,12 @@ simpl.add('docs', function(o) {
     '': /\s+/
   };
   var self, parse = o.parser.generate({
-    named_value_nodefault: [
+    spec: [
       'id', ':', 'types', {name: 0, type: 2}
     ],
     named_value: [
       'id', '=', 'literal', ':', 'types', {name: 0, default: 2, type: 4},
-      'named_value_nodefault', 0
+      'spec', 0
     ],
     named_values: [
       'named_value', ',', 'named_values', [0, 2],
@@ -50,7 +50,7 @@ simpl.add('docs', function(o) {
       'number', 0,
       'code', 0
     ]
-  }, 'named_value_nodefault', tokens);
+  }, 'spec', tokens);
   
   /** docs: {
         generate: function(code:string) -> [Block, ...],
@@ -59,34 +59,63 @@ simpl.add('docs', function(o) {
       }
       
       Documentation is parsed from comments in `code` beginning with `/**`, which are split into blocks separated by
-      one or more empty lines. The first block is parsed using the doc spec grammar. If the parse succeeds, the result
-      is returned in `spec`. Otherwise, `spec` is null, `error` is set to the `parser` module's `ParseError`, and the
-      block is parsed as `text` along with subsequent blocks.
+      one or more empty lines. The first block is parsed using the doc spec grammar below. If the parse succeeds, the
+      result is returned in `spec`. Otherwise, `spec` is null, `error` is set to the `parser` module's `ParseError`,
+      and the block is parsed as `text` along with subsequent blocks.
+      
+     `        <spec> ::= <id> ':' <types>
+       <named_value> ::= <id> '=' <literal> ':' <types>
+                       | <spec>
+      <named_values> ::= <named_value> ',' <named_values>
+                       | <named_value>
+             <value> ::= <named_value>
+                       | <types>
+            <values> ::= <value> ',' <values>
+                       | <value>
+              <type> ::= <id>
+                       | 'function'
+                       | 'function' '(' <values> ')'
+                       | '{' <named_values> '}'
+                       | '[' <values> ']'
+             <types> ::= <type> '|' <types>
+                       | 'function' '->' <types>
+                       | 'function' '(' <values> ')' '->' <types>
+                       | <type>
+           <literal> ::= 'null' | 'undefined' | 'true' | 'false' | <string> | <number> | <code>`
+      
+      See source for regular expressions corresponding to `<id>`, `<string>`, `<number>`, and `<code>`, and for
+      examples.
+      
+      Text blocks following the spec block support code spans between backticks.  If an entire block is surrounded in
+      backticks, it is parsed as a preformatted block aligned with the right side of the opening backtick.
       
       `stringify` returns a plain-text version of the doc structure returned by `generate`, and `stringifySpec` does
       the same for the `spec` structure within `Block`. `breakLimit` sets the `depth` at which nested object properties
       stop being separated by line breaks. */
       
-  /** Block: {spec:Value|null, error:ParseError|undefined, text:[[string|{code:string}, ...], ...]} */
+  /** Block: {spec:Value|null, error:ParseError|undefined, text:[[string|{code:string}, ...]|{pre:string}, ...]} */
   /** Value: [Value, ...]|string|{name:string|undefined, default:string|undefined, type:Type} */
   /** Type: [Type, ...]|string|{function:{args:Value, returns:Type|undefined}}|{object:Value}|{array:Value} */
   return self = {
     generate: function(code) {
       return (code.match(/\/\*\*\s*[\s\S]+?\s*\*\//g) || []).map(function(comment) {
-        comment = comment.substring(3, comment.length-2).trim().split(/\s*\n\s*\n\s*/);
-        var spec = comment.shift(), error;
+        var blocks = comment.substring(3, comment.length-2).trim().split(/\n\s*\n/),
+            spec = blocks.shift(), error = null;
         try {
           spec = parse(spec);
         } catch (e) {
-          comment.unshift(spec);
+          blocks.unshift(spec);
           spec = null;
           error = e;
         }
         return {
           spec: spec,
           error: error,
-          text: comment.map(function(block) {
+          text: blocks.map(function(block) {
             var chunks = [], code;
+            if (code = block.match(/^(\s*)`([^`]+)`\s*$/))
+              return {pre: code[2].replace(new RegExp('\n'+code[1]+' ', 'g'), '\n')};
+            block = block.trim().replace(/\s*\n\s*|\s\s+/g, ' ');
             while (code = tokens.code.exec(block)) {
               if (code.index) chunks.push(block.substr(0, code.index));
               chunks.push({code: code[0].substring(1, code[0].length-1)});
@@ -102,10 +131,8 @@ simpl.add('docs', function(o) {
       return self.generate(code).map(function(block) {
         var spec = self.stringifySpec(block.spec, breakLimit);
         return (spec ? [spec] : []).concat(block.text.map(function(chunks) {
-          return chunks.map(function(chunk) {
-            if (typeof chunk == 'string')
-              return chunk.replace(/(^|\n)\s*/g, '');
-            return '`'+chunk.code+'`';
+          return chunks.pre ? chunks.pre : chunks.map(function(chunk) {
+            return typeof chunk == 'string' ? chunk : '`'+chunk.code+'`';
           }).join('');
         })).join('\n\n');
       }).join('\n\n');
