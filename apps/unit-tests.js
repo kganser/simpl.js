@@ -16,7 +16,7 @@ var compare = function(a, b) {
   var ka = Object.keys(a);
   return compare(ka, Object.keys(b)) && !ka.some(function(k) { return !compare(a[k], b[k]); });
 };
-simpl.use({async: 0, database: 0, docs: 0, string: 0}, function(o) {
+simpl.use({async: 0, database: 0, docs: 0, html: 0, string: 0}, function(o) {
   o.async.step(
     function(next, pass) {
       next(assert(pass === undefined, 'async step no argument'));
@@ -79,9 +79,10 @@ simpl.use({async: 0, database: 0, docs: 0, string: 0}, function(o) {
         db.get('', true).then(function(result) {
           assert(compare({array: ['elem', 1, 2, null, 3], string: 'value'}, result),
             'database write transaction after write transaction');
+          var i = 1;
           this.get('', function(path, array) {
-            assert(!path.length && !array || path.length == 1 && path[0] === 'array' && array,
-              'database cursor arguments '+JSON.stringify(path)+' '+array);
+            assert(!path.length && !array && i == 1 || path.length == 1 && path[0] === 'array' && array && i == 2,
+              'database cursor arguments '+i++);
             return path.length ? function(key) {
               if (key > 2) return 'stop';
             } : {
@@ -89,7 +90,7 @@ simpl.use({async: 0, database: 0, docs: 0, string: 0}, function(o) {
               upperExclusive: true
             };
           }).then(function(result) {
-            assert(compare({array: ['elem', 1, 2]}, result), 'database cursor result');
+            assert(i == 3 && compare({array: ['elem', 1, 2]}, result), 'database cursor result');
             db.close();
             o.database.delete('unit-tests', function(error, blocked) {
               if (!blocked) next(assert(!error, 'database delete'));
@@ -107,15 +108,28 @@ simpl.use({async: 0, database: 0, docs: 0, string: 0}, function(o) {
         'docs stringify');
       assert(o.docs.stringifySpec(doc[0].spec) == 'name: {\n  fn: function(arg1: boolean|string, arg2=undefined: [number, ...]) → {key: value},\n  str: string\n}',
         'docs stringifySpec');
-      next();
-    },
-    function(next) {
+      
+      assert(o.html.markup({div: 'hello'}) === '<div>hello</div>',
+        'html markup basic');
+      assert(o.html.markup({div: [{a: {href: '#', children: 'link'}}, 'hello']}) === '<div><a href="#">link</a>hello</div>',
+        'html markup nested');
+      assert(o.html.markup([{link: {rel: 'stylesheet'}}, {br: null}]) === '<link rel="stylesheet"><br>',
+        'html markup self-closing tags');
+      assert(o.html.markup({script: function(a) { if (!a) return 'a'; }}) === '<script>(function (a) { if (!a) return \'a\'; }("a"));</script>',
+        'html markup inline code');
+      assert(o.html.markup({script: function(a) { if (!a) return ['a', 'b']; }}) === '<script>(function (a) { if (!a) return [\'a\', \'b\']; }(["a","b"]));</script>',
+        'html markup inline code single arg');
+      assert(o.html.markup({script: function(a, b) { if (!a) return ['a', 'b']; }}) === '<script>(function (a, b) { if (!a) return [\'a\', \'b\']; }("a","b"));</script>',
+        'html markup inline code multiple args');
+      assert(o.html.markup([{a: {title: '"hello & goodbye"', children: 'hello <& goodbye'}}, {script: function() { '</script>'; }}]) === '<a title="&quot;hello &amp; goodbye&quot;">hello &lt;&amp; goodbye</a><script>(function () { \'<\\/script>\'; }());</script>',
+        'html markup escaped');
+        
       var uint8 = [116,101,115,116,32,49,50,51,32,195,161,195,169,195,173,195,179,195,186],
           str = 'test 123 áéíóú',
           buf = o.string.toUTF8Buffer(str);
       assert(buf.length == uint8.length && !uint8.some(function(n, i) { return n != buf[i]; }), 'string to buffer');
       assert(o.string.fromUTF8Buffer(new Uint8Array(uint8).buffer) === str, 'string from buffer');
-      assert(passed == 22, 'All tests passed ('+passed+'/22)');
+      assert(passed == 29, 'All tests passed ('+passed+'/29)');
     }
   );
 })

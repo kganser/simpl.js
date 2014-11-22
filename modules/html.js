@@ -81,11 +81,12 @@ simpl.add('html', function() {
         to toggle sections of markup. Within elements in the markup, `&` and `<` are encoded as `&amp;` and `&gt;`, and
         within element attributes, `&` and `"` are encoded as `&amp;` and `&quot;`.
         
-        * `node()` is actually evaluated as follows:
+        * function `node` is actually stringified as follows:
         
-       `(node.length && (node = node()) !== undefined ? Array.isArray(node) ? node : [node] : []).map(function(arg) {
-          return JSON.stringify(arg);
-        }).join(',')` */
+       `var args = node();
+        return '('+node+'('+(
+          node.length && args !== undefined ? Array.isArray(args) && node.length >= args.length ? args : [args] : []
+        ).map(function(arg) { return JSON.stringify(arg); }).join(',')+'));';` */
     markup: function(node) {
       switch (typeof node) {
         case 'object':
@@ -99,7 +100,8 @@ simpl.add('html', function() {
             return attr == 'children' ? '' : ' '+attr+(value[attr] == null ? '' : '="'+value[attr].replace(/&/g, '&amp;').replace(/"/g, '&quot;')+'"');
           }).join('')+'>'+self.markup(object ? value.children : value)+(selfClosing[tag] ? '' : '</'+tag+'>');
         case 'function':
-          return ('('+node+'('+(node.length && (node = node()) !== undefined ? Array.isArray(node) ? node : [node] : [])
+          var args = node();
+          return ('('+node+'('+(node.length && args !== undefined ? Array.isArray(args) && node.length >= args.length ? args : [args] : [])
             .map(function(arg) { return JSON.stringify(arg); }).join(',')+'));').replace(/<\/(script)>/ig, '<\\/$1>');
         case 'string':
           return node.replace(/&/g, '&amp;').replace(/</g, '&lt;');
