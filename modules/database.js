@@ -7,6 +7,12 @@ simpl.add('database', function() {
   var makePath = function(key) {
     return (key[0] ? key[0]+'/' : '')+encodeURIComponent(key[1]);
   };
+  var scopedRange = function(parent, lower, upper, le, ue) {
+    ue = upper == null || ue;
+    lower = lower == null ? [parent] : [parent, lower];
+    upper = upper == null ? [parent+'\0'] : [parent, upper];
+    return IDBKeyRange.bound(lower, upper, le, ue);
+  };
   var getPath = function(store, path, callback) {
     // substitute array indices in path with element keys
     // if last segment is an array index, its original (numeric) value
@@ -23,7 +29,7 @@ simpl.add('database', function() {
         if (result.type != 'array') return advance(i+1);
         // set to numeric index initially, and to key if element is found
         path[i] = position;
-        store.index('parent').openCursor(path.slice(0, i).join('/')).onsuccess = function(e) {
+        store.openCursor(scopedRange(path.slice(0, i).join('/'))).onsuccess = function(e) {
           var cursor = e.target.result;
           if (cursor && skip) {
             cursor.advance(skip);
@@ -36,9 +42,9 @@ simpl.add('database', function() {
       };
     })(1);
   };
-  var get = function(store, key, callback, range) {
+  var get = function(store, key, callback, cursor) {
     var next;
-    if (typeof range != 'function') range = function() {}; 
+    if (typeof cursor != 'function') cursor = function() {}; 
     store.get(key).onsuccess = function(e) {
       var result = e.target.result;
       if (!result) return next || callback();
@@ -50,31 +56,29 @@ simpl.add('database', function() {
         if (type != 'object' && type != 'array')
           return callback(value);
         var array = type == 'array',
-            params = range(path, array);
+            c = cursor(path, array);
         value = array ? [] : {};
-        if (params === false) return callback(value);
-        if (!params || typeof params != 'object') params = {action: params || {}};
-        if (typeof params.action != 'function') params.action = function() {};
-        var order = params.descending ? 'prev' : 'next',
-            l = params.lowerBound != null && [parent, params.lowerBound],
-            u = params.upperBound != null && [parent, params.upperBound],
-            le = params.lowerExclusive,
-            ue = params.upperExclusive,
-            bound = l ? u ? IDBKeyRange.bound(l, u, le, ue) : IDBKeyRange.lowerBound(l, le) : u && IDBKeyRange.upperBound(u, ue);
-        (bound ? store.openCursor(bound, order) : store.index('parent').openCursor(parent, order)).onsuccess = function(e) {
+        if (c === false) return callback(value);
+        if (!c || typeof c != 'object') c = {action: c || {}};
+        if (typeof c.action != 'function') c.action = function() {};
+        store.openCursor(
+          scopedRange(parent, c.lowerBound, c.upperBound, c.lowerExclusive, c.upperExclusive),
+          c.descending ? 'prev' : 'next'
+        ).onsuccess = function(e) {
           var cursor = e.target.result;
           if (!cursor) return --pending || callback(value);
           var result = cursor.value,
               key = array ? index++ : result.key,
-              action = params.action(key);
-          if (action != 'skip' && action != 'stop') {
+              action = path.length && c.action(key);
+          if (action == 'stop') return --pending || callback(value);
+          if (action != 'skip') {
             value[key] = pending++;
             next(result, makePath([result.parent, result.key]), path.concat([key]), function(child) {
               value[key] = child;
               if (!--pending) callback(value);
             });
           }
-          if (action != 'stop') cursor.continue();
+          cursor.continue();
         };
       })(result, makePath(key), [], callback);
     };
@@ -104,7 +108,7 @@ simpl.add('database', function() {
   var deleteChildren = function(store, path, callback) {
     var pending = 1,
         cb = function() { if (!--pending) callback(); };
-    store.index('parent').openCursor(path).onsuccess = function(e) {
+    store.openCursor(scopedRange(path)).onsuccess = function(e) {
       var cursor = e.target.result;
       if (!cursor) return cb();
       var result = cursor.value;
@@ -119,10 +123,10 @@ simpl.add('database', function() {
   };
   
   return {
-    open: function(database, upgrade, version) {
+    open: function(database, upgrade, version, onError) {
     /** database: {
-          open: function(database:string, upgrade=`{}`:json|function(UpgradeTransaction), version=1:number) -> Database,
-          delete: function(database:string, callback:function(error:undefined|DOMError)),
+          open: function(database:string, upgrade=`{}`:json|function(UpgradeTransaction), version=1:number, onError=undefined:function(error:DOMError, blocked:boolean)) -> Database,
+          delete: function(database:string, callback:function(error:undefined|DOMError, blocked:boolean)),
           list: function(callback:function(DOMStringList))
         }
         
@@ -155,9 +159,7 @@ simpl.add('database', function() {
             createObjectStore: function(name, data) {
               if (db.objectStoreNames.contains(name))
                 throw 'objectStore already exists';
-              var store = db.createObjectStore(name, {keyPath: ['parent', 'key']});
-              store.createIndex('parent', 'parent');
-              put(store, makeKey([]), data === undefined ? {} : data, function() {});
+              put(db.createObjectStore(name, {keyPath: ['parent', 'key']}), makeKey([]), data === undefined ? {} : data, function() {});
               return self;
             },
             deleteObjectStore: function(name) {
@@ -175,6 +177,10 @@ simpl.add('database', function() {
             close = null;
           }
         };
+        if (onError) {
+          request.onerror = function(e) { onError(e.target.error, false); };
+          request.onblocked = function() { onError(null, true); };
+        }
       };
       var transaction = function(type, stores, callback) {
         var trans, pending = 0, values = [], self = {
@@ -197,9 +203,8 @@ simpl.add('database', function() {
                 return callback('Invalid index to array resource');
               parentPath = root ? 0 : parentPath.join('/');
               if (insert) {
-                var i = 0, realKey = 0, lastShiftKey,
-                    index = store.index('parent');
-                index.openCursor(parentPath).onsuccess = function(e) {
+                var i = 0, realKey = 0, lastShiftKey;
+                store.openCursor(scopedRange(parentPath)).onsuccess = function(e) {
                   var cursor = e.target.result;
                   if (cursor && i < position) {
                     // before desired position, track real key as previous key + 1
@@ -213,7 +218,7 @@ simpl.add('database', function() {
                     // shift subsequent elements' keys
                     var pending = 1,
                         cb = function() { if (!--pending) callback(); };
-                    index.openCursor(parentPath, 'prev').onsuccess = function(e) {
+                    store.openCursor(scopedRange(parentPath), 'prev').onsuccess = function(e) {
                       var cursor = e.target.result,
                           element = cursor.value,
                           key = element.key;
@@ -247,7 +252,7 @@ simpl.add('database', function() {
                 return callback('Parent resource does not exist');
               if (parent.type != 'array')
                 return callback('Parent resource is not an array');
-              store.index('parent').openCursor(path = path.join('/'), 'prev').onsuccess = function(e) {
+              store.openCursor(scopedRange(path = path.join('/')), 'prev').onsuccess = function(e) {
                 var cursor = e.target.result;
                 put(store, [path, cursor ? cursor.value.key+1 : 0], value, callback);
               };
@@ -356,10 +361,22 @@ simpl.add('database', function() {
               key from the structure or to exclude and stop iterating, respectively.
               
               For example, the following `ScopedTransaction` call uses a cursor to fetch only the immediate members of
-              the object at the requested path:
+              the object at the requested path. Object and array values will be empty:
               
-             `get('path/to/object', function(path) {
+             `.get('path/to/object', function(path) {
                 return !path.length;
+              });`
+              
+              The following call will get immediate members of the requested object sorted lexicographically (by code
+              unit value) up to and including key value 'c', but excluding key 'abc' (if any):
+
+             `.get('path/to/object', function(path) {
+                return path.length ? false : {
+                  upperBound: 'c',
+                  action: function(key) {
+                    if (key == 'abc') return 'skip';
+                  }
+                };
               });` */
           return self = Array.isArray(stores) ? {
             get: function(store, path, cursor) {
@@ -428,7 +445,10 @@ simpl.add('database', function() {
     delete: function(database, callback) {
       var request = indexedDB.deleteDatabase(database);
       request.onsuccess = request.onerror = function(e) {
-        callback(e.result && e.result.error);
+        callback(e.target.error, false);
+      };
+      request.onblocked = function() {
+        callback(null, true);
       };
     },
     list: function(callback) {

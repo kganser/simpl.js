@@ -38,14 +38,17 @@ simpl.use({async: 0, database: 0, docs: 0, string: 0}, function(o) {
     },
     function(next) {
       o.database.list(function(dbs) {
-        next(assert(typeof dbs == 'object' && dbs.toString() == '[object DOMStringList]',
-          'database list: '+Array.prototype.slice.call(dbs).join(', ')));
-      })
+        assert(typeof dbs == 'object' && dbs.toString() == '[object DOMStringList]',
+          'database list: '+Array.prototype.slice.call(dbs).join(', '));
+        if (!dbs.contains('unit-tests')) return next();
+        o.database.delete('unit-tests', function(error, blocked) {
+          if (!blocked && !error) next();
+        });
+      });
     },
     function(next) {
-      var name = 'test'+Math.floor(Math.random()*100000),
-          data = {array: ['elem', 1, null], object: {boolean: true}, string: 'value'},
-          db = o.database.open(name, data);
+      var data = {array: ['elem', 1, null], object: {boolean: true}, string: 'value'},
+          db = o.database.open('unit-tests', data);
       db.get().get('array').then(function(root, array) {
         assert(compare(root, data), 'database get root');
         assert(compare(array, data.array), 'database get path');
@@ -76,9 +79,21 @@ simpl.use({async: 0, database: 0, docs: 0, string: 0}, function(o) {
         db.get('', true).then(function(result) {
           assert(compare({array: ['elem', 1, 2, null, 3], string: 'value'}, result),
             'database write transaction after write transaction');
-          db.close();
-          o.database.delete(name, function(error) {
-            next(assert(!error, 'database delete'));
+          this.get('', function(path, array) {
+            assert(!path.length && !array || path.length == 1 && path[0] === 'array' && array,
+              'database cursor arguments '+JSON.stringify(path)+' '+array);
+            return path.length ? function(key) {
+              if (key > 2) return 'stop';
+            } : {
+              upperBound: 'string',
+              upperExclusive: true
+            };
+          }).then(function(result) {
+            assert(compare({array: ['elem', 1, 2]}, result), 'database cursor result');
+            db.close();
+            o.database.delete('unit-tests', function(error, blocked) {
+              if (!blocked) next(assert(!error, 'database delete'));
+            });
           });
         });
       });
@@ -100,7 +115,7 @@ simpl.use({async: 0, database: 0, docs: 0, string: 0}, function(o) {
           buf = o.string.toUTF8Buffer(str);
       assert(buf.length == uint8.length && !uint8.some(function(n, i) { return n != buf[i]; }), 'string to buffer');
       assert(o.string.fromUTF8Buffer(new Uint8Array(uint8).buffer) === str, 'string from buffer');
-      assert(passed == 19, 'All tests passed ('+passed+'/19)');
+      assert(passed == 22, 'All tests passed ('+passed+'/22)');
     }
   );
 })

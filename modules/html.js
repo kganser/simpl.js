@@ -114,7 +114,7 @@ simpl.add('html', function() {
         elements and text nodes rather than concatenating strings. Hence, attributes can be applied recursively however
         the client DOM API allows:
         
-        `{div: {style: {display: 'block'}}} ↔ document.createElement('div').style.display = 'block';`
+        `{div: {style: {display: 'block'}}} ←→ document.createElement('div').style.display = 'block';`
         
         This also allows event handlers to be attached as attributes:
 

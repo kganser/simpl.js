@@ -13,7 +13,8 @@ simpl.add('docs', function(o) {
     ],
     named_value: [
       'id', '=', 'literal', ':', 'types', {name: 0, default: 2, type: 4},
-      'spec', 0
+      'spec', 0,
+      '...', 0 // limit these?
     ],
     named_values: [
       'named_value', ',', 'named_values', [0, 2],
@@ -21,8 +22,7 @@ simpl.add('docs', function(o) {
     ],
     value: [
       'named_value', 0,
-      'types', {type: 0},
-      '...', 0 // limit these?
+      'types', {type: 0}
     ],
     values: [
       'value', ',', 'values', [0, 2],
@@ -66,6 +66,7 @@ simpl.add('docs', function(o) {
      `        <spec> ::= <id> ':' <types>
        <named_value> ::= <id> '=' <literal> ':' <types>
                        | <spec>
+                       | '...'
       <named_values> ::= <named_value> ',' <named_values>
                        | <named_value>
              <value> ::= <named_value>
