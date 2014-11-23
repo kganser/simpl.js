@@ -87,7 +87,7 @@ simpl.add('docs', function(o) {
       See source for regular expressions corresponding to `<id>`, `<string>`, `<number>`, and `<code>`, and for
       examples.
       
-      Text blocks following the spec block support code spans between backticks.  If an entire block is surrounded in
+      Text blocks following the spec block support code spans between backticks. If an entire block is surrounded in
       backticks, it is parsed as a preformatted block aligned with the right side of the opening backtick.
       
       `stringify` returns a plain-text version of the doc structure returned by `generate`, and `stringifySpec` does

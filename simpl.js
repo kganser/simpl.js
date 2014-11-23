@@ -112,8 +112,8 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                 db.get('modules/'+encodeURIComponent(name)).then(callback);
               }, function(level, args, module, line, column) {
                 broadcast('log', {app: name, level: level, message: args, module: module, line: line, column: column});
-              }, function(e) {
-                broadcast('error', {app: name, message: e.message});
+              }, function(message, module, line) {
+                broadcast('error', {app: name, message: message, module: module, line: line});
                 delete apps[name];
               });
               broadcast('run', {app: name});
@@ -154,16 +154,14 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                         data = message.data;
                     switch (event) {
                       case 'log':
-                        message = {
+                        var app = apps[data.app];
+                        if (!app) return;
+                        if (app.log.push(message = {
                           level: data.level == 'log' ? 'debug' : data.level,
                           message: data.message,
                           module: data.module || '',
-                          line: data.line ? data.module ? data.line : data.line-offset : null
-                        };
-                        var app = apps[data.app];
-                        if (!app) return;
-                        if (app.log.push(message) > 1000)
-                          app.log.shift();
+                          line: data.line && data.line > offset ? data.module ? data.line : data.line-offset : null
+                        }) > 1000) app.log.shift();
                         if (selected && selected.entry == app) {
                           var body = document.body,
                               scroll = body.classList.contains('show-log') && body.scrollHeight - body.scrollTop == document.documentElement.clientHeight;
@@ -178,11 +176,20 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                         if (!app) return;
                         app.running = event == 'run';
                         app.tab.classList[event == 'run' ? 'add' : 'remove']('running');
+                        app.tab.classList[event == 'error' ? 'add' : 'remove']('error');
                         if (event == 'run') {
-                          if (selected && selected.entry == app) log.textContent = '';
                           app.log = [];
+                          if (selected && selected.entry == app)
+                            log.textContent = '';
                         } else if (event == 'error') {
-                          alert(data.message);
+                          app.log.push(message = {
+                            level: 'error',
+                            message: [data.message],
+                            module: data.module || '',
+                            line: data.line && data.line > offset ? data.module ? data.line : data.line-offset : null
+                          });
+                          if (selected && selected.entry == app)
+                            o.html.dom(logLine(message), log);
                         }
                         break;
                       case 'delete':
@@ -266,6 +273,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                     var next = {config: selected.entry.running ? 'log' : 'code', code: app ? 'config' : 'docs', log: 'code', docs: 'code'}[panel],
                         body = document.body;
                     body.className = body.classList.contains('collapsed') ? 'collapsed show-'+panel : 'show-'+panel;
+                    body.scrollTop = panel == 'log' ? body.scrollHeight : 0;
                     selected.entry.view.className = 'view '+next;
                     selected.entry.view.title = 'Show '+next[0].toUpperCase()+next.slice(1);
                     if (line) code.removeLineClass(line, 'background', 'current');
@@ -275,8 +283,6 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                         line = code.addLineClass(ln-1, 'background', 'current');
                         code.scrollIntoView({line: ln, ch: ch});
                       }
-                    } else if (panel == 'log') {
-                      body.scrollTop = body.scrollHeight;
                     }
                   };
                   var li = function(name, app) {
@@ -366,7 +372,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                       code.on('changes', function() {
                         if (!selected) return;
                         selected.entry.dirty = true;
-                        selected.entry.tab.lastChild.textContent = '* '+selected.name;
+                        selected.entry.tab.classList.add('changed');
                       });
                       CodeMirror.commands.save = function() {
                         if (!selected || !selected.entry.dirty) return;
@@ -378,7 +384,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                         }, function(e, ok) {
                           var ok = e.target.status == 200;
                           if (ok && selected == current) {
-                            selected.entry.tab.lastChild.textContent = selected.name;
+                            selected.entry.tab.classList.remove('changed');
                             doc(selected.name, selected.entry.code);
                           }
                           status(ok ? 'success' : 'failure', ok ? 'Saved' : 'Error');

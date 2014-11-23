@@ -76,10 +76,25 @@ nav li {
 }
 nav li span {
   display: block;
+  position: relative;
+  height: 20px;
   padding: 5px 0 0 10px;
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
+}
+nav .changed span:before {
+  content: "*";
+}
+nav .error span:after {
+  content: "⚠";
+  font: 26px entypo;
+  color: #c33;
+  position: absolute;
+  top: 0;
+  right: 5px;
+  height: 100%;
+  margin-top: -.28em;
 }
 .controls {
   float: right;
