@@ -40,7 +40,7 @@ simpl.add('database', function() {
           }
         };
       };
-    })(1);
+    }(1));
   };
   var get = function(store, key, callback, cursor) {
     var next;

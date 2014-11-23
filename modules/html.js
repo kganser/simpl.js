@@ -83,9 +83,9 @@ simpl.add('html', function() {
         
         * function `node` is actually stringified as follows:
         
-       `var args = node();
+       `var args;
         return '('+node+'('+(
-          node.length && args !== undefined ? Array.isArray(args) && node.length >= args.length ? args : [args] : []
+          node.length && (args = node()) !== undefined ? Array.isArray(args) && node.length >= args.length ? args : [args] : []
         ).map(function(arg) { return JSON.stringify(arg); }).join(',')+'));';` */
     markup: function(node) {
       switch (typeof node) {
@@ -100,8 +100,8 @@ simpl.add('html', function() {
             return attr == 'children' ? '' : ' '+attr+(value[attr] == null ? '' : '="'+value[attr].replace(/&/g, '&amp;').replace(/"/g, '&quot;')+'"');
           }).join('')+'>'+self.markup(object ? value.children : value)+(selfClosing[tag] ? '' : '</'+tag+'>');
         case 'function':
-          var args = node();
-          return ('('+node+'('+(node.length && args !== undefined ? Array.isArray(args) && node.length >= args.length ? args : [args] : [])
+          var args;
+          return ('('+node+'('+(node.length && (args = node()) !== undefined ? Array.isArray(args) && node.length >= args.length ? args : [args] : [])
             .map(function(arg) { return JSON.stringify(arg); }).join(',')+'));').replace(/<\/(script)>/ig, '<\\/$1>');
         case 'string':
           return node.replace(/&/g, '&amp;').replace(/</g, '&lt;');

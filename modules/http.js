@@ -1,6 +1,6 @@
 simpl.add('http', function(o) {
   
-  var self, entity = function(status, headers, body, headersSent, chunk) {
+  var self, entity = function(status, headers, body, headersSent, chunk, end) {
     if (headersSent && (headers || status)) throw 'HTTP headers already sent';
     headers = headersSent ? false : (headers || {});
     
@@ -13,15 +13,18 @@ simpl.add('http', function(o) {
     if (headers) {
       if (!headers['Content-Type']) headers['Content-Type'] = 'text/plain';
       if (!chunk) headers['Content-Length'] = body.length;
-      pre += 'HTTP/1.1 '+self.statusMessage(status)+'\r\n'+Object.keys(headers).map(function(header) { return header+': '+headers[header]+'\r\n'; }).join('')+'\r\n';
+      else if (!('Transfer-Encoding' in headers)) headers['Transfer-Encoding'] = 'chunked';
+      pre += 'HTTP/1.1 '+self.statusMessage(status)+'\r\n'+Object.keys(headers).map(function(header) {
+        return headers[header] == null ? '' : header+': '+headers[header]+'\r\n';
+      }).join('')+'\r\n';
     }
     
     if (chunk) pre += body.length.toString(16)+'\r\n';
     pre = o.string.toUTF8Buffer(pre);
-    var data = new Uint8Array(pre.length + body.length + (chunk ? 2 : 0));
+    var data = new Uint8Array(pre.length + body.length + (chunk ? end ? 7 : 2 : 0));
     data.set(pre, 0);
     data.set(body, pre.length);
-    if (chunk) data.set([13, 10], data.length - 2);
+    if (chunk) data.set(end ? [13, 10, 48, 13, 10, 13, 10] : [13, 10], data.length - (end ? 7 : 2));
     
     return data.buffer;
   };
@@ -33,7 +36,8 @@ simpl.add('http', function(o) {
       }
       
       HTTP/1.1 server and utilities. `serve` uses `ListenOptions`, `ListenCallback`, and `ClientSocket` from the
-      `socket` module. */
+      `socket` module. `parseQuery` object values are strings or arrays of strings if more than one string value is
+      specified for a key. */
       
   /** RequestCallback: function(request:Request, response:Response, socket:ClientSocket) -> function(data:ArrayBuffer)|null
       
@@ -46,15 +50,18 @@ simpl.add('http', function(o) {
         method: string,
         uri: string,
         path: string,
-        query: object,
-        headers: object,
-        cookie: object
+        query=`{}`: object,
+        headers=`{}`: object,
+        cookie=`{}`: object
       }
       
+      `query` is the result of `parseQuery` run on `uri`'s query string, if any. `headers` and `cookie` store only the
+      last string value for a given key.
+      
       `slurp` buffers the request body (up to `maxSize` bytes) and issues `callback` when complete. If format is
-      `'utf8'`, `'url'`, or `'json'`, the body is converted to a string, flat object, or json structure, respectively.
-      Otherwise, `body` is an `ArrayBuffer`. If the max size is exceeded, `callback` is not issued and the server
-      responds with a generic `413 Request Entity Too Large`. */
+      `'utf8'`, `'url'`, or `'json'`, the body is converted to a string, `parseQuery` object, or json structure,
+      respectively. Otherwise, `body` is an `ArrayBuffer`. If the max size is exceeded, `callback` is not issued and
+      the server responds with a generic `413 Request Entity Too Large`. */
       
   /** Response: {
         send: function(body='':ArrayBuffer|string, headers=`{}`:object, status=200:number, callback:function(error:string|undefined)),
@@ -64,11 +71,11 @@ simpl.add('http', function(o) {
         error: function
       }
       
-      The first call to `send` will send headers and initiate a chunked HTTP response, after which `headers` and
-      `status` default to (and must be) null in calls to `send` and `end`. A response initiated with `send` must be
-      completed with a call to `end`. `generic` is a convenience method that calls
-      `end(statusMessage(status), null, status || 200)`. `ok` and `error` are nullary convenience methods that call
-      `generic()` and `generic(400)`, respectively. */
+      The first call to `send` will send headers and initiate a chunked HTTP response (adding a `Transfer-Encoding:
+      chunked` header unless overridden in the `headers` object, after which `headers` and `status` default to (and
+      must be) null in calls to `send` and `end`. A response initiated with `send` must be completed with a call to
+      `end`. `generic` is a convenience method that calls `end(statusMessage(status), null, status || 200)`. `ok` and
+      `error` are nullary convenience methods that call `generic()` and `generic(400)`, respectively. */
   return self = {
     serve: function(options, onRequest, callback) {
       o.socket.listen(options, function(socket) {
@@ -134,7 +141,7 @@ simpl.add('http', function(o) {
                     socket.send(entity(status, headers, body, headersSent, headersSent = true), callback);
                   },
                   end: function(body, headers, status, callback) {
-                    socket.send(entity(status, headers, body, headersSent, headersSent), callback);
+                    socket.send(entity(status, headers, body, headersSent, headersSent, true), callback);
                   },
                   generic: function(status) {
                     response.end(self.statusMessage(status), null, status || 200);

@@ -16,7 +16,8 @@ var compare = function(a, b) {
   var ka = Object.keys(a);
   return compare(ka, Object.keys(b)) && !ka.some(function(k) { return !compare(a[k], b[k]); });
 };
-simpl.use({async: 0, database: 0, docs: 0, html: 0, string: 0}, function(o) {
+simpl.use({async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 0, xhr: 0}, function(o) {
+  var start = Date.now();
   o.async.step(
     function(next, pass) {
       next(assert(pass === undefined, 'async step no argument'));
@@ -117,19 +118,176 @@ simpl.use({async: 0, database: 0, docs: 0, html: 0, string: 0}, function(o) {
         'html markup self-closing tags');
       assert(o.html.markup({script: function(a) { if (!a) return 'a'; }}) === '<script>(function (a) { if (!a) return \'a\'; }("a"));</script>',
         'html markup inline code');
+      assert(o.html.markup({script: function() { code = true; }}) === '<script>(function () { code = true; }());</script>' && code !== true,
+        'html markup inline code no params');
       assert(o.html.markup({script: function(a) { if (!a) return ['a', 'b']; }}) === '<script>(function (a) { if (!a) return [\'a\', \'b\']; }(["a","b"]));</script>',
-        'html markup inline code single arg');
+        'html markup inline code single param');
       assert(o.html.markup({script: function(a, b) { if (!a) return ['a', 'b']; }}) === '<script>(function (a, b) { if (!a) return [\'a\', \'b\']; }("a","b"));</script>',
-        'html markup inline code multiple args');
+        'html markup inline code multiple params');
       assert(o.html.markup([{a: {title: '"hello & goodbye"', children: 'hello <& goodbye'}}, {script: function() { '</script>'; }}]) === '<a title="&quot;hello &amp; goodbye&quot;">hello &lt;&amp; goodbye</a><script>(function () { \'<\\/script>\'; }());</script>',
         'html markup escaped');
-        
+      
+      var i = 1, j = 1;
+      o.http.serve({port: 9123, ip: '127.0.0.1'}, function(request, response, socket) {
+        if (i == 1 && i++) {
+          assert(request.method === 'GET' && request.path === '/', 'http get request');
+          return response.end('hello');
+        }
+        if (i == 3 && i++) {
+          assert(request.method === 'GET' && request.path === '/path' && request.uri === '/path?a=1&b=ab%20cd&a=2&c=3' && compare(request.query, {a: ['1', '2'], b: 'ab cd', c: '3'}) && request.headers.Accept === 'text/plain; q=0.9',
+            'http query, header parsing');
+          response.send('hello');
+          return setTimeout(function() {
+            assert(i++ == 4, 'http chunked response send');
+            response.end('goodbye');
+          }, 10);
+        }
+        if (i == 6 && i++) {
+          return request.slurp(function(body) {
+            assert(i++ == 7 && request.method === 'POST' && body === 'yabadaba', 'http request body slurp');
+            response.generic();
+          }, 'utf8');
+        }
+        if (i == 9 && i++) {
+          assert(request.path === '/first' && request.method === 'POST' && request.headers['Content-Length'] == 7992,
+            'http large request body');
+          return request.slurp(function(body) { i++; });
+        }
+        if (request.path == '/second') {
+          assert(request.method === 'POST' && request.headers['Content-Length'] == 19,
+            'http concurrent request');
+          return request.slurp(function(body) {
+            assert(body == null, 'http malformed json request');
+            response.error();
+          }, 'json');
+        }
+      }, function(error, server) {
+        assert(!error, 'http listen from port 9123');
+        if (error) return next();
+        var host = 'http://127.0.0.1:9123';
+        o.xhr(host, function(e) {
+          assert(i++ == 2 && e.target.status == 200 && e.target.responseText === 'hello',
+            'http get response');
+          o.xhr(host+'/path?a=1&b=ab%20cd&a=2&c=3', {headers: {'Accept': 'text/plain; q=0.9'}}, function(e) {
+            assert(i++ == 5 && e.target.status == 200 && e.target.responseText === 'hellogoodbye' && e.target.getResponseHeader('Transfer-Encoding') === 'chunked',
+              'http chunked response receive');
+            o.xhr(host, {method: 'POST', data: 'yabadaba'}, function(e) {
+              assert(i++ == 8 && e.target.status == 200 && e.target.responseText === '200 OK',
+                'http response after slurp');
+              o.xhr(host+'/first', {method: 'POST', data: new Array(1000).join('yabadaba')}, function(e) {
+                assert(i++ == 10 && e.target.status == 413,
+                  'http request too large error');
+              });
+              o.xhr(host+'/second', {method: 'POST', data: '{"malformed": json}'}, function(e) {
+                assert(i++ == 11 && e.target.status == 400 && e.target.responseText === '400 Bad Request',
+                  'http response to malformed body');
+                server.disconnect();
+                next();
+              });
+            });
+          });
+        });
+      });
+    },
+    function(next) {
+      var grammar = {
+        addition: [
+          'addition', '+', 'multiplication', function(e) { return e[0] + e[2]; },
+          'addition', '-', 'multiplication', function(e) { return e[0] - e[2]; },
+          'multiplication', function(e) { return e[0]; }
+        ],
+        multiplication: [
+          'multiplication', '*', 'group', function(e) { return e[0] * e[2]; },
+          'multiplication', '/', 'group', function(e) { return e[0] / e[2]; },
+          'group', function(e) { return e[0]; }
+        ],
+        group: [
+          '(', 'addition', ')', function(e) { return e[1]; },
+          'number', function(e) { return parseInt(e[0], 10); }
+        ]
+      };
+      var tokens = {number: /[0-9]+/, '': /\s+/};
+      try {
+        var parse = o.parser.generate(grammar, 'addition', tokens);
+        assert(true, 'parser compile valid SLR grammar');
+        try {
+          assert(parse('(1 + 2) * 3 / 4 - 5') === -2.75, 'parser parse valid SLR input');
+        } catch (e) {
+          assert(false, 'parser parse valid SLR input');
+        }
+        try {
+          parse('');
+          assert(false, 'parser error on truncated input');
+        } catch (e) {
+          assert(true, 'parser error on truncated input');
+          assert(e && e.message === 'Unexpected end of input' && e.line === '' && e.row === 0 && e.column === 0, 'parser end of input error');
+        }
+        try {
+          parse('\n5 +\n4 + 5 && 6\n');
+          assert(false, 'parser error on invalid input');
+        } catch (e) {
+          assert(true, 'parser error on invalid input');
+          assert(e && e.message === 'Unexpected token' && e.line === '4 + 5 && 6' && e.row === 2 && e.column === 6, 'parser unexpected token error');
+        }
+        try {
+          parse = JSON.parse(JSON.stringify(parse()));
+          assert(true, 'parser serialize state machine representation');
+          try {
+            parse = o.parser.generate(grammar, parse, tokens);
+            assert(true, 'parser deserialize state machine representation');
+            try {
+              assert(parse('(1 + 2) * 3 / 4 - 5') === -2.75, 'parser parse valid input after deserialization');
+            } catch (e) {
+              assert(false, 'parser parse valid input after deserialization');
+            }
+          } catch (e) {
+            assert(false, 'parser deserialize state machine representation');
+          }
+        } catch (e) {
+          assert(false, 'parser serialize state machine representation');
+        }
+      } catch (e) {
+        assert(false, 'parser compile valid SLR grammar');
+      }
+      try {
+        var parse = o.parser.generate({
+          S: ['L', '=', 'R', 0, 'R', 0],
+          L: ['*', 'R', 0, 'id', 0],
+          R: ['L', 0]
+        }, 'S');
+        assert(true, 'parser compile valid LALR grammar');
+        try {
+          parse('**id=id');
+          assert(true, 'parser parse valid LALR input');
+        } catch (e) {
+          assert(false, 'parser parse valid LALR input');
+        }
+      } catch (e) {
+        assert(false, 'parser compile valid LALR grammar');
+      }
+      try {
+        o.parser.generate({
+          S: ['A', 'S', 0, 'b', 0],
+          A: ['S', 'A', 0, 'a', 0]
+        }, 'S');
+        assert(false, 'parser error compiling non-LALR grammar');
+      } catch (e) {
+        assert(true, 'parser error compiling non-LALR grammar');
+        assert(!e.indexOf('Shift-reduce conflict'), 'parser shift-reduce error detection');
+      }
+      try {
+        o.parser.generate({S: ['A', 0, 'A', 0]}, 'S');
+        assert(false, 'parser reduce-reduce error detection');
+      } catch (e) {
+        assert(!e.indexOf('Reduce-reduce conflict'), 'parser reduce-reduce error detection');
+      }
+      
       var uint8 = [116,101,115,116,32,49,50,51,32,195,161,195,169,195,173,195,179,195,186],
           str = 'test 123 áéíóú',
           buf = o.string.toUTF8Buffer(str);
       assert(buf.length == uint8.length && !uint8.some(function(n, i) { return n != buf[i]; }), 'string to buffer');
       assert(o.string.fromUTF8Buffer(new Uint8Array(uint8).buffer) === str, 'string from buffer');
-      assert(passed == 29, 'All tests passed ('+passed+'/29)');
+      assert(passed == 57, 'tests complete ('+passed+'/57 in '+(Date.now()-start)+'ms)');
     }
   );
 })

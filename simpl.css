@@ -110,6 +110,9 @@ button:before {
 button:hover {
   color: white;
 }
+button:active {
+  opacity: .7;
+}
 .run:hover, .restart:hover, #status.success {
   background: #3c3;
 }
