@@ -88,7 +88,10 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
     }
     if (request.path == '/activity') {
       clients.push(response);
-      return response.send(': ping', {'Content-Type': 'text/event-stream'});
+      return response.send(': ping', {
+        'Content-Type': 'text/event-stream',
+        'Transfer-Encoding': null
+      });
     }
     if (request.path == '/') {
       if (request.method == 'POST')
