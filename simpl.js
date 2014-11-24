@@ -126,7 +126,7 @@ simpl = function(s) {
   var cleanup = function(i) {
     var worker = workers[i];
     worker.destructors.forEach(function(d) { d(); });
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(worker.url);
     Object.keys(worker.urls).forEach(function(url) { URL.revokeObjectURL(url); });
     workers.splice(i, 1);
   };
@@ -142,7 +142,7 @@ simpl = function(s) {
           error(e.message, peer.urls[e.filename], e.lineno);
           cleanup(workers.indexOf(peer));
         };
-        workers.push(peer = {worker: peer, listeners: listeners || {}, load: load, log: log, urls: {}, destructors: []});
+        workers.push(peer = {worker: peer, listeners: listeners || {}, load: load, log: log, url: url, urls: {}, destructors: []});
       } else if (module != null) {
         moduleListeners[module] = listeners;
       } else {
