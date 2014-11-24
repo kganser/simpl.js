@@ -190,7 +190,7 @@ simpl.add('app', function(o) {
               field.focus();
               alert(name ? 'App name taken' : 'Please enter app name');
             } else {
-              apps[name] = {code: '', config: {}, log: []};
+              apps[name] = {versions: [{code: '', config: {}}], log: []};
               o.html.dom(li(name, true), appList);
               toggle(name, true);
             }
@@ -213,7 +213,7 @@ simpl.add('app', function(o) {
               field.focus();
               alert(name ? 'Module name taken' : 'Please enter module name');
             } else {
-              modules[name] = {code: "simpl.add('"+name.replace(/\\/g, '\\').replace(/'/g, "\\'")+"', function() {\n  \n});\n"};
+              modules[name] = {versions: [{code: "simpl.add('"+name.replace(/\\/g, '\\').replace(/'/g, "\\'")+"', function() {\n  \n});\n"}]};
               o.html.dom(li(name, false), moduleList);
               toggle(name, false, 'code');
             }
