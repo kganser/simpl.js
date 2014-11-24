@@ -108,6 +108,7 @@ simpl.add('http', function(o) {
         return function(buffer) {
           do {
             var start = 0, end = buffer.byteLength;
+            // TODO: 414 Request-URI Too Long and 413 Request Entity Too Large while buffering headers
             if (!request.headers) {
               var split, offset = headers.length;
               headers += o.string.fromUTF8Buffer(buffer);
@@ -159,7 +160,7 @@ simpl.add('http', function(o) {
               if (end > remaining) end = remaining;
               remaining -= end;
             }
-            // TODO: decode chunks if chunk-encoded
+            // TODO: decode chunks if chunk-encoded (or emit 411 Length Required)
             if (read) read(buffer.slice(start, end));
             if (!remaining) {
               if (read) read();

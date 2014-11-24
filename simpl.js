@@ -123,6 +123,13 @@ simpl = function(s) {
       }
     }
   };
+  var cleanup = function(i) {
+    var worker = workers[i];
+    worker.destructors.forEach(function(d) { d(); });
+    URL.revokeObjectURL(url);
+    Object.keys(worker.urls).forEach(function(url) { URL.revokeObjectURL(url); });
+    workers.splice(i, 1);
+  };
   
   var channel = function(simpl, module) {
     return function(listeners, code, load, log, error) {
@@ -131,7 +138,10 @@ simpl = function(s) {
       if (simpl || code) peer.onmessage = receive;
       
       if (code != null) {
-        peer.onerror = function(e) { error(e.message, peer.urls[e.filename], e.lineno); };
+        peer.onerror = function(e) {
+          error(e.message, peer.urls[e.filename], e.lineno);
+          cleanup(workers.indexOf(peer));
+        };
         workers.push(peer = {worker: peer, listeners: listeners || {}, load: load, log: log, urls: {}, destructors: []});
       } else if (module != null) {
         moduleListeners[module] = listeners;
@@ -145,11 +155,8 @@ simpl = function(s) {
       
       return url ? {send: sender, terminate: function(i) {
         if (~(i = workers.indexOf(peer))) {
-          peer.destructors.forEach(function(d) { d(); });
           peer.worker.terminate();
-          URL.revokeObjectURL(url);
-          Object.keys(workers[i].urls).forEach(function(url) { URL.revokeObjectURL(url); });
-          workers.splice(i, 1);
+          cleanup(i);
         }
       }} : sender;
     };
