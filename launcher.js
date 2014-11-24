@@ -1,11 +1,13 @@
-var port = chrome.runtime.connect(),
+var bg = chrome.runtime.connect(),
     action = document.getElementById('action'),
-    input = document.getElementById('port'),
+    port = document.getElementById('port'),
     error = document.getElementById('error');
-port.onMessage.addListener(function(message) {
+if (window.running) action.textContent = 'Stop';
+bg.onMessage.addListener(function(message) {
   if (!message.error) {
     action.textContent = message.action == 'start' ? 'Stop' : 'Launch';
-    if (message.action == 'start') open('http://localhost:'+message.port);
+    if (message.action == 'start' && message.port)
+      open('http://localhost:'+message.port); // TODO: switch to window if already open
   }
   error.textContent = message.error || '';
   action.disabled = false;
@@ -13,11 +15,11 @@ port.onMessage.addListener(function(message) {
 action.onclick = function() {
   error.textContent = '';
   if (this.textContent == 'Launch') {
-    var p = parseInt(input.value, 10);
+    var p = parseInt(port.value, 10);
     if (!(p > 0)) return error.textContent = 'Invalid port number';
-    port.postMessage({action: 'start', port: p});
+    bg.postMessage({action: 'start', port: p});
   } else {
-    port.postMessage({action: 'stop'});
+    bg.postMessage({action: 'stop'});
   }
   this.disabled = true;
 };

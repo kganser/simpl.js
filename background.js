@@ -454,9 +454,12 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
           response.end(e.target.response, {'Content-Type': o.http.mimeType((request.path.match(/\.([^.]*)$/) || [])[1])});
         });
       }, function(error, s) {
+        server = s;
         port.postMessage({error: error, action: 'start', port: command.port});
       });
     });
+    
+    if (server) port.postMessage({action: 'start'});
   });
   
   chrome.runtime.onSuspend.addListener(function() {
@@ -468,5 +471,9 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
 });
 
 chrome.app.runtime.onLaunched.addListener(function() {
-  chrome.app.window.create('simpl.html', {id: 'simpl', innerBounds: {height: 100, width: 300}, resizable: false});
+  chrome.app.window.create('simpl.html', {
+    id: 'simpl',
+    resizable: false,
+    innerBounds: {width: 300, height: 100}
+  });
 });
