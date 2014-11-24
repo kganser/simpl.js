@@ -92,6 +92,7 @@ simpl.add('socket', function(proxy) {
         clientSocketId = info.clientSocketId;
     if (!servers[serverSocketId]) return;
     sockets.tcp.setPaused(clientSocketId, false);
+    servers[serverSocketId].clients[clientSocketId] = true;
     clients[clientSocketId] = {server: serverSocketId, callback: servers[serverSocketId].callback({
       send: function(data, callback) {
         send(clientSocketId, data, callback);

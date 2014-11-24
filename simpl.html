@@ -1,0 +1,25 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Simpl.js</title>
+    <style>
+      body {
+        text-align: center;
+        margin: 25px 0 0 0;
+      }
+      label, #port {
+        font: 13px monospace;
+      }
+      #error {
+        color: red;
+        margin-top: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <label for="port">http://localhost:<input id="port" placeholder="port" value="8000" size="4">
+    <button id="action">Launch</button>
+    <div id="error"></div>
+    <script src="launcher.js"></script>
+  </body>
+</html>

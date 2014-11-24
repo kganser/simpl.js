@@ -57,7 +57,7 @@ simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
           {link: {rel: 'stylesheet', href: '/apps/assets/time-tracker.css'}}
         ]},
         {body: [
-          {script: {src: '/loader.js'}},
+          {script: {src: '/simpl.js'}},
           {script: {src: '/modules/html.js'}},
           {script: {src: '/modules/xhr.js'}},
           {script: {src: '/modules/async.js'}},

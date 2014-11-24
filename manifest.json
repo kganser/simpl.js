@@ -10,14 +10,14 @@
   "app": {
     "background": {
       "scripts": [
-        "loader.js",
+        "simpl.js",
         "modules/string.js",
         "modules/socket.js",
         "modules/http.js",
         "modules/html.js",
         "modules/xhr.js",
         "modules/database.js",
-        "simpl.js"
+        "background.js"
       ]
     }
   },
