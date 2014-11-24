@@ -17,8 +17,10 @@
     </style>
   </head>
   <body>
-    <label for="port">http://localhost:<input id="port" placeholder="port" value="8000" size="4">
-    <button id="action">Launch</button>
+    <form name="launcher">
+      <label for="port">http://localhost:<input id="port" placeholder="port" value="8000" size="4">
+      <input id="action" type="submit" value="Launch">
+    </form>
     <div id="error"></div>
     <script src="launcher.js"></script>
   </body>

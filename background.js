@@ -1,6 +1,6 @@
 simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy) {
 
-  var server, ping, loader, lines,
+  var server, port, ping, loader, lines,
       db = o.database.open('simpl', {});
   
   db.get('apps').then(function(apps) {
@@ -36,15 +36,15 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
     lines = loader.match(/\n/g).length+1;
   });
   
-  chrome.runtime.onConnect.addListener(function(port) {
-    port.onMessage.addListener(function(command) {
+  chrome.runtime.onConnect.addListener(function(launcher) {
+    launcher.onMessage.addListener(function(command) {
       if (command.action == 'stop') {
         if (server) {
           clearInterval(ping);
           server.disconnect();
           server = null;
         }
-        return port.postMessage({action: 'stop'});
+        return launcher.postMessage({action: 'stop'});
       }
       
       var apps = {}, clients = [], broadcast = function(event, data) {
@@ -455,11 +455,12 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
         });
       }, function(error, s) {
         server = s;
-        port.postMessage({error: error, action: 'start', port: command.port});
+        port = command.port;
+        launcher.postMessage({error: error, action: 'start', port: port});
       });
     });
     
-    if (server) port.postMessage({action: 'start'});
+    if (server) launcher.postMessage({init: true, action: 'start', port: port});
   });
   
   chrome.runtime.onSuspend.addListener(function() {
