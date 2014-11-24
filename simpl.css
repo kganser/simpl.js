@@ -83,18 +83,26 @@ nav li span {
   text-overflow: ellipsis;
   overflow: hidden;
 }
-nav .changed span:before {
-  content: "*";
-}
-nav .error span:after {
-  content: "⚠";
+nav li span:after {
   font: 26px entypo;
-  color: #c33;
+  color: #999;
   position: absolute;
   top: 0;
   right: 5px;
   height: 100%;
+  width: 20px;
+  text-align: center;
   margin-top: -.28em;
+}
+nav .error span:after {
+  content: "⚠";
+  color: #c33;
+}
+nav .loading span:after {
+  content: "⇆";
+}
+nav .changed span:before {
+  content: "*";
 }
 .controls {
   float: right;
@@ -170,7 +178,7 @@ button:active {
 .collapsed .toggle:before {
   content: "▸";
 }
-.view, .restart, .stop, .running .run, .running .delete, .collapsed .delete {
+.view, .selected.loading .view, .restart, .stop, .running .run, .running .delete, .collapsed .delete {
   display: none;
 }
 .selected .view, .running .restart, .running .stop, .running .log {
@@ -292,9 +300,9 @@ button:active {
   padding: 4px 9px;
   border: solid 1px #e0e0e0;
 }
-.CodeMirror, #config, #log, #docs {
+.CodeMirror, #config, #log, #docs, #loading {
   display: none;
 }
-.show-code .CodeMirror, .show-config #config, .show-log #log, .show-docs #docs {
+.show-code .CodeMirror, .show-config #config, .show-log #log, .show-docs #docs, .show-loading #loading {
   display: block;
 }
