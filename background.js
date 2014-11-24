@@ -460,7 +460,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
       });
     });
     
-    if (server) launcher.postMessage({init: true, action: 'start', port: port});
+    if (server) launcher.postMessage({action: 'start', port: port});
   });
   
   chrome.runtime.onSuspend.addListener(function() {

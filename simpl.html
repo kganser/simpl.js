@@ -7,8 +7,17 @@
         text-align: center;
         margin: 25px 0 0 0;
       }
-      label, #port {
+      body, #port {
         font: 13px monospace;
+      }
+      #link[href], #port:disabled {
+        color: #00e;
+      }
+      #port:disabled {
+        text-decoration: underline;
+        background: transparent;
+        border: none;
+        padding: 0;
       }
       #error {
         color: red;
@@ -18,7 +27,7 @@
   </head>
   <body>
     <form name="launcher">
-      <label for="port">http://localhost:</label><input id="port" placeholder="port" value="8000" size="4">
+      <a id="link">http://localhost:<input id="port" placeholder="port" value="8000" size="4"></a>
       <input id="action" type="submit" value="Launch">
     </form>
     <div id="error"></div>
