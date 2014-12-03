@@ -1,56 +1,72 @@
 simpl.add('jsonv', function(o) {
-  return function(data, element, listener) {
-    listener = listener || function() {};
-    
-    var json = function(data) {
-      var type = Array.isArray(data) ? 'array' : typeof data == 'object' ? data ? 'object' : 'null' : typeof data;
-      return {span: {className: 'json-'+type, children: type == 'array'
-        ? {ol: data.map(function(e) { return {li: [{span: {className: 'json-delete', children: '×'}}, json(e)]}; })}
-        : type == 'object'
-          ? {ul: Object.keys(data).map(function(key) { return {li: [{span: {className: 'json-delete', children: '×'}}, {span: {className: 'json-key', children: key}}, ': ', json(data[key])]}; })}
-          : String(data)}};
-    };
-    
-    // TODO: better interface between DOM and data
-    // TODO: post to and insert to beginning of arrays
-    // TODO: handle duplicate keys in objects
-    // TODO: handle key ordering in objects
-    // TODO: implement sort on arrays
-    // TODO: pending request indicator
-    // TODO: handle pagination in objects, arrays (when implemented in db api)
-    var handler = {
+  var json = function(data) {
+    var type = Array.isArray(data) ? 'array' : typeof data == 'object' ? data ? 'object' : 'null' : typeof data;
+    if (type == 'object') {
+      var data_ = {};
+      Object.keys(data).sort().forEach(function(key) { data_[key] = data[key]; });
+      data = data_;
+    }
+    return {span: {className: 'jsonv-'+type, children: type == 'array'
+      ? {ol: data.map(function(e) { return {li: [{span: {className: 'jsonv-delete', children: '×'}}, json(e)]}; })}
+      : type == 'object'
+        ? {ul: Object.keys(data).map(function(key) { return {li: [{span: {className: 'jsonv-delete', children: '×'}}, {span: {className: 'jsonv-key', children: key}}, ': ', json(data[key])]}; })}
+        : String(data)}};
+  };
+  var scalars = {'jsonv-string': 1, 'jsonv-number': 1, 'jsonv-boolean': 1, 'jsonv-null': 1},
+      compounds = {LI: 1, OL: 1, UL: 1};
+  // TODO: implement sort on arrays
+  // TODO: pending request indicator
+  // TODO: pagination for objects, arrays
+  var handler = function(listener, data, self) {
+    return self = {
+      data: data,
       object: function(elem) {
-        return elem.parentNode.parentNode.parentNode.className == 'json-object';
+        return elem.parentNode.parentNode.parentNode.className == 'jsonv-object';
+      },
+      parent: function() {
+        var parent = self.data;
+        self.path.slice(0, -1).forEach(function(key) { parent = parent[key]; });
+        return parent;
       },
       cancel: function(elem) {
-        if (!this.path) return;
-        this.path = null;
-        if (this.origType) { // revert if editing
+        if (!self.path) return;
+        self.path = null;
+        if (self.origType) { // revert if editing
           elem.contentEditable = false;
-          elem.className = this.origType;
-          elem.textContent = this.origValue;
-          this.path = this.origType = this.origValue = null;
+          elem.className = self.origType;
+          elem.textContent = self.origValue;
+          self.path = self.origType = self.origValue = null;
         } else { // remove if adding
           elem.parentNode.parentNode.removeChild(elem.parentNode);
         }
       },
       submit: function(elem) {
-        if (!this.path) return;
-        if (this.origType && elem.textContent == this.origValue) { // value unchanged
+        if (!self.path) return;
+        var origJson = self.origType == 'jsonv-string' ? JSON.stringify(self.origValue) : self.origValue;
+        if (self.origType && elem.textContent == origJson) { // value unchanged
+          elem.textContent = self.origValue;
           elem.contentEditable = false;
-          this.path = this.origType = this.origValue = null;
+          self.path = self.origType = self.origValue = null;
         } else {
-          var method = 'INSERT';
-          if (this.origType || this.object(elem)) {
-            method = 'PUT';
-            if (!this.origType)
-              this.path.splice(-1, 1, elem.parentNode.children[1].textContent);
-          }
-          var value = elem.textContent;
+          var method = 'insert',
+              object = self.object(elem),
+              value = elem.textContent,
+              parent = self.parent();
           try { value = JSON.parse(value); } catch (e) {}
-          listener(method, this.path.map(encodeURIComponent).join('/'), value);
-          this.path = this.origType = this.origValue = null; // reset must be done before DOM changes (?) to prevent double-submit on keydown and blur
+          if (self.origType || object) {
+            method = 'put';
+            if (!self.origType)
+              self.path.splice(-1, 1, elem.parentNode.children[1].textContent);
+          }
+          listener(method, self.path.map(encodeURIComponent).join('/'), value);
+          parent[self.path.pop()] = value;
+          // reset must be done before DOM changes (?) to prevent double-submit on keydown and blur
+          self.path = self.origType = self.origValue = null;
           elem.parentNode.children[1].contentEditable = false;
+          if (object) { // replace full parent object
+            elem = elem.parentNode.parentNode.parentNode;
+            value = parent;
+          }
           elem.parentNode.replaceChild(o.html.dom(json(value)), elem);
         }
       },
@@ -59,48 +75,51 @@ simpl.add('jsonv', function(o) {
             c = t.className;
         switch (e.type) {
           case 'click':
-            if (c == 'json-object' || c == 'json-array') {
-              t.className += ' closed';
-            } else if (c == 'json-object closed' || c == 'json-array closed') {
-              t.className = c.split(' ')[0];
-            } else if (c == 'json-delete' || c == 'json-string' || c == 'json-number' || c == 'json-boolean' || c == 'json-null' || t.tagName == 'LI' || t.tagName == 'OL' || t.tagName == 'UL') {
+            if (c == 'jsonv-object' || c == 'jsonv-array') {
+              t.classList.add('closed');
+            } else if (c == 'jsonv-object closed' || c == 'jsonv-array closed') {
+              t.classList.remove('closed');
+            } else if (listener && t.contentEditable != 'true' && (c in scalars || c == 'jsonv-delete' || t.tagName in compounds)) {
               var item = t;
-              if (t.tagName == 'LI' || t.tagName == 'OL' || t.tagName == 'UL') {
+              if (t.tagName in compounds) {
                 if (item.tagName == 'LI') item = t.parentNode;
+                if (item.parentNode.classList.contains('closed')) return;
                 if (item.tagName == 'OL') {
                   item = item.insertBefore(o.html.dom({li: [
-                    {span: {className: 'json-delete', children: '×'}},
-                    {span: {className: 'json-null'}}
+                    {span: {className: 'jsonv-delete', children: '×'}},
+                    {span: {className: 'jsonv-null'}}
                   ]}), t.tagName == 'OL' ? t.firstChild : t.nextSibling);
                 } else {
                   item = o.html.dom({li: [
-                    {span: {className: 'json-delete', children: '×'}},
-                    {span: {className: 'json-key'}}, ': ',
-                    {span: {className: 'json-null'}}
+                    {span: {className: 'jsonv-delete', children: '×'}},
+                    {span: {className: 'jsonv-key'}}, ': ',
+                    {span: {className: 'jsonv-null'}}
                   ]}, item);
                 }
                 t = item.children[1];
               } else {
                 item = t.parentNode;
-                this.origType = c;
-                this.origValue = t.textContent;
+                self.origType = c;
+                self.origValue = t.textContent;
+                if (c == 'jsonv-string') t.textContent = JSON.stringify(t.textContent);
               }
-              if (c != 'json-delete') {
+              if (c != 'jsonv-delete') {
                 t.contentEditable = true;
                 t.focus();
                 document.execCommand('selectAll', false, null);
               }
-              this.path = [];
+              self.path = [];
               while (item != e.currentTarget) {
-                this.path.unshift(item.children[1].className == 'json-key'
+                self.path.unshift(item.children[1].className == 'jsonv-key'
                   ? item.children[1].textContent
                   : Array.prototype.indexOf.call(item.parentNode.children, item));
                 item = item.parentNode.parentNode.parentNode; // li/root > span > ul/ol > li
               }
-              if (c == 'json-delete') {
-                listener('DELETE', this.path.map(encodeURIComponent).join('/'));
+              if (c == 'jsonv-delete') {
+                listener('delete', self.path.map(encodeURIComponent).join('/'));
+                delete self.parent()[self.path.pop()];
+                self.path = self.origType = self.origValue = null;
                 t.parentNode.parentNode.removeChild(t.parentNode);
-                this.path = this.origType = this.origValue = null;
               }
             }
             break;
@@ -108,22 +127,23 @@ simpl.add('jsonv', function(o) {
             var esc = e.keyCode == 27,
                 tab = e.keyCode == 9,
                 enter = e.keyCode == 13,
-                colon = e.keyCode == 186,
-                key = c == 'json-key';
+                colon = e.keyCode == 186 || e.keyCode == 59 && e.shiftKey,
+                key = c == 'jsonv-key';
             if (esc || !t.textContent && (tab || enter || key && colon)) { // cancel
               e.preventDefault();
-              this.cancel(t);
+              self.cancel(t);
             } else if (!key && (tab || enter) && !e.shiftKey) { // submit
               e.preventDefault();
-              this.submit(t);
+              self.submit(t);
             } else if (key && t.textContent && (tab || enter || colon)) { // move to value
               e.preventDefault();
+              e.stopPropagation();
               t.contentEditable = false;
               t.parentNode.lastChild.contentEditable = true;
               t.parentNode.lastChild.focus();
-            } else if (this.object(t) && !key && (tab || enter) && e.shiftKey) { // move to key
+            } else if (self.object(t) && !key && (tab || enter) && e.shiftKey) { // move to key
               e.preventDefault();
-              if (this.origType) {
+              if (self.origType) {
                 t.blur();
               } else {
                 t.contentEditable = false;
@@ -133,33 +153,43 @@ simpl.add('jsonv', function(o) {
             }
             break;
           case 'blur':
-            var p = t.parentNode;
-            t = p.lastChild;
-            if ((c == 'json-string' || c == 'json-number' || c == 'json-boolean' || c == 'json-null' || c == 'json-key')
-              && (!e.relatedTarget || e.relatedTarget.parentNode != p)) {
-              if (p.children[1].textContent && t.textContent) {
-                this.submit(t);
-              } else {
-                this.cancel(t);
-              }
+            if (c in scalars || c == 'jsonv-key') {
+              self.focus = null;
+              setTimeout(function() {
+                var parent = t.parentNode;
+                if (self.focus == parent) return;
+                t = parent.lastChild;
+                if (parent.children[1].textContent && t.textContent)
+                  return self.submit(t);
+                self.cancel(t);
+              }, 0);
             }
+            break;
+          case 'focus':
+            self.focus = e.target.parentNode;
             break;
         }
       }
     };
-    
-    element.addEventListener('click', handler);
-    element.addEventListener('keydown', handler);
-    element.addEventListener('blur', handler, true);
-    
-    var self = {
+  };
+  var click = handler();
+  return function(elem, data, listener) {
+    if (data === undefined) data = JSON.parse(elem.textContent);
+    if (listener) {
+      listener = handler(typeof listener == 'function' ? listener : function() {}, data);
+      elem.classList.add('jsonv-editable');
+      elem.addEventListener('keydown', listener);
+      elem.addEventListener('blur', listener, true);
+      elem.addEventListener('focus', listener, true);
+    }
+    elem.classList.add('jsonv');
+    elem.addEventListener('click', listener || click);
+    o.html.dom(json(data), elem, true);
+    return {
       update: function(data) {
-        element.textContent = '';
-        o.html.dom(json(data), element);
+        if (listener) listener.data = data;
+        o.html.dom(json(data), elem, true);
       }
     };
-    
-    self.update(data);
-    return self;
   };
 }, {html: 0});

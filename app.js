@@ -259,7 +259,7 @@ simpl.add('app', function(o) {
         };
         return [
           {pre: {id: 'config', className: 'json', children: function(e) {
-            config = o.jsonv(selected && selected.entry.versions[0].config, e, function(method, path, data) {
+            config = o.jsonv(e, selected ? selected.entry.versions[0].config : null, function(method, path, data) {
               var app = selected.entry.versions[0];
               status('info', 'Saving...');
               o.xhr('/apps/'+encodeURIComponent(selected.name)+'/config/'+path, {

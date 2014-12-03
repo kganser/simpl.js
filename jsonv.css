@@ -1,18 +1,18 @@
-.json-object ul, .json-array ol {
+.jsonv-object ul, .jsonv-array ol {
   display: inline;
   list-style: none;
   padding: 0;
 }
-.json li {
+.jsonv li {
   padding-left: 1.2em;
 }
-.json li:after {
+.jsonv li:after {
   content: ",";
 }
-.json li:last-child:after {
+.jsonv li:last-child:after {
   display: none;
 }
-.json-delete {
+.jsonv .jsonv-delete {
   display: none;
   width: .95em;
   height: .85em;
@@ -23,72 +23,75 @@
   font-weight: bold;
   cursor: pointer;
 }
-.json-delete:hover {
+.jsonv-editable .jsonv-delete:hover {
   color: white;
   background: #c5201c;
 }
-.json li:hover > .json-delete {
+.jsonv-editable li:hover > .jsonv-delete {
   display: inline-block;
 }
-.json-object:before, .json-array:before {
+.jsonv-object:before, .jsonv-array:before {
   content: "";
   display: inline-block;
+  vertical-align: middle;
+  height: 0;
   border-style: solid;
   border-width: .6em .35em 0 .35em;
   border-color: #5a5a5a transparent transparent transparent;
-  margin: 0 .35em 0 .15em;
+  margin-right: .5em;
   cursor: pointer;
+  cursor: hand;
 }
-.json-object.closed:before, .json-array.closed:before {
+.jsonv-object.closed:before, .jsonv-array.closed:before {
   border-width: .35em 0 .35em .6em;
   border-color: transparent transparent transparent #5a5a5a;
   margin: 0 .4em 0 .2em;
 }
-.json-object.closed li, .json-array.closed li {
+.jsonv-object.closed li, .jsonv-array.closed li {
   display: none;
 }
-.json-object ul:before {
+.jsonv-object ul:before {
   content: "{";
 }
-.json-object ul:after {
+.jsonv-object ul:after {
   content: "}";
 }
-.json-object.closed ul:before {
+.jsonv-object.closed ul:before {
   content: "{…";
 }
-.json-array ol:before {
+.jsonv-array ol:before {
   content: "[";
 }
-.json-array ol:after {
+.jsonv-array ol:after {
   content: "]";
 }
-.json-array.closed ol:before {
+.jsonv-array.closed ol:before {
   content: "[…";
 }
-.json-string:before, .json-string:after {
+.jsonv-string:before, .jsonv-string:after {
   content: "\"";
 }
-.json-key {
+.jsonv-key {
   color: #881391;
   white-space: pre-wrap;
 }
-.json-string {
+.jsonv-string {
   color: #c5201c;
   white-space: pre-wrap;
 }
-.json-number, .json-boolean {
+.jsonv-number, .jsonv-boolean {
   color: #1c00cf;
 }
-.json-null {
+.jsonv-null {
   color: #808080;
 }
-.json span[contenteditable=true] {
+.jsonv span[contenteditable=true] {
   color: black;
   border: solid 1px #999;
   padding: 0 2px;
   box-shadow: 3px 3px 3px #999;
   outline: none;
 }
-.json-string[contenteditable=true]:before, .json-string[contenteditable=true]:after, .json-key[contenteditable=true]:after {
+.jsonv-string[contenteditable=true]:before, .jsonv-string[contenteditable=true]:after, .jsonv-key[contenteditable=true]:after {
   content: none;
 }
