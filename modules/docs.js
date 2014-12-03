@@ -51,9 +51,32 @@ simpl.add('docs', function(o) {
       'code', 0
     ]
   }, 'spec', tokens);
+  var format = function(node, type) {
+    if (type) {
+      if (Array.isArray(node))
+        return {span: {className: 'docjs-types', children: node.map(function(node) { return format(node, true); })}};
+      type = typeof node == 'string' ? node : Object.keys(node)[0];
+      return {span: {className: 'docjs-type', children: {span: {className: 'docjs-type-'+type, children: [
+        type == 'object' || type == 'array' ? format(node[type]) : {span: {className: 'docjs-name', children: type}},
+        type == 'function' && node != 'function' && [
+          node.function.args && {span: {className: 'docjs-args', children: format(node.function.args)}},
+          node.function.returns && {span: {className: 'docjs-returns', children: format(node.function.returns, true)}}
+        ]
+      ]}}}};
+    }
+    if (Array.isArray(node))
+      return {span: {className: 'docjs-values', children: node.map(function(node) { return format(node); })}};
+    return {span: {className: 'docjs-value'+(node.name ? ' docjs-named-value' : ''), children: typeof node == 'string' ? node : [
+      node.name && {span: {className: 'docjs-name', children: node.name}},
+      node.default && {span: {className: 'docjs-default', children: node.default}},
+      format(node.type, true)
+    ]}};
+  };
   
   /** docs: {
         generate: function(code:string) -> [Block, ...],
+        generateDom: function(code:string) -> json,
+        parseFile: function(path:string, callback:function([Block, ...])),
         stringify: function(code:string, breakLimit=1:number) -> string,
         stringifySpec: function(spec:Value|Type, breakLimit=1:number, depth=0:number, type=false:boolean) -> string
       }
@@ -89,6 +112,12 @@ simpl.add('docs', function(o) {
       
       Text blocks following the spec block support code spans between backticks. If an entire block is surrounded in
       backticks, it is parsed as a preformatted block aligned with the right side of the opening backtick.
+      
+      `generateDom` returns a DOM data structure suitable for the `html.dom` method, with elements tagged using
+      `docjs`-prefixed class names.
+
+      `parseFile` is a convenience method that makes an ajax request for the file at `path`, calls `generate` on the
+      response text, and issues `callback` with the result.
       
       `stringify` returns a plain-text version of the doc structure returned by `generate`, and `stringifySpec` does
       the same for the `spec` structure within `Block`. `breakLimit` sets the `depth` at which nested object properties
@@ -127,6 +156,45 @@ simpl.add('docs', function(o) {
           })
         };
       });
+    },
+    generateDom: function(code) {
+      return self.generate(code).map(function(block) {
+        if (!block.spec) console.error(block.error.toString());
+        return [
+          block.spec && {pre: {className: 'docjs-spec', children: function format(node, type) {
+            if (type) {
+              if (Array.isArray(node))
+                return {span: {className: 'docjs-types', children: node.map(function(node) { return format(node, true); })}};
+              type = typeof node == 'string' ? node : Object.keys(node)[0];
+              return {span: {className: 'docjs-type', children: {span: {className: 'docjs-type-'+type, children: [
+                type == 'object' || type == 'array' ? format(node[type]) : {span: {className: 'docjs-name', children: type}},
+                type == 'function' && node != 'function' && [
+                  node.function.args && {span: {className: 'docjs-args', children: format(node.function.args)}},
+                  node.function.returns && {span: {className: 'docjs-returns', children: format(node.function.returns, true)}}
+                ]
+              ]}}}};
+            }
+            if (Array.isArray(node))
+              return {span: {className: 'docjs-values', children: node.map(function(node) { return format(node); })}};
+            return {span: {className: 'docjs-value'+(node.name ? ' docjs-named-value' : ''), children: typeof node == 'string' ? node : [
+              node.name && {span: {className: 'docjs-name', children: node.name}},
+              node.default && {span: {className: 'docjs-default', children: node.default}},
+              format(node.type, true)
+            ]}};
+          }(block.spec)}},
+          block.text.map(function(text) {
+            return text.pre ? text : {p: text};
+          })
+        ];
+      });
+    },
+    parseFile: function(path, callback) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', path);
+      xhr.onload = function(e) {
+        callback(self.generate(e.target.responseText));
+      };
+      xhr.send();
     },
     stringify: function(code, breakLimit) {
       return self.generate(code).map(function(block) {

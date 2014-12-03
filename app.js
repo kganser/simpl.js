@@ -72,16 +72,7 @@ simpl.add('app', function(o) {
       ]}};
     };
     var doc = function(name, code) {
-      o.html.dom([{h1: name}, o.docs.generate(code).map(function(block) {
-        return [
-          {pre: block.spec
-            ? {className: 'spec', children: o.docs.stringifySpec(block.spec)}
-            : {className: 'spec error', children: block.error.toString()}},
-          block.text.map(function(text) {
-            return text.pre ? text : {p: text};
-          })
-        ];
-      })], docs, true);
+      o.html.dom([{h1: name}, o.docs.generateDom(code)], docs, true);
     };
     var handler = function(action, name, app, entry) {
       return function(e) {

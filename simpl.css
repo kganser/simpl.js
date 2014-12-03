@@ -277,6 +277,7 @@ button:active {
   content: "";
   display: block;
   clear: both;
+  height: 0;
 }
 #log .message {
   float: left;
@@ -295,14 +296,99 @@ button:active {
   background: #f7f7f7;
   padding: 5px 10px;
 }
-#docs .spec {
-  background: transparent;
-  padding: 4px 9px;
-  border: solid 1px #e0e0e0;
-}
 .CodeMirror, #config, #log, #docs, #loading {
   display: none;
 }
 .show-code .CodeMirror, .show-config #config, .show-log #log, .show-docs #docs, .show-loading #loading {
   display: block;
+}
+#docs .docjs-spec {
+  background: transparent;
+  padding: 4px 9px;
+  border: solid 1px #e0e0e0;
+}
+.docjs-type-function > .docjs-name,
+.docjs-type-number > .docjs-name,
+.docjs-type-boolean > .docjs-name,
+.docjs-type-string > .docjs-name {
+  color: #008;
+}
+.docjs-named-value > .docjs-type:before,
+.docjs-named-value > .docjs-types:before {
+  content: ": ";
+}
+.docjs-args > .docjs-named-value:hover,
+.docjs-args > .docjs-values > .docjs-named-value:hover {
+  cursor: pointer;
+}
+.docjs-args > .docjs-named-value > .docjs-name,
+.docjs-args > .docjs-values > .docjs-named-value > .docjs-name {
+  border-bottom: dotted 1px #999;
+}
+.docjs-args > .docjs-named-value > .docjs-type,
+.docjs-args > .docjs-named-value > .docjs-types,
+.docjs-args > .docjs-named-value > .docjs-default,
+.docjs-args > .docjs-values > .docjs-named-value > .docjs-type,
+.docjs-args > .docjs-values > .docjs-named-value > .docjs-types,
+.docjs-args > .docjs-values > .docjs-named-value > .docjs-default {
+  display: none;
+  border-bottom: dotted 1px #999;
+}
+.docjs-args > .docjs-named-value:hover > .docjs-type,
+.docjs-args > .docjs-named-value:hover > .docjs-types,
+.docjs-args > .docjs-named-value:hover > .docjs-default,
+.docjs-args > .docjs-values > .docjs-named-value:hover > .docjs-type,
+.docjs-args > .docjs-values > .docjs-named-value:hover > .docjs-types,
+.docjs-args > .docjs-values > .docjs-named-value:hover > .docjs-default {
+  display: inline;
+}
+.docjs-default {
+  color: #066;
+}
+.docjs-default:before {
+  content: "=";
+  color: initial;
+}
+.docjs-args:before {
+  content: "(";
+}
+.docjs-args:after {
+  content: ")";
+}
+.docjs-returns:before {
+  content: " → ";
+}
+.docjs-type-object:before {
+  content: "{";
+}
+.docjs-type-object:after {
+  content: "}";
+}
+.docjs-type-array:before {
+  content: "[";
+}
+.docjs-type-array:after {
+  content: "]";
+}
+.docjs-values > span:after {
+  content: ", ";
+}
+.docjs-values > span:last-child:after {
+  content: none;
+}
+.docjs-type-object .docjs-value {
+  display: block;
+  padding-left: 1.2em;
+}
+.docjs-args .docjs-value,
+.docjs-type-array .docjs-value,
+.docjs-type-object .docjs-type-object .docjs-value {
+  display: inline;
+  padding: 0;
+}
+.docjs-types > span:after {
+  content: "|";
+}
+.docjs-types > span:last-child:after {
+  content: none;
 }

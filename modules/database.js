@@ -18,7 +18,7 @@ simpl.add('database', function() {
     // if last segment is an array index, its original (numeric) value
     // will be returned as `position`
     var position;
-    path = (path || '').split('/');
+    path = (path || '').split('/').map(decodeURIComponent);
     (function advance(i) {
       while (i < path.length && !/0|[1-9][0-9]*/.test(path[i])) i++;
       if (i == path.length) return callback(path, position);
@@ -44,7 +44,7 @@ simpl.add('database', function() {
   };
   var get = function(store, key, callback, cursor) {
     var next;
-    if (typeof cursor != 'function') cursor = function() {}; 
+    if (typeof cursor != 'function') cursor = function() {};
     store.get(key).onsuccess = function(e) {
       var result = e.target.result;
       if (!result) return next || callback();
@@ -290,16 +290,18 @@ simpl.add('database', function() {
       };
       /** Database: {
             transaction: function(writable=false:boolean, stores='data':[string, ...]|string) -> Transaction|ScopedTransaction,
-            get: function(path='':string, writable=false:boolean, cursor=undefined:Cursor, store='data':string) -> Transaction|ScopedTransaction,
-            put: function(path='':string, value:json, insert=false:boolean, store='data':string) -> Transaction|ScopedTransaction,
-            append: function(path='':string, value:json, store='data':string) -> Transaction|ScopedTransaction,
-            delete: function(path='':string, store='data':string) -> Transaction|ScopedTransaction,
+            get: function(path='':string, writable=false:boolean, cursor=undefined:Cursor, store='data':string) -> ScopedTransaction,
+            put: function(path='':string, value:json, store='data':string) -> ScopedTransaction,
+            insert: function(path='':string, value:json, store='data':string) -> ScopedTransaction,
+            append: function(path='':string, value:json, store='data':string) -> ScopedTransaction,
+            delete: function(path='':string, store='data':string) -> ScopedTransaction,
             close: function
           }
           
-          All methods except `close` return a `Transaction` if `stores` is an array, or a `ScopedTransaction` if it is
-          a string (the default). `get`, `put`, `append`, and `delete` are convenience methods that operate through
-          `transaction`. `get` initiates a read-only transaction by default. */
+          `get`, `put`, `insert`, `append`, and `delete` are convenience methods that operate through `transaction` for
+          a single objectStore and return the corresponding `ScopedTransaction`. `get` initiates a read-only
+          transaction by default. `transaction` returns a `ScopedTransaction` if a single (string) objectStore is
+          specified, and a `Transaction` if operating on multiple objectStores. */
       return self = {
         transaction: function(writable, stores) {
           if (stores == null) stores = 'data';
@@ -308,7 +310,8 @@ simpl.add('database', function() {
           });
           /** Transaction: {
                 get: function(store:string, path='':string, cursor=undefined:Cursor) -> Transaction,
-                put: null|function(store:string, path='':string, value:json, insert=false:boolean) -> Transaction,
+                put: null|function(store:string, path='':string, value:json) -> Transaction,
+                insert: null|function(store:string, path='':string, value:json) -> Transaction,
                 append: null|function(store:string, path='':string, value:json) -> Transaction,
                 delete: null|function(store:string, path='':string) -> Transaction,
                 then: function(callback:function(this:Transaction, json|undefined, ...))
@@ -319,26 +322,27 @@ simpl.add('database', function() {
               
           /** ScopedTransaction: {
                 get: function(path='':string, cursor=undefined:Cursor) -> ScopedTransaction,
-                put: null|function(path='':string, value:json, insert=false:boolean) -> ScopedTransaction,
+                put: null|function(path='':string, value:json) -> ScopedTransaction,
+                insert: null|function(path='':string, value:json) -> ScopedTransaction,
                 append: null|function(path='':string, value:json) -> ScopedTransaction,
                 delete: null|function(path='':string) -> ScopedTransaction,
                 then: function(callback:function(this:ScopedTransaction, json|undefined, ...))
               }
               
               All methods except `then` are chainable and execute on the same transaction in parallel. If the
-              transaction is not writable, `put`, `append`, and `delete` are null.
+              transaction is not writable, `put`, `insert`, `append`, and `delete` are null.
               
               `path` is a `/`-separated string of array indices and `encodeURIComponent`-encoded object keys denoting
               the path to the desired element within the object store's json data structure; e.g.
               `'users/123/firstName'`. If undefined, `cursor` buffers all data at the requested path as the result of a
-              `get` operation. Setting `insert` to true on `put` will splice the given `value` into the parent array at
-              the specified position, shifting any subsequent elements forward.
+              `get` operation. `insert` will splice the given `value` into the parent array at the specified position,
+              shifting any subsequent elements forward.
               
               When all pending operations complete, `callback` is called with the result of each queued operation in
               order. More operations can be queued onto the same transaction at that time via `this`.
               
-              Results from `put`, `append`, and `delete` are error strings or undefined if successful. `get` results
-              are json data or undefined if no value exists at the requested path. */
+              Results from `put`, `insert`, `append`, and `delete` are error strings or undefined if successful. `get`
+              results are json data or undefined if no value exists at the requested path. */
               
           /** Cursor: function(path:[string|number, ...], array:boolean) -> boolean|Action|{
                 lowerBound=null: string|number,
@@ -360,17 +364,17 @@ simpl.add('database', function() {
               `Action` callback can optionally return either `'skip'` or `'stop'` to exclude the element at the given
               key from the structure or to exclude and stop iterating, respectively.
               
-              For example, the following `ScopedTransaction` call uses a cursor to fetch only the immediate members of
-              the object at the requested path. Object and array values will be empty:
+              For example, the following call uses a cursor to fetch only the immediate members of the object at the
+              requested path. Object and array values will be empty:
               
-             `.get('path/to/object', function(path) {
+             `db.get('path/to/object', function(path) {
                 return !path.length;
               });`
               
               The following call will get immediate members of the requested object sorted lexicographically (by code
-              unit value) up to and including key value 'c', but excluding key 'abc' (if any):
+              unit value) up to and including key value `'c'`, but excluding key `'abc'` (if any):
 
-             `.get('path/to/object', function(path) {
+             `db.get('path/to/object', function(path) {
                 return path.length ? false : {
                   upperBound: 'c',
                   action: function(key) {
@@ -383,8 +387,12 @@ simpl.add('database', function() {
               trans.get(store, path, cursor);
               return self;
             },
-            put: !writable ? null : function(store, path, value, insert) {
-              trans.put(store, path, value, insert);
+            put: !writable ? null : function(store, path, value) {
+              trans.put(store, path, value);
+              return self;
+            },
+            insert: !writable ? null : function(store, path, value) {
+              trans.put(store, path, value, true);
               return self;
             },
             append: !writable ? null : function(store, path, value) {
@@ -403,8 +411,12 @@ simpl.add('database', function() {
               trans.get(stores, path, cursor);
               return self;
             },
-            put: !writable ? null : function(path, value, insert) {
-              trans.put(stores, path, value, insert);
+            put: !writable ? null : function(path, value) {
+              trans.put(stores, path, value);
+              return self;
+            },
+            insert: !writable ? null : function(path, value) {
+              trans.put(stores, path, value, true);
               return self;
             },
             append: !writable ? null : function(path, value) {
@@ -423,8 +435,11 @@ simpl.add('database', function() {
         get: function(path, writable, cursor, store) {
           return self.transaction(writable, store).get(path, cursor);
         },
-        put: function(path, value, insert, store) {
-          return self.transaction(true, store).put(path, value, insert);
+        put: function(path, value, store) {
+          return self.transaction(true, store).put(path, value);
+        },
+        insert: function(path, value, store) {
+          return self.transaction(true, store).insert(path, value);
         },
         append: function(path, value, store) {
           return self.transaction(true, store).append(path, value);
