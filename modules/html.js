@@ -130,7 +130,7 @@ simpl.add('html', function() {
         children of `parent` (if set). `dom` returns the DOMNode corresponding to the top level of `node` created, or
         `parent` if `node` is an array. */
     dom: function(node, parent, clear) {
-      if (clear) while (parent.firstChild) parent.removeChild(parent.firstChild);
+      if (clear && parent) while (parent.firstChild) parent.removeChild(parent.firstChild);
       switch (typeof node) {
         case 'object':
           if (!node) return;

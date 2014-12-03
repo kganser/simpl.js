@@ -134,15 +134,23 @@ simpl = function(s) {
   var channel = function(simpl, module) {
     return function(listeners, code, load, log, error) {
       var url = code != null && URL.createObjectURL(new Blob([code], {type: 'application/javascript'})),
-          peer = url ? new Worker(url) : self;
+          peer = url ? new Worker(url) : self, worker;
       if (simpl || code) peer.onmessage = receive;
       
       if (code != null) {
         peer.onerror = function(e) {
-          error(e.message, peer.urls[e.filename], e.lineno);
-          cleanup(workers.indexOf(peer));
+          error(e.message, worker.urls[e.filename], e.lineno);
+          cleanup(workers.indexOf(worker));
         };
-        workers.push(peer = {worker: peer, listeners: listeners || {}, load: load, log: log, url: url, urls: {}, destructors: []});
+        workers.push(worker = {
+          worker: peer,
+          listeners: listeners || {},
+          load: load,
+          log: log,
+          url: url,
+          urls: {},
+          destructors: []
+        });
       } else if (module != null) {
         moduleListeners[module] = listeners;
       } else {
@@ -154,8 +162,8 @@ simpl = function(s) {
       };
       
       return url ? {send: sender, terminate: function(i) {
-        if (~(i = workers.indexOf(peer))) {
-          peer.worker.terminate();
+        if (~(i = workers.indexOf(worker))) {
+          peer.terminate();
           cleanup(i);
         }
       }} : sender;

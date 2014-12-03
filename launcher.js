@@ -22,7 +22,7 @@ document.launcher.onsubmit = function(e) {
   error.textContent = '';
   if (action.value == 'Launch') {
     var p = /^\d+$/.test(port.value) && parseInt(port.value, 10);
-    if (!p) {
+    if (!p || p.toString(16).length > 8) {
       error.textContent = 'Invalid port number';
       return port.focus();
     }

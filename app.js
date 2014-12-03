@@ -1,7 +1,7 @@
 simpl.add('app', function(o) {
   return function(apps, modules, offset, body) {
-    Object.keys(apps).forEach(function(name) { apps[name] = {running: apps[name], log: [], loading: false}; });
-    Object.keys(modules).forEach(function(name) { modules[name] = {loading: false}; });
+    Object.keys(apps).forEach(function(name) { apps[name] = {running: apps[name], log: []}; });
+    Object.keys(modules).forEach(function(name) { modules[name] = {}; });
     var appList, moduleList, selected, code, config, log, docs, line, status;
     if (window.EventSource) new EventSource('/activity').onmessage = function(e) {
       var message = JSON.parse(e.data),
@@ -124,10 +124,9 @@ simpl.add('app', function(o) {
           config.update(entry.versions[0].config);
           if (app) o.html.dom(entry.log.map(logLine), log, true);
           else doc(name, entry.versions[0].code);
-        } else if (!entry.loading) {
+        } else if (!entry.tab.classList.contains('loading')) {
           code.setOption('readOnly', 'nocursor');
           code.setValue('');
-          entry.loading = true;
           entry.tab.classList.add('loading');
           o.xhr((app ? '/apps/' : '/modules/')+encodeURIComponent(name), {responseType: 'json'}, function(e) {
             // TODO: handle error

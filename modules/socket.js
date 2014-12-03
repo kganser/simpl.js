@@ -124,11 +124,15 @@ simpl.add('socket', function(proxy) {
   var listen = function(options, onConnect, callback) {
     sockets.tcpServer.create({name: options.name}, function(info) {
       var socketId = info.socketId;
-      sockets.tcpServer.listen(socketId, options.ip || '0.0.0.0', options.port, options.backlog || 50, function(resultCode) {
-        if (resultCode) sockets.tcpServer.close(socketId);
-        else servers[socketId] = {clients: {}, callback: onConnect};
-        callback(resultCode && chrome.runtime.lastError.message, socketId);
-      });
+      try {
+        sockets.tcpServer.listen(socketId, options.ip || '0.0.0.0', options.port, options.backlog || 50, function(resultCode) {
+          if (resultCode) sockets.tcpServer.close(socketId);
+          else servers[socketId] = {clients: {}, callback: onConnect};
+          callback(resultCode && chrome.runtime.lastError.message, socketId);
+        });
+      } catch (e) {
+        callback(e.message);
+      }
     });
   };
   var send = function(socketId, data, callback) {
