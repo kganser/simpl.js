@@ -51,27 +51,6 @@ simpl.add('docs', function(o) {
       'code', 0
     ]
   }, 'spec', tokens);
-  var format = function(node, type) {
-    if (type) {
-      if (Array.isArray(node))
-        return {span: {className: 'docjs-types', children: node.map(function(node) { return format(node, true); })}};
-      type = typeof node == 'string' ? node : Object.keys(node)[0];
-      return {span: {className: 'docjs-type', children: {span: {className: 'docjs-type-'+type, children: [
-        type == 'object' || type == 'array' ? format(node[type]) : {span: {className: 'docjs-name', children: type}},
-        type == 'function' && node != 'function' && [
-          node.function.args && {span: {className: 'docjs-args', children: format(node.function.args)}},
-          node.function.returns && {span: {className: 'docjs-returns', children: format(node.function.returns, true)}}
-        ]
-      ]}}}};
-    }
-    if (Array.isArray(node))
-      return {span: {className: 'docjs-values', children: node.map(function(node) { return format(node); })}};
-    return {span: {className: 'docjs-value'+(node.name ? ' docjs-named-value' : ''), children: typeof node == 'string' ? node : [
-      node.name && {span: {className: 'docjs-name', children: node.name}},
-      node.default && {span: {className: 'docjs-default', children: node.default}},
-      format(node.type, true)
-    ]}};
-  };
   
   /** docs: {
         generate: function(code:string) -> [Block, ...],
@@ -167,8 +146,8 @@ simpl.add('docs', function(o) {
                 return {span: {className: 'docjs-types', children: node.map(function(node) { return format(node, true); })}};
               type = typeof node == 'string' ? node : Object.keys(node)[0];
               return {span: {className: 'docjs-type', children: {span: {className: 'docjs-type-'+type, children: [
-                type == 'object' || type == 'array' ? format(node[type]) : {span: {className: 'docjs-name', children: type}},
-                type == 'function' && node != 'function' && [
+                (type == 'object' || type == 'array') && node != type ? format(node[type]) : {span: {className: 'docjs-name', children: type}},
+                type == 'function' && node != type && [
                   node.function.args && {span: {className: 'docjs-args', children: format(node.function.args)}},
                   node.function.returns && {span: {className: 'docjs-returns', children: format(node.function.returns, true)}}
                 ]
