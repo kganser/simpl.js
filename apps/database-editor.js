@@ -19,7 +19,7 @@ simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
         case 'INSERT':
           return request.slurp(function(body) {
             if (body === undefined) return response.generic(415);
-            (request.method == 'POST' ? db.append(path, body) : db.put(path, body, request.method == 'INSERT')).then(respond);
+            db[{PUT: 'put', POST: 'append', INSERT: 'insert'}[request.method]](path, body).then(respond);
           }, 'json');
         case 'DELETE':
           return db.delete(path).then(respond);
@@ -48,7 +48,7 @@ simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
           {script: function() {
             simpl.use({jsonv: 0}, function(o) {
               var elem = document.getElementById('value');
-              o.jsonv(JSON.parse(elem.textContent), elem, function(method, path, data) {
+              o.jsonv(elem, undefined, function(method, path, data) {
                 console.log(method, path, data);
                 var request = new XMLHttpRequest();
                 request.open(method, '/'+path);

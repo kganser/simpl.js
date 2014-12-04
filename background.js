@@ -94,7 +94,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
             if (method == 'PUT' || method == 'INSERT')
               return request.slurp(function(body) {
                 if (body === undefined) return response.generic(415);
-                db.put(path, body, method == 'INSERT').then(handler);
+                db[method.toLowerCase()](path, body).then(handler);
               }, 'json');
             if (method == 'DELETE')
               return db.delete(path).then(handler);
