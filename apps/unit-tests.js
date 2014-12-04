@@ -56,7 +56,7 @@ simpl.use({async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 
         db.put('object/boolean', false).then(function() {
           this.get('object/boolean').then(function(result) {
             assert(result === false, 'database put');
-            this.put('array/2', 2, true).then(function() {
+            this.insert('array/2', 2).then(function() {
               this.get('array').then(function(result) {
                 assert(compare(['elem', 1, 2, null], result), 'database insert');
                 this.append('array', 3).then(function() {
@@ -66,6 +66,16 @@ simpl.use({async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 
                       this.get().get('object').get('object/boolean').then(function(all, deleted, child) {
                         assert(compare({array: ['elem', 1, 2, null, 3], string: 'value'}, all) && deleted === undefined && child === undefined,
                           'database delete record');
+                        this.delete('array/3').then(function() {
+                          this.get('array').then(function(result) {
+                            assert(compare(['elem', 1, 2, 3], result), 'database delete array element');
+                            this.put('array/4', 4).then(function() {
+                              this.get('array').then(function(result) {
+                                assert(compare(['elem', 1, 2, 3, 4], result), 'database array index resolution');
+                              });
+                            });
+                          });
+                        });
                       });
                     });
                   });
@@ -78,7 +88,7 @@ simpl.use({async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 
           assert(compare(data, result), 'database read transaction during write transaction');
         });
         db.get('', true).then(function(result) {
-          assert(compare({array: ['elem', 1, 2, null, 3], string: 'value'}, result),
+          assert(compare({array: ['elem', 1, 2, 3, 4], string: 'value'}, result),
             'database write transaction after write transaction');
           var i = 1;
           this.get('', function(path, array) {
@@ -92,9 +102,15 @@ simpl.use({async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 
             };
           }).then(function(result) {
             assert(i == 3 && compare({array: ['elem', 1, 2]}, result), 'database cursor result');
-            db.close();
-            o.database.delete('unit-tests', function(error, blocked) {
-              if (!blocked) next(assert(!error, 'database delete'));
+            this.put(encodeURIComponent('e$caped "stríng"'), "'válue'").then(function() {
+              this.get().then(function(value) {
+                assert('e$caped "stríng"' in value && value['e$caped "stríng"'] === "'válue'",
+                  'database put/get encoded paths, unicode values');
+                db.close();
+                o.database.delete('unit-tests', function(error, blocked) {
+                  if (!blocked) next(assert(!error, 'database delete'));
+                });
+              });
             });
           });
         });
@@ -287,7 +303,7 @@ simpl.use({async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 
           buf = o.string.toUTF8Buffer(str);
       assert(buf.length == uint8.length && !uint8.some(function(n, i) { return n != buf[i]; }), 'string to buffer');
       assert(o.string.fromUTF8Buffer(new Uint8Array(uint8).buffer) === str, 'string from buffer');
-      assert(passed == 57, 'tests complete ('+passed+'/57 in '+(Date.now()-start)+'ms)');
+      assert(passed == 60, 'tests complete ('+passed+'/60 in '+(Date.now()-start)+'ms)');
     }
   );
 })
