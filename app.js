@@ -1,7 +1,15 @@
 simpl.add('app', function(o) {
   return function(apps, modules, offset, body) {
-    Object.keys(apps).forEach(function(name) { apps[name] = {running: apps[name], log: []}; });
-    Object.keys(modules).forEach(function(name) { modules[name] = {}; });
+    Object.keys(apps).forEach(function(name) {
+      apps[name].forEach(function(version, i, app) {
+        app[i] = {minor: version[0], running: version[1], log: []};
+      });
+    });
+    Object.keys(modules).forEach(function(name) {
+      modules[name].forEach(function(version, i, module) {
+        module[i] = {minor: version};
+      });
+    });
     var appList, moduleList, selected, code, config, log, docs, line, status;
     if (window.EventSource) new EventSource('/activity').onmessage = function(e) {
       var message = JSON.parse(e.data),
@@ -9,13 +17,20 @@ simpl.add('app', function(o) {
           data = message.data;
       switch (event) {
         case 'log':
-          var app = apps[data.app];
+        case 'error':
+          var app = (apps[data.app] || {})[data.version];
           if (!app) return;
+          if (event == 'error') {
+            app.running = false;
+            app.tab.classList.add(data.level = 'error');
+            data.message = [data.message];
+          }
           if (app.log.push(message = {
             level: data.level == 'log' ? 'debug' : data.level,
             message: data.message,
-            module: data.module || '',
-            line: data.line && data.line > offset ? data.module ? data.line : data.line-offset : null
+            module: data.module ? data.module.name : '',
+            version: data.module ? data.module.version : '',
+            line: data.line > offset ? data.module ? data.line : data.line-offset : null
           }) > 1000) app.log.shift();
           if (selected && selected.entry == app) {
             var scroll = body.classList.contains('show-log') && body.scrollHeight - body.scrollTop == document.documentElement.clientHeight;
@@ -25,36 +40,29 @@ simpl.add('app', function(o) {
           break;
         case 'run':
         case 'stop':
-        case 'error':
-          var app = apps[data.app];
+          var app = (apps[data.app] || {})[data.version];
           if (!app) return;
           app.running = event == 'run';
           app.tab.classList[event == 'run' ? 'add' : 'remove']('running');
-          app.tab.classList[event == 'error' ? 'add' : 'remove']('error');
+          app.tab.classList.remove('error');
           if (event == 'run') {
             app.log = [];
             if (selected && selected.entry == app)
               log.textContent = '';
-          } else if (event == 'error') {
-            app.log.push(message = {
-              level: 'error',
-              message: [data.message],
-              module: data.module || '',
-              line: data.line && data.line > offset ? data.module ? data.line : data.line-offset : null
-            });
-            if (selected && selected.entry == app)
-              o.html.dom(logLine(message), log);
           }
           break;
         case 'delete':
-          var entries = data.app ? apps : modules;
-              entry = entries[data.name];
+          var versions = (data.app ? apps : modules)[data.name];
+              entry = versions && versions[data.version];
           if (!entry) return;
           if (selected && selected.entry == entry) selected = null;
-          delete entries[data.name];
+          delete versions[data.version]; // TODO: remove app entry if no versions left
           entry.tab.parentNode.removeChild(entry.tab);
           break;
       }
+    };
+    var url = function(app, name, version) {
+      return [app ? '/apps' : '/modules', encodeURIComponent(name), version].join('/');
     };
     var logLine = function(entry) {
       var string = entry.message.join(', '),
@@ -67,25 +75,29 @@ simpl.add('app', function(o) {
       }
       if (string) message.push(string);
       return {div: {className: 'entry '+entry.level, children: [
-        {div: {className: 'location', children: entry.line && entry.module+':'+entry.line}},
+        {div: {className: 'location', children: entry.line && entry.module+':'+entry.line, dataset: {
+          module: entry.module,
+          version: entry.version,
+          line: entry.line
+        }}},
         {div: {className: 'message', children: message}}
       ]}};
     };
     var doc = function(name, code) {
       o.html.dom([{h1: name}, o.docs.generateDom(code)], docs, true);
     };
-    var handler = function(action, name, app, entry) {
+    var handler = function(action, name, version, app, entry) {
       return function(e) {
         e.stopPropagation();
-        var command = action != 'delete' && {action: action, app: name};
-        if (!command && !confirm('Are you sure you want to delete?')) return;
+        var command = action != 'delete' && {action: action, app: name, version: version};
+        if (!command && !confirm('Are you sure you want to delete this '+(app ? 'app?' : 'module?'))) return;
         this.disabled = true;
-        o.xhr(command ? '/' : (app ? '/apps/' : '/modules/')+encodeURIComponent(name), {
+        o.xhr(command ? '/' : url(app, name, version), {
           method: command ? 'POST' : 'DELETE',
           json: command
         }, function() {
           e.target.disabled = false;
-          var entry = (app ? apps : modules)[name];
+          var entry = (app ? apps : modules)[name][version];
           if (!command || !entry) return;
           entry.running = action != 'stop';
           entry.tab.classList[entry.running ? 'add' : 'remove']('running');
@@ -93,41 +105,45 @@ simpl.add('app', function(o) {
             entry.log = [];
             if (selected && selected.entry == entry) {
               log.textContent = '';
-              toggle(name, true, 'log');
+              toggle(name, version, true, 'log');
             }
           }
         });
       };
     };
-    var toggle = function(name, app, panel, ln, ch) {
-      var entry = (app ? apps : modules)[name],
-          refresh = selected && selected.entry == entry && entry.tab.classList.contains('selected');
+    var toggle = function(name, version, app, panel, ln, ch) {
+      var entry = (app ? apps : modules)[name][version],
+          refresh = entry.tab.classList.contains('loading');
       if (!selected || selected.entry != entry || refresh) {
         if (selected) {
           selected.entry.tab.classList.remove('selected');
-          if (!refresh && selected.entry.versions)
-            selected.entry.versions[0].code = code.getValue();
+          if ('code' in selected.entry && !refresh)
+            selected.entry.code = code.getValue();
         }
-        if (entry.versions) {
+        if ('code' in entry) {
           selected = line = null;
           code.setOption('readOnly', false);
-          code.setValue(entry.versions[0].code);
-          config.update(entry.versions[0].config);
+          code.setValue(entry.code); // TODO: use codemirror documents
+          config.update(entry.config);
           if (app) o.html.dom(entry.log.map(logLine), log, true);
-          else doc(name, entry.versions[0].code);
-        } else if (!entry.tab.classList.contains('loading')) {
+          else doc(name, entry.code);
+          entry.tab.classList.remove('loading');
+        } else if (!refresh) {
           code.setOption('readOnly', 'nocursor');
           code.setValue('');
           entry.tab.classList.add('loading');
-          o.xhr((app ? '/apps/' : '/modules/')+encodeURIComponent(name), {responseType: 'json'}, function(e) {
+          o.xhr(url(app, name, version), {responseType: 'json'}, function(e) {
             // TODO: handle error
-            entry.versions = e.target.response.versions;
-            entry.tab.classList.remove('loading');
-            if (entry == selected.entry) toggle(name, app, panel, ln, ch);
+            var response = e.target.response;
+            entry.code = response.code;
+            entry.config = response.config;
+            entry.minor = response.minor;
+            entry.published = response.published;
+            if (entry == selected.entry) toggle(name, version, app, panel, ln, ch);
           });
         }
         entry.tab.classList.add('selected');
-        selected = {name: name, app: app, entry: entry};
+        selected = {name: name, version: version, app: app, entry: entry};
       }
       if (!panel) panel = app ? entry.running ? 'log' : 'code' : 'docs';
       body.className = body.classList.contains('collapsed') ? 'collapsed show-'+panel : 'show-'+panel;
@@ -144,26 +160,30 @@ simpl.add('app', function(o) {
         }
       }
     };
-    var li = function(name, app) {
-      var entry = (app ? apps : modules)[name];
+    var publish = function(name, version) {
+      return function(e) {
+        alert('Publishing '+name+'-'+version);
+      };
+    };
+    var li = function(name, major, minor, app) {
+      var entry = (app ? apps : modules)[name][major];
       return {li: function(elem) {
         entry.tab = elem;
         elem.onclick = function(e) {
-          toggle(name, app, (e.target == entry.view) && e.target.className.replace(/\s*view\s*/, ''));
+          toggle(name, major, app, (e.target == entry.view) && e.target.className.replace(/\s*view\s*/, ''));
         };
         if (entry.running)
           elem.classList.add('running');
         return [
           {div: {className: 'controls', children: [
+            app && {button: {className: 'publish', title: 'Publish', onclick: publish(name, major)}},
             {button: {className: 'view', children: function(e) { entry.view = e; }}},
-            app && [
-              {button: {className: 'run', title: 'Run', onclick: handler('run', name, app)}},
-              {button: {className: 'restart', title: 'Restart', onclick: handler('restart', name, app)}},
-              {button: {className: 'stop', title: 'Stop', onclick: handler('stop', name, app)}}
-            ],
-            {button: {className: 'delete', title: 'Delete', onclick: handler('delete', name, app)}}
+            app && {button: {className: 'run', title: 'Run', onclick: handler('run', name, major, app)}},
+            app && {button: {className: 'restart', title: 'Restart', onclick: handler('restart', name, major, app)}},
+            app && {button: {className: 'stop', title: 'Stop', onclick: handler('stop', name, major, app)}},
+            {button: {className: 'delete', title: 'Delete', onclick: handler('delete', name, major, app)}}
           ]}},
-          {span: name}
+          {span: minor == null ? name : name+' v'+(major+1)+'.'+minor}
         ];
       }};
     };
@@ -180,16 +200,18 @@ simpl.add('app', function(o) {
               field.focus();
               alert(name ? 'App name taken' : 'Please enter app name');
             } else {
-              apps[name] = {versions: [{code: '', config: {}}], log: []};
+              apps[name] = [{code: '', config: {}, log: []}];
               o.html.dom(li(name, true), appList);
-              toggle(name, true);
+              toggle(name, 0, true);
             }
           }}}
         ]}},
         {ul: function(e) {
           appList = e;
           return Object.keys(apps).map(function(name) {
-            return li(name, true);
+            return apps[name].map(function(app, major) {
+              return li(name, major, app.minor, true);
+            });
           });
         }},
         {h2: 'Modules'},
@@ -203,16 +225,18 @@ simpl.add('app', function(o) {
               field.focus();
               alert(name ? 'Module name taken' : 'Please enter module name');
             } else {
-              modules[name] = {versions: [{code: "simpl.add('"+name.replace(/\\/g, '\\').replace(/'/g, "\\'")+"', function() {\n  \n});\n"}]};
+              modules[name] = [{code: "simpl.add('"+name.replace(/\\/g, '\\').replace(/'/g, "\\'")+"', function() {\n  \n});\n"}];
               o.html.dom(li(name, false), moduleList);
-              toggle(name, false, 'code');
+              toggle(name, 0, false, 'code');
             }
           }}}
         ]}},
         {ul: function(e) {
           moduleList = e;
           return Object.keys(modules).map(function(name) {
-            return li(name, false);
+            return modules[name].map(function(module, major) {
+              return li(name, major, module.minor, false);
+            });
           });
         }},
         {button: {className: 'toggle', onclick: function() {
@@ -234,26 +258,27 @@ simpl.add('app', function(o) {
         });
         CodeMirror.commands.save = function() {
           if (!selected || !selected.entry.dirty) return;
-          var current = selected;
+          var entry = selected.entry;
           status('info', 'Saving...');
-          o.xhr((selected.app ? '/apps/' : '/modules/')+encodeURIComponent(selected.name), {
+          o.xhr(url(selected.app, selected.name, selected.version), {
             method: 'POST',
-            data: selected.entry.versions[0].code = code.getValue()
+            data: entry.code = code.getValue()
           }, function(e, ok) {
             var ok = e.target.status == 200;
-            if (ok && selected == current) {
-              selected.entry.tab.classList.remove('changed');
-              doc(selected.name, selected.entry.versions[0].code);
+            if (ok) {
+              entry.tab.classList.remove('changed');
+              if (selected && selected.app && selected.entry == entry)
+                doc(selected.name, entry.code);
             }
             status(ok ? 'success' : 'failure', ok ? 'Saved' : 'Error');
           });
         };
         return [
           {pre: {id: 'config', className: 'json', children: function(e) {
-            config = o.jsonv(e, selected ? selected.entry.versions[0].config : null, function(method, path, data) {
-              var app = selected.entry.versions[0];
+            config = o.jsonv(e, selected ? selected.entry.config : null, function(method, path, data) {
+              var app = selected.entry;
               status('info', 'Saving...');
-              o.xhr('/apps/'+encodeURIComponent(selected.name)+'/config/'+path, {
+              o.xhr(url(true, selected.name, selected.version)+'/config/'+path, {
                 method: method,
                 json: data,
                 responseType: 'json'
@@ -266,8 +291,10 @@ simpl.add('app', function(o) {
           }}},
           {pre: {id: 'log', children: function(e) { log = e; }, onclick: function(e) {
             if (e.target.className == 'location') {
-              var ref = e.target.textContent.split(':');
-              toggle(ref[0] || selected.name, !ref[0], 'code', ref[1], 0);
+              var ref = e.target.dataset,
+                  name = ref.module || selected.name,
+                  version = ref.version ? parseInt(ref.version, 10) : selected.version;
+              toggle(name, version, !ref.module, 'code', ref.line, 0);
             }
           }}},
           {div: {id: 'docs', children: function(e) { docs = e; }}},
@@ -287,4 +314,4 @@ simpl.add('app', function(o) {
       }}}
     ], body);
   };
-}, {html: 0, xhr: 0, jsonv: 0, docs: 0});
+}, 0, {html: 0, xhr: 0, jsonv: 0, docs: 0});

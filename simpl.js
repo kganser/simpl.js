@@ -4,18 +4,20 @@ var simpl = function(modules, clients) {
     for (var i = client ? clients.push(client)-1 : 0; i < clients.length; i++) {
       client = clients[i];
       var needed = Object.keys(client.dependencies),
-          available = 0;
+          available = {};
       needed.forEach(function(name) {
-        if (!modules.hasOwnProperty(name)) {
-          requested.push(name);
-          return modules[name] = false;
+        var version = parseInt(needed[name], 10) || 0;
+        if (!modules[name]) modules[name] = {};
+        if (!(version in modules[name])) {
+          requested.push({name: name, version: version});
+          return modules[name][version] = false;
         }
-        if (modules[name].export)
-          available++;
+        if (modules[name][version].export)
+          available[name] = modules[name][version];
       });
-      if (available == needed.length) {
+      if (Object.keys(available).length == needed.length) {
         needed.forEach(function(name) {
-          var module = modules[name];
+          var module = available[name];
           if (!module.init) {
             module.init = true;
             module.export = module.export();
@@ -28,18 +30,19 @@ var simpl = function(modules, clients) {
     return requested;
   };
   return {
-    add: function(name, module, dependencies) {
+    add: function(name, module, version, dependencies) {
       if (dependencies) return simpl.use(dependencies, function(o) {
-        simpl.add(name, function() { return module(o); });
-      }, name);
-      if (!modules[name]) {
-        modules[name] = {export: module};
+        simpl.add(name, function() { return module(o); }, version);
+      });
+      if (!modules[name]) modules[name] = {};
+      if (!modules[name][version = parseInt(version, 10) || 0]) {
+        modules[name][version] = {export: module};
         return dispatch();
       }
       return [];
     },
-    use: function(modules, callback, name) {
-      return dispatch({dependencies: modules, callback: callback, name: name});
+    use: function(modules, callback) {
+      return dispatch({dependencies: modules, callback: callback});
     }
   };
 }({}, []);
@@ -173,20 +176,20 @@ simpl = function(s) {
   var proxy = channel(true)();
   
   return {
-    add: function(name, module, dependencies) {
+    add: function(name, module, version, dependencies) {
       if (dependencies) return simpl.use(dependencies, function(o) {
         simpl.add(name, function() {
           return module(o, channel(false, name));
-        });
-      }, name);
+        }, version);
+      });
       return s.add(name, function() {
         return module(channel(false, name));
-      });
+      }, version);
     },
-    use: function(modules, callback, name) {
+    use: function(modules, callback) {
       return load(s.use(modules, function(o) {
         callback(o, channel(false));
-      }, name));
+      }));
     },
     worker: inWorker
   };

@@ -208,4 +208,4 @@ simpl.add('docs', function(o) {
       return (node.name ? node.name+(node.default ? '='+node.default : '')+': ' : '')+spec(node.type, breakLimit, depth+1, true);
     }
   };
-}, {parser: 0});
+}, 0, {parser: 0});

@@ -1,8 +1,7 @@
 simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy) {
 
   var server, port, ping, loader, lines,
-      db = o.database.open('simpl', {}),
-      immediates = function(path) { return !path.length; };
+      db = o.database.open('simpl', {});
   
   db.get('apps').then(function(apps) {
     if (apps) return;
@@ -65,7 +64,13 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
               parts = path.split('/'),
               method = request.method;
           
-          if (parts.length == 2) {
+          if (parts.length < 3 || !/^\d+$/.test(parts[2]))
+            return response.error();
+          
+          parts.splice(2, 0, 'versions');
+          path = parts.join('/');
+          
+          if (parts.length == 4) {
             if (method == 'GET')
               return db.get(path).then(function(resource) {
                 if (resource === undefined) return response.generic(404);
@@ -73,19 +78,26 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
               });
             if (method == 'DELETE')
               return db.delete(path).then(function() {
-                broadcast('delete', {app: parts[0] == 'apps', name: decodeURIComponent(parts[1])});
+                broadcast('delete', {app: parts[0] == 'apps', version: version, name: decodeURIComponent(parts[1])});
                 response.ok();
               });
             if (method == 'POST')
-              return request.slurp(function(code) {
-                db.put(path+'/versions/0/code', code).then(function(error) {
-                  if (!error) return response.ok();
-                  this.put(path, {versions: [{code: code, config: {}}]}).then(response.ok);
-                });
-              }, 'utf8', 65536);
-          } else if (parts[2] == 'config') {
-            parts.splice(2, 0, 'versions', '0');
-            path = parts.join('/');
+              return db.get(path).then(function(version) {
+                if (!version) return response.error();
+                if (request.query.publish) // TODO: keep config in published?
+                  return (request.query.publish == 'major'
+                    ? this.append(parts.slice(0, 3).join('/'), {code: version.code, config: version.config, published: {minor: 0, code: version.code}})
+                    : this.put(path+'/minor', version.minor ? version.minor+1 : 0).put(path+'/published', {code: version.code, config: version.config})
+                  ).then(response.ok);
+                return request.slurp(function(code) {
+                  db.put(path+'/code', code).then(function(error) {
+                    if (!error) return response.ok();
+                    if (parts[3] != '0') return response.error();
+                    this.put(path, {versions: [{code: code, config: {}}]}).then(response.ok);
+                  });
+                }, 'utf8', 65536);
+              });
+          } else if (parts[4] == 'config') {
             var handler = function() {
               this.get(parts.slice(0, 5).join('/')).then(function(config) {
                 response.end(JSON.stringify(config), {'Content-Type': o.http.mimeType('json')});
@@ -110,34 +122,49 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
         if (request.path == '/') {
           if (request.method == 'POST')
             return request.slurp(function(body) {
-              if (body === undefined) return response.generic(415);
+              if (body === undefined || !/^\d+$/.test(body.version))
+                return response.generic(415);
               var name = body.app,
+                  version = parseInt(body.version, 10),
+                  id = name+'-'+version,
                   action = body.action;
-              if ((action == 'stop' || action == 'restart') && apps[name]) {
-                apps[name].terminate();
-                broadcast('stop', {app: name});
-                delete apps[name];
+              if ((action == 'stop' || action == 'restart') && apps[id]) {
+                apps[id].terminate();
+                broadcast('stop', {app: name, version: version});
+                delete apps[id];
                 if (action == 'stop') return response.ok();
               }
-              if ((action == 'run' || action == 'restart') && !apps[name])
-                return db.get('apps/'+encodeURIComponent(name)+'/versions/0').then(function(app) {
+              if ((action == 'run' || action == 'restart') && !apps[id])
+                return db.get('apps/'+encodeURIComponent(name)+'/versions/'+version).then(function(app) {
                   if (!app) return response.error();
-                  apps[name] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\n'+app.code, function(name, callback) {
-                    db.get('modules/'+encodeURIComponent(name)+'/versions/0/code').then(callback);
+                  apps[id] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\n'+app.code, function(module, callback) {
+                    db.get('modules/'+encodeURIComponent(module.name)+'/versions/'+module.version+'/code').then(callback);
                   }, function(level, args, module, line, column) {
-                    broadcast('log', {app: name, level: level, message: args, module: module, line: line, column: column});
+                    broadcast('log', {app: name, version: version, level: level, message: args, module: module, line: line, column: column});
                   }, function(message, module, line) {
-                    broadcast('error', {app: name, message: message, module: module, line: line});
-                    delete apps[name];
+                    broadcast('error', {app: name, version: version, message: message, module: module, line: line});
+                    delete apps[id];
                   });
-                  broadcast('run', {app: name});
+                  broadcast('run', {app: name, version: version});
                   response.ok();
                 });
               response.error();
             }, 'json');
-          return db.get('apps', false, immediates).get('modules', false, immediates).then(function(a, m) {
-            Object.keys(a).forEach(function(name) { a[name] = !!apps[name]; });
-            Object.keys(m).forEach(function(name) { m[name] = 1; });
+          return db.get('', false, function(path) {
+            return path.length != 4 ? null : function(key) {
+              if (key != 'minor') return 'skip';
+            };
+          }).then(function(data) {
+            Object.keys(data.apps).forEach(function(name) {
+              data.apps[name] = data.apps[name].versions.map(function(v, i) {
+                return [v.minor == null ? null : v.minor, !!apps[name+'-'+i]];
+              });
+            });
+            Object.keys(data.modules).forEach(function(name) {
+              data.modules[name] = data.modules[name].versions.map(function(v) {
+                return v.minor == null ? null : v.minor;
+              });
+            });
             response.end(o.html.markup([
               {'!doctype': {html: null}},
               {html: [
@@ -159,7 +186,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                   {script: {src: '/codemirror.js'}},
                   {script: {src: '/app.js'}},
                   {script: function(apps, modules, offset) {
-                    if (!apps) return [a, m, lines];
+                    if (!apps) return [data.apps, data.modules, lines];
                     simpl.use({app: 0}, function(o) {
                       o.app(apps, modules, offset, document.body);
                     });

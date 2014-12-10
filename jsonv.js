@@ -192,4 +192,4 @@ simpl.add('jsonv', function(o) {
       }
     };
   };
-}, {html: 0});
+}, 0, {html: 0});

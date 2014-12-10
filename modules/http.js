@@ -262,4 +262,4 @@ simpl.add('http', function(o) {
       return o;
     }
   };
-}, {socket: 0, string: 0});
+}, 0, {socket: 0, string: 0});

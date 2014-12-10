@@ -99,7 +99,7 @@ nav .error span:after {
   color: #c33;
 }
 nav .loading span:after {
-  content: "⇆";
+  content: "⏳";
 }
 nav .changed span:before {
   content: "*";
@@ -145,8 +145,14 @@ button:active {
 .code:hover, .config:hover, .log:hover, .docs:hover, #status.info {
   background: #36c;
 }
+.publish:hover {
+  background: #93c;
+}
 .toggle:hover, .show-code .toggle:hover {
   background: #666;
+}
+.publish:before {
+  content: "";
 }
 .code:before {
   content: "";
@@ -178,10 +184,10 @@ button:active {
 .collapsed .toggle:before {
   content: "▸";
 }
-.view, .selected.loading .view, .restart, .stop, .running .run, .running .delete, .collapsed .delete {
+.publish, .view, .selected.loading .publish, .selected.loading .view, .restart, .stop, .running .run, .running .delete, .collapsed .delete {
   display: none;
 }
-.selected .view, .running .restart, .running .stop, .running .log {
+.selected .publish, .selected .view, .running .restart, .running .stop, .running .log {
   display: inline;
 }
 .selected {
@@ -323,15 +329,17 @@ button:active {
   cursor: pointer;
   display: inline-block;
   position: relative;
-  margin: -2px 2px -3px;
+  margin: -2px 0 -3px;
   padding: 2px 3px 3px;
   background: white;
   box-shadow: 0 0 3px rgba(0, 0, 0, .6);
   border-radius: 3px;
 }
-.docjs-args .docjs-args > .docjs-value > .docjs-named-value:hover,
-.docjs-args .docjs-args > .docjs-values > .docjs-value > .docjs-named-value:hover {
-  margin: 2px 2px 1px;
+.docjs-args > .docjs-value > .docjs-named-value:hover .docjs-args > .docjs-value > .docjs-named-value:hover,
+.docjs-args > .docjs-values > .docjs-value > .docjs-named-value:hover .docjs-args > .docjs-value > .docjs-named-value:hover,
+.docjs-args > .docjs-value > .docjs-named-value:hover .docjs-args > .docjs-values > .docjs-value > .docjs-named-value:hover,
+.docjs-args > .docjs-values > .docjs-value > .docjs-named-value:hover .docjs-args > .docjs-values > .docjs-value > .docjs-named-value:hover {
+  margin: 2px 0 1px;
 }
 .docjs-args > .docjs-value > .docjs-named-value > .docjs-name,
 .docjs-args > .docjs-values > .docjs-value > .docjs-named-value > .docjs-name {
