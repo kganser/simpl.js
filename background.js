@@ -81,22 +81,27 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
                 broadcast('delete', {app: parts[0] == 'apps', version: version, name: decodeURIComponent(parts[1])});
                 response.ok();
               });
-            if (method == 'POST')
-              return db.get(path).then(function(version) {
-                if (!version) return response.error();
-                if (request.query.publish) // TODO: keep config in published?
+            if (method == 'POST') {
+              var app = path[0] == 'apps';
+              if (request.query.publish)
+                return db.get(path).then(function(version) {
+                  if (!version) return response.error();
+                  var record = app
+                    ? {minor: 0, code: version.code, config: version.config, published: {code: version.code, config: version.config}}
+                    : {minor: 0, code: version.code, published: {code: version.code}};
                   return (request.query.publish == 'major'
-                    ? this.append(parts.slice(0, 3).join('/'), {code: version.code, config: version.config, published: {minor: 0, code: version.code}})
-                    : this.put(path+'/minor', version.minor ? version.minor+1 : 0).put(path+'/published', {code: version.code, config: version.config})
+                    ? this.append(parts.slice(0, 3).join('/'), record)
+                    : this.put(path+'/minor', version.minor ? version.minor+1 : 0).put(path+'/published', record.published)
                   ).then(response.ok);
-                return request.slurp(function(code) {
-                  db.put(path+'/code', code).then(function(error) {
-                    if (!error) return response.ok();
-                    if (parts[3] != '0') return response.error();
-                    this.put(path, {versions: [{code: code, config: {}}]}).then(response.ok);
-                  });
-                }, 'utf8', 65536);
-              });
+                });
+              return request.slurp(function(code) {
+                db.put(path+'/code', code).then(function(error) { // TODO: check If-Match header
+                  if (!error) return response.ok();
+                  if (parts[3] != '0') return response.error();
+                  this.put(path, app ? {code: code, config: {}} : {code: code}).then(response.ok);
+                });
+              }, 'utf8', 65536);
+            }
           } else if (parts[4] == 'config') {
             var handler = function() {
               this.get(parts.slice(0, 5).join('/')).then(function(config) {

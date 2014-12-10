@@ -267,7 +267,7 @@ simpl.add('app', function(o) {
             var ok = e.target.status == 200;
             if (ok) {
               entry.tab.classList.remove('changed');
-              if (selected && selected.app && selected.entry == entry)
+              if (selected && !selected.app && selected.entry == entry)
                 doc(selected.name, entry.code);
             }
             status(ok ? 'success' : 'failure', ok ? 'Saved' : 'Error');
