@@ -74,7 +74,7 @@ nav li {
   margin-bottom: 1px;
   cursor: default;
 }
-nav li span {
+nav .name {
   display: block;
   position: relative;
   height: 20px;
@@ -83,7 +83,12 @@ nav li span {
   text-overflow: ellipsis;
   overflow: hidden;
 }
-nav li span:after {
+nav .name span {
+  font-size: 90%;
+  color: #999;
+  margin-left: 5px;
+}
+nav .name:after {
   font: 26px entypo;
   color: #999;
   position: absolute;
@@ -94,14 +99,14 @@ nav li span:after {
   text-align: center;
   margin-top: -.28em;
 }
-nav .error span:after {
+nav .error .name:after {
   content: "⚠";
   color: #c33;
 }
-nav .loading span:after {
+nav .loading .name:after {
   content: "⏳";
 }
-nav .changed span:before {
+nav .changed .name:before {
   content: "*";
 }
 .controls {

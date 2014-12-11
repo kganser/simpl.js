@@ -57,15 +57,13 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
       
       ping = setInterval(broadcast, 15000); // TODO: use TCP keep-alive
       
-      o.http.serve({port: command.port}, function(request, response) {
+      o.http.serve({port: command.port}, function(request, response, socket) {
         
-        if (/^\/(apps|modules)\//.test(request.path)) {
+        if (/^\/(apps|modules)\/[^\/]*\/\d+(\/|$)/.test(request.path)) {
           var path = request.path.substr(1),
               parts = path.split('/'),
+              entity = {app: parts[0] == 'apps', name: decodeURIComponent(parts[1]), version: parseInt(parts[2], 10)},
               method = request.method;
-          
-          if (parts.length < 3 || !/^\d+$/.test(parts[2]))
-            return response.error();
           
           parts.splice(2, 0, 'versions');
           path = parts.join('/');
@@ -78,30 +76,32 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
               });
             if (method == 'DELETE')
               return db.delete(path).then(function() {
-                broadcast('delete', {app: parts[0] == 'apps', version: version, name: decodeURIComponent(parts[1])});
+                broadcast('delete', entity);
                 response.ok();
               });
-            if (method == 'POST') {
-              var app = path[0] == 'apps';
-              if (request.query.publish)
-                return db.get(path).then(function(version) {
-                  if (!version) return response.error();
-                  var record = app
-                    ? {minor: 0, code: version.code, config: version.config, published: {code: version.code, config: version.config}}
-                    : {minor: 0, code: version.code, published: {code: version.code}};
-                  return (request.query.publish == 'major'
-                    ? this.append(parts.slice(0, 3).join('/'), record)
-                    : this.put(path+'/minor', version.minor ? version.minor+1 : 0).put(path+'/published', record.published)
-                  ).then(response.ok);
-                });
+            if (method == 'POST')
               return request.slurp(function(code) {
                 db.put(path+'/code', code).then(function(error) { // TODO: check If-Match header
                   if (!error) return response.ok();
                   if (parts[3] != '0') return response.error();
-                  this.put(path, app ? {code: code, config: {}} : {code: code}).then(response.ok);
+                  this.put(path, entity.app ? {code: code, config: {}} : {code: code}).then(response.ok);
                 });
               }, 'utf8', 65536);
-            }
+          } else if (parts.length == 5 && method == 'POST' && (parts[4] == 'publish' || parts[4] == 'upgrade')) {
+            path = parts.slice(0, 4).join('/');
+            return db.get(path, true).then(function(version) {
+              if (!version) return response.error();
+              var record = entity.app
+                ? {minor: 0, code: version.code, config: version.config, published: {code: version.code, config: version.config}}
+                : {minor: 0, code: version.code, published: {code: version.code}};
+              return (parts[4] == 'upgrade'
+                ? this.append(parts.slice(0, 3).join('/'), record)
+                : this.put(path+'/minor', version.minor == null ? 0 : version.minor+1).put(path+'/published', record.published)
+              ).then(function() {
+                broadcast(parts[4], entity);
+                response.ok();
+              });
+            });
           } else if (parts[4] == 'config') {
             var handler = function() {
               this.get(parts.slice(0, 5).join('/')).then(function(config) {
@@ -119,6 +119,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
         }
         if (request.path == '/activity') {
           clients.push(response);
+          socket.setNoDelay(true);
           return response.send(': ping', {
             'Content-Type': 'text/event-stream',
             'Transfer-Encoding': null
@@ -156,7 +157,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
               response.error();
             }, 'json');
           return db.get('', false, function(path) {
-            return path.length != 4 ? null : function(key) {
+            return path.length < 4 ? null : function(key) {
               if (key != 'minor') return 'skip';
             };
           }).then(function(data) {

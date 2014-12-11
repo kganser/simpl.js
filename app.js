@@ -52,12 +52,22 @@ simpl.add('app', function(o) {
           }
           break;
         case 'delete':
-          var versions = (data.app ? apps : modules)[data.name];
+          var versions = (data.app ? apps : modules)[data.name],
               entry = versions && versions[data.version];
           if (!entry) return;
           if (selected && selected.entry == entry) selected = null;
           delete versions[data.version]; // TODO: remove app entry if no versions left
           entry.tab.parentNode.removeChild(entry.tab);
+          break;
+        case 'upgrade': // TODO
+        case 'publish':
+          var entry = ((data.app ? apps : modules)[data.name] || {})[data.version];
+          if (!entry) return;
+          entry.minor = entry.minor == null ? 0 : entry.minor+1;
+          entry.published = data.app ? {code: entry.code, config: entry.config} : {code: entry.code};
+          var version = (data.version+1)+'.'+entry.minor;
+          entry.tab.lastChild.title = data.name+' '+version;
+          entry.tab.lastChild.lastChild.textContent = version;
           break;
       }
     };
@@ -133,7 +143,10 @@ simpl.add('app', function(o) {
           code.setValue('');
           entry.tab.classList.add('loading');
           o.xhr(url(app, name, version), {responseType: 'json'}, function(e) {
-            // TODO: handle error
+            if (e.target.status != 200) {
+              entry.tab.classList.remove('loading');
+              return status('failure', 'Error retrieving '+(app ? 'app' : 'module'));
+            }
             var response = e.target.response;
             entry.code = response.code;
             entry.config = response.config;
@@ -160,13 +173,22 @@ simpl.add('app', function(o) {
         }
       }
     };
-    var publish = function(name, version) {
-      return function(e) {
-        alert('Publishing '+name+'-'+version);
+    var publish = function(name, version, app) {
+      return function() {
+        var entity = (app ? apps : modules)[name][version];
+        if (entity.published && entity.code == entity.published.code && JSON.stringify(entity.config) == JSON.stringify(entity.published.config))
+          return alert('No changes to publish');
+        status('info', 'Publishing...');
+        o.xhr(url(app, name, version)+'/publish', {method: 'POST'}, function(e) {
+          if (e.target.status != 200)
+            return status('failure', 'Error');
+          status('success', 'Published');
+        });
       };
     };
     var li = function(name, major, minor, app) {
-      var entry = (app ? apps : modules)[name][major];
+      var entry = (app ? apps : modules)[name][major],
+          version = minor == null ? '' : (major+1)+'.'+minor;
       return {li: function(elem) {
         entry.tab = elem;
         elem.onclick = function(e) {
@@ -176,14 +198,18 @@ simpl.add('app', function(o) {
           elem.classList.add('running');
         return [
           {div: {className: 'controls', children: [
-            app && {button: {className: 'publish', title: 'Publish', onclick: publish(name, major)}},
+            {button: {className: 'publish', title: 'Publish', onclick: publish(name, major, app)}},
             {button: {className: 'view', children: function(e) { entry.view = e; }}},
             app && {button: {className: 'run', title: 'Run', onclick: handler('run', name, major, app)}},
             app && {button: {className: 'restart', title: 'Restart', onclick: handler('restart', name, major, app)}},
             app && {button: {className: 'stop', title: 'Stop', onclick: handler('stop', name, major, app)}},
             {button: {className: 'delete', title: 'Delete', onclick: handler('delete', name, major, app)}}
           ]}},
-          {span: minor == null ? name : name+' v'+(major+1)+'.'+minor}
+          {span: {
+            className: 'name',
+            title: version ? name+' '+version : name,
+            children: [name, {span: version}]
+          }}
         ];
       }};
     };
@@ -263,14 +289,13 @@ simpl.add('app', function(o) {
           o.xhr(url(selected.app, selected.name, selected.version), {
             method: 'POST',
             data: entry.code = code.getValue()
-          }, function(e, ok) {
-            var ok = e.target.status == 200;
-            if (ok) {
-              entry.tab.classList.remove('changed');
-              if (selected && !selected.app && selected.entry == entry)
-                doc(selected.name, entry.code);
-            }
-            status(ok ? 'success' : 'failure', ok ? 'Saved' : 'Error');
+          }, function(e) {
+            if (e.target.status != 200)
+              return status('failure', 'Error');
+            status('success', 'Saved');
+            entry.tab.classList.remove('changed');
+            if (selected && !selected.app && selected.entry == entry)
+              doc(selected.name, entry.code);
           });
         };
         return [
@@ -282,10 +307,11 @@ simpl.add('app', function(o) {
                 method: method,
                 json: data,
                 responseType: 'json'
-              }, function(e, ok) {
-                if (ok = e.target.status == 200)
-                  app.config = e.target.response;
-                status(ok ? 'success' : 'failure', ok ? 'Saved' : 'Error');
+              }, function(e) {
+                if (e.target.status != 200)
+                  return status('failure', 'Error');
+                status('success', 'Saved');
+                app.config = e.target.response;
               });
             });
           }}},
