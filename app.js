@@ -14,25 +14,26 @@ simpl.add('app', function(o) {
     if (window.EventSource) new EventSource('/activity').onmessage = function(e) {
       var message = JSON.parse(e.data),
           event = message.event,
-          data = message.data;
+          data = message.data,
+          versions = event in {run: 1, stop: 1, log: 1, error: 1} ? apps[data.app] : (data.app ? apps : modules)[data.name],
+          entry = versions && data.version;
+      if (!entry) return;
       switch (event) {
         case 'log':
         case 'error':
-          var app = (apps[data.app] || {})[data.version];
-          if (!app) return;
           if (event == 'error') {
-            app.running = false;
-            app.tab.classList.add(data.level = 'error');
+            entry.running = false;
+            entry.tab.classList.add(data.level = 'error');
             data.message = [data.message];
           }
-          if (app.log.push(message = {
+          if (entry.log.push(message = {
             level: data.level == 'log' ? 'debug' : data.level,
             message: data.message,
             module: data.module ? data.module.name : '',
             version: data.module ? data.module.version : '',
             line: data.line > offset ? data.module ? data.line : data.line-offset : null
-          }) > 1000) app.log.shift();
-          if (selected && selected.entry == app) {
+          }) > 1000) entry.log.shift();
+          if (selected && selected.entry == entry) {
             var scroll = body.classList.contains('show-log') && body.scrollHeight - body.scrollTop == document.documentElement.clientHeight;
             o.html.dom(logLine(message), log);
             if (scroll) body.scrollTop = body.scrollHeight;
@@ -40,29 +41,28 @@ simpl.add('app', function(o) {
           break;
         case 'run':
         case 'stop':
-          var app = (apps[data.app] || {})[data.version];
-          if (!app) return;
-          app.running = event == 'run';
-          app.tab.classList[event == 'run' ? 'add' : 'remove']('running');
-          app.tab.classList.remove('error');
+          entry.running = event == 'run';
+          entry.tab.classList[event == 'run' ? 'add' : 'remove']('running');
+          entry.tab.classList.remove('error');
           if (event == 'run') {
-            app.log = [];
-            if (selected && selected.entry == app)
+            entry.log = [];
+            if (selected && selected.entry == entry)
               log.textContent = '';
           }
           break;
         case 'delete':
-          var versions = (data.app ? apps : modules)[data.name],
-              entry = versions && versions[data.version];
-          if (!entry) return;
           if (selected && selected.entry == entry) selected = null;
-          delete versions[data.version]; // TODO: remove app entry if no versions left
+          delete versions[data.version];
+          if (!versions.length) delete (data.app ? apps : modules)[data.name];
           entry.tab.parentNode.removeChild(entry.tab);
           break;
-        case 'upgrade': // TODO
+        case 'upgrade':
+          var version = versions.push(data.app ? {minor: 0, log: []} : {minor: 0});
+          (data.app ? appList : moduleList).insertBefore(
+            o.html.dom(li(data.name, version-1, 0, data.app)),
+            versions[version-2].tab.nextSibling);
+          break;
         case 'publish':
-          var entry = ((data.app ? apps : modules)[data.name] || {})[data.version];
-          if (!entry) return;
           entry.minor = entry.minor == null ? 0 : entry.minor+1;
           entry.published = data.app ? {code: entry.code, config: entry.config} : {code: entry.code};
           var version = (data.version+1)+'.'+entry.minor;
