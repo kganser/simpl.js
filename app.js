@@ -16,7 +16,7 @@ simpl.add('app', function(o) {
           event = message.event,
           data = message.data,
           versions = event in {run: 1, stop: 1, log: 1, error: 1} ? apps[data.app] : (data.app ? apps : modules)[data.name],
-          entry = versions && data.version;
+          entry = versions && versions[data.version];
       if (!entry) return;
       switch (event) {
         case 'log':

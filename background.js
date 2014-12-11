@@ -91,6 +91,8 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
             path = parts.slice(0, 4).join('/');
             return db.get(path, true).then(function(version) {
               if (!version) return response.error();
+              if (version.published && version.code == version.published.code && JSON.stringify(version.config) == JSON.stringify(version.published.config))
+                return response.generic(412);
               var record = entity.app
                 ? {minor: 0, code: version.code, config: version.config, published: {code: version.code, config: version.config}}
                 : {minor: 0, code: version.code, published: {code: version.code}};
