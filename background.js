@@ -47,12 +47,10 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
         return launcher.postMessage({action: 'stop'});
       }
       
-      var apps = {}, clients = [], broadcast = function(event, data) {
-        var disconnected = [], pending = clients.length;
-        clients.forEach(function(client, i) {
-          client.send(o.string.toUTF8Buffer((event ? 'data: '+JSON.stringify({event: event, data: data}) : ':ping')+'\n\n').buffer, function(info) {
-            if (info.resultCode) disconnected.push(i);
-            if (!--pending) disconnected.forEach(function(i) { clients.splice(i, 1); });
+      var apps = {}, clients = {}, broadcast = function(event, data) {
+        Object.keys(clients).forEach(function(socketId) {
+          clients[socketId].send(o.string.toUTF8Buffer((event ? 'data: '+JSON.stringify({event: event, data: data}) : ':ping')+'\n\n').buffer, function(info) {
+            if (info.resultCode) delete clients[socketId];
           });
         });
       };
@@ -122,7 +120,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
           }
         }
         if (request.path == '/activity') {
-          clients.push(socket);
+          clients[socket.socketId] = socket;
           socket.setNoDelay(true);
           return response.end('', {
             'Content-Type': 'text/event-stream',
