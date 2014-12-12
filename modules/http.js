@@ -11,9 +11,12 @@ simpl.add('http', function(o) {
     
     var pre = '';
     if (headers) {
-      if (!headers['Content-Type']) headers['Content-Type'] = 'text/plain';
-      if (!chunk) headers['Content-Length'] = body.length;
-      else if (!('Transfer-Encoding' in headers)) headers['Transfer-Encoding'] = 'chunked';
+      if (!('Content-Type' in headers))
+        headers['Content-Type'] = 'text/plain';
+      if (!chunk && !('Content-Length' in headers))
+        headers['Content-Length'] = body.length;
+      if (chunk && !('Transfer-Encoding' in headers))
+        headers['Transfer-Encoding'] = 'chunked';
       pre += 'HTTP/1.1 '+self.statusMessage(status)+'\r\n'+Object.keys(headers).map(function(header) {
         return headers[header] == null ? '' : header+': '+headers[header]+'\r\n';
       }).join('')+'\r\n';
@@ -24,7 +27,7 @@ simpl.add('http', function(o) {
     var data = new Uint8Array(pre.length + body.length + (chunk ? end ? 7 : 2 : 0));
     data.set(pre, 0);
     data.set(body, pre.length);
-    if (chunk) data.set(end ? [13, 10, 48, 13, 10, 13, 10] : [13, 10], data.length - (end ? 7 : 2));
+    if (chunk) data.set(end ? [13,10,48,13,10,13,10] : [13,10], data.length - (end ? 7 : 2));
     
     return data.buffer;
   };

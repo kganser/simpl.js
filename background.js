@@ -48,14 +48,16 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
       }
       
       var apps = {}, clients = [], broadcast = function(event, data) {
-        clients.forEach(function(client) {
-          client.send((event ? 'data: '+JSON.stringify({event: event, data: data}) : ': ping')+'\r\n\r\n', null, null, function(info) {
-            if (info.resultCode) clients.splice(clients.indexOf(client), 1);
+        var disconnected = [], pending = clients.length;
+        clients.forEach(function(client, i) {
+          client.send(o.string.toUTF8Buffer((event ? 'data: '+JSON.stringify({event: event, data: data}) : ':ping')+'\n\n').buffer, function(info) {
+            if (info.resultCode) disconnected.push(i);
+            if (!--pending) disconnected.forEach(function(i) { clients.splice(i, 1); });
           });
         });
       };
       
-      ping = setInterval(broadcast, 15000); // TODO: use TCP keep-alive
+      ping = setInterval(broadcast, 15000);
       
       o.http.serve({port: command.port}, function(request, response, socket) {
         
@@ -120,11 +122,11 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0}, function(o, proxy)
           }
         }
         if (request.path == '/activity') {
-          clients.push(response);
+          clients.push(socket);
           socket.setNoDelay(true);
-          return response.send(': ping', {
+          return response.end('', {
             'Content-Type': 'text/event-stream',
-            'Transfer-Encoding': null
+            'Content-Length': null
           });
         }
         if (request.path == '/') {

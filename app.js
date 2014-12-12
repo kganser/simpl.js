@@ -12,9 +12,9 @@ simpl.add('app', function(o) {
     });
     var appList, moduleList, selected, code, config, log, docs, line, status;
     if (window.EventSource) new EventSource('/activity').onmessage = function(e) {
-      var message = JSON.parse(e.data),
-          event = message.event,
-          data = message.data,
+      try { var message = JSON.parse(e.data); } catch (e) { return; }
+      var event = message.event,
+          data = message.data || {},
           versions = event in {run: 1, stop: 1, log: 1, error: 1} ? apps[data.app] : (data.app ? apps : modules)[data.name],
           entry = versions && versions[data.version];
       if (!entry) return;
