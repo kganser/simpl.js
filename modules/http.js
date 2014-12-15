@@ -11,6 +11,8 @@ simpl.add('http', function(o) {
     
     var pre = '';
     if (headers) {
+      if (typeof headers == 'string')
+        headers = {'Content-Type': self.mimeType(headers)};
       if (!('Content-Type' in headers))
         headers['Content-Type'] = 'text/plain';
       if (!chunk && !('Content-Length' in headers))
@@ -67,8 +69,8 @@ simpl.add('http', function(o) {
       the server responds with a generic `413 Request Entity Too Large`. */
       
   /** Response: {
-        send: function(body='':ArrayBuffer|string, headers=`{}`:object, status=200:number, callback:function(error:string|undefined)),
-        end: function(body='':ArrayBuffer|string, headers=`{}`:object, status=200:number, callback:function(error:string|undefined)),
+        send: function(body='':ArrayBuffer|string, headers=`{}`:object|string, status=200:number, callback:function(error:string|undefined)),
+        end: function(body='':ArrayBuffer|string, headers=`{}`:object|string, status=200:number, callback:function(error:string|undefined)),
         generic: function(status=200:number),
         ok: function,
         error: function
@@ -76,9 +78,10 @@ simpl.add('http', function(o) {
       
       The first call to `send` will send headers and initiate a chunked HTTP response (adding a `Transfer-Encoding:
       chunked` header unless overridden in the `headers` object, after which `headers` and `status` default to (and
-      must be) null in calls to `send` and `end`. A response initiated with `send` must be completed with a call to
-      `end`. `generic` is a convenience method that calls `end(statusMessage(status), null, status || 200)`. `ok` and
-      `error` are nullary convenience methods that call `generic()` and `generic(400)`, respectively. */
+      must be) null in calls to `send` and `end`. If `headers` is a string, it is interpreted as an extension and
+      substituted with the corresponding `Content-Type` header. A response initiated with `send` must be completed with
+      a call to `end`. `generic` is a convenience method that calls `end(statusMessage(status), null, status || 200)`.
+      `ok` and `error` are nullary convenience methods that call `generic()` and `generic(400)`, respectively. */
   return self = {
     serve: function(options, onRequest, callback) {
       o.socket.listen(options, function(socket) {

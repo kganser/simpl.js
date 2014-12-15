@@ -20,7 +20,7 @@ simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
         e.target.response.issues.forEach(function(issue) {
           issues[issue.id] = {id: issue.id, name: issue.project.name+' - '+issue.subject, url: 'http://'+config.redmineHost+'/issues/'+issue.id};
         });
-        response.end(JSON.stringify(issues), {'Content-Type': o.http.mimeType('json')});
+        response.end(JSON.stringify(issues), 'json');
       });
     }
     if (request.path == '/entries') {
@@ -35,7 +35,7 @@ simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
           });
         }, 'json');
       return db.get('entries').then(function(entries) {
-        response.end(JSON.stringify(entries), {'Content-Type': o.http.mimeType('json')});
+        response.end(JSON.stringify(entries), 'json');
       });
     }
     var match;
@@ -222,11 +222,11 @@ simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
             });
           }}
         ]}
-      ]}), {'Content-Type': o.http.mimeType('html')});
+      ]}), 'html');
     o.xhr(location.origin+request.path, {responseType: 'arraybuffer'}, function(e) {
       if (e.target.status != 200)
         return response.generic(404);
-      response.end(e.target.response, {'Content-Type': o.http.mimeType((request.path.match(/\.([^.]*)$/) || [])[1])});
+      response.end(e.target.response, (request.path.match(/\.([^.]*)$/) || [])[1]);
     });
   }, function(error) {
     if (error) console.error('Error listening on 0.0.0.0:'+config.port+'\n'+error);

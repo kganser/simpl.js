@@ -32,7 +32,7 @@ simpl.use({http: 0, database: 0, html: 0, crypto: 0}, function(o) {
           {head: [{title: 'Simple Login'}]},
           {body: body}
         ]}
-      ]), {'Content-Type': o.http.mimeType('html')}, status);
+      ]), 'html', status);
     };
     var logoff = function(cookie, message) {
       if (cookie) db.delete('sessions/'+encodeURIComponent(cookie)).then(function() { logoff(null, message); });
@@ -64,12 +64,8 @@ simpl.use({http: 0, database: 0, html: 0, crypto: 0}, function(o) {
             });
           }, 'url');
         return render([{form: {method: 'post', action: '/login', children: [
-          {label: 'Username: '},
-          {input: {type: 'text', name: 'username'}},
-          {br: null},
-          {label: 'Password: '},
-          {input: {type: 'password', name: 'password'}},
-          {br: null},
+          {label: 'Username: '}, {input: {type: 'text', name: 'username'}}, {br: null},
+          {label: 'Password: '}, {input: {type: 'password', name: 'password'}}, {br: null},
           {input: {type: 'submit', value: 'Log In'}}
         ]}}]);
       case '/logoff':
@@ -88,12 +84,9 @@ simpl.use({http: 0, database: 0, html: 0, crypto: 0}, function(o) {
             });
           }, 'url');
         return render([{form: {method: 'post', action: '/register', children: [
-          {label: 'Name: '},
-          {input: {type: 'text', name: 'name'}}, {br: null},
-          {label: 'Username: '},
-          {input: {type: 'text', name: 'username'}}, {br: null},
-          {label: 'Password: '},
-          {input: {type: 'password', name: 'password'}}, {br: null},
+          {label: 'Name: '}, {input: {type: 'text', name: 'name'}}, {br: null},
+          {label: 'Username: '}, {input: {type: 'text', name: 'username'}}, {br: null},
+          {label: 'Password: '}, {input: {type: 'password', name: 'password'}}, {br: null},
           {input: {type: 'submit', value: 'Register'}}
         ]}}]);
     }

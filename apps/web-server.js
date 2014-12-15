@@ -5,11 +5,7 @@ simpl.use({http: 0}, function(o) {
   o.http.serve({port: config.port}, function(request, response) {
   
     if (request.path == '/')
-      return response.end(
-        '<h1>My First Web App</h1>'+(++hits)+' hits',
-        {'Content-Type': o.http.mimeType('html')}
-      );
-      
+      return response.end('<h1>My First Web App</h1>'+(++hits)+' hits', 'html');
     response.generic(404);
     
   }, function(error) {
