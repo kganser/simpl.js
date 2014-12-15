@@ -6,7 +6,13 @@
   "icons": {"128": "icon.png"},
   "version": "0.1",
   "minimum_chrome_version": "33",
-  "permissions": ["unlimitedStorage", "http://*/", "https://*/", "ftp://*/"],
+  "permissions": [
+    "unlimitedStorage",
+    "system.network",
+    "http://*/",
+    "https://*/",
+    "ftp://*/"
+  ],
   "app": {
     "background": {
       "scripts": [
@@ -17,6 +23,7 @@
         "modules/html.js",
         "modules/xhr.js",
         "modules/database.js",
+        "modules/net.js",
         "background.js"
       ]
     }

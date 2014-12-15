@@ -30,6 +30,7 @@ nav {
   overflow-x: hidden;
 }
 h1 {
+  font-family: "Segoe UI";
   margin: 0 0 .5em 0;
 }
 h2 {
@@ -38,9 +39,9 @@ h2 {
   font-size: 11px;
   font-weight: normal;
   text-transform: uppercase;
-  letter-spacing: .1em;
+  letter-spacing: 1px;
   background: #333;
-  color: #ccc;
+  color: #ddd;
 }
 .form {
   position: relative;
@@ -90,7 +91,7 @@ nav .name span {
 }
 nav .name:after {
   font: 26px entypo;
-  color: #999;
+  color: #666;
   position: absolute;
   top: 0;
   right: 5px;
@@ -125,6 +126,7 @@ button {
   background: #f7f7f7;
   outline: none;
   overflow: hidden;
+  cursor: pointer;
 }
 button:before {
   font: 26px entypo;
@@ -132,7 +134,7 @@ button:before {
   left: 0;
   margin-top: -.75em;
   width: 100%;
-  height: 100%;
+  height: 0;
   text-align: center;
 }
 button:hover {
@@ -147,7 +149,7 @@ button:active {
 .delete:hover, .stop:hover, #status.failure {
   background: #c33;
 }
-.code:hover, .config:hover, .log:hover, .docs:hover, #status.info {
+.code:hover, .settings:hover, .log:hover, .docs:hover, #status.info {
   background: #36c;
 }
 .publish:hover {
@@ -162,7 +164,7 @@ button:active {
 .code:before {
   content: "";
 }
-.config:before {
+.settings:before {
   content: "⚙";
 }
 .log:before {
@@ -189,10 +191,10 @@ button:active {
 .collapsed .toggle:before {
   content: "▸";
 }
-.publish, .view, .selected.loading .publish, .selected.loading .view, .restart, .stop, .running .run, .running .delete, .collapsed .delete {
+.view, .selected.loading .view, .restart, .stop, .running .run, .running .delete, .collapsed nav .delete {
   display: none;
 }
-.selected .publish, .selected .view, .running .restart, .running .stop, .running .log {
+.selected .view, .running .restart, .running .stop {
   display: inline;
 }
 .selected {
@@ -225,7 +227,7 @@ button:active {
   background: white;
   box-shadow: 0 0 3px rgba(0, 0, 0, .3);
 }
-.collapsed h2, .collapsed .form, .collapsed nav li, .collapsed .selected:after {
+.collapsed nav h2, .collapsed .form, .collapsed nav li, .collapsed .selected:after {
   display: none;
 }
 .collapsed nav {
@@ -274,10 +276,10 @@ button:active {
   animation: yellow-fade 2s;
   -webkit-animation: yellow-fade 2s;
 }
-.show-config #main, .show-log #main, .show-docs #main {
+.show-settings #main, .show-log #main, .show-docs #main {
   background: transparent;
 }
-#config, #log, #docs {
+#log, #docs {
   padding: 4px 8px;
 }
 #log .entry {
@@ -301,11 +303,106 @@ button:active {
 #log .error, #log .warn, #docs .error {
   color: red;
 }
-.CodeMirror, #config, #log, #docs, #loading {
+.CodeMirror, #settings, .show-module #configuration, #log, #docs, #loading {
   display: none;
 }
-.show-code .CodeMirror, .show-config #config, .show-log #log, .show-docs #docs, .show-loading #loading {
+.show-code .CodeMirror, .show-settings #settings, .show-log #log, .show-docs #docs, .show-loading #loading {
   display: block;
+}
+#settings section {
+  display: inline-block;
+  vertical-align: top;
+  box-sizing: border-box;
+  width: 40%;
+  min-height: 199px;
+  padding-left: 1px;
+  overflow: auto;
+}
+#settings #history {
+  display: block;
+  padding-left: 0;
+  width: auto;
+  min-height: 0;
+}
+#settings #actions {
+  width: 20%;
+  padding-top: 50px;
+  text-align: center;
+}
+.show-module #settings #actions {
+  width: 60%;
+}
+#actions button {
+  padding: 5px 10px 5px 30px;
+  margin: 0 0 3px 0;
+  width: auto;
+  height: auto;
+}
+#actions button:before {
+  width: 30px;
+  margin-top: -.5em;
+}
+.search {
+  position: relative;
+  margin-bottom: 5px;
+}
+.search input {
+  padding: 0 10px 0 28px;
+}
+.search:before {
+  content: "🔍";
+  font: 26px entypo;
+  color: #aaa;
+  position: absolute;
+  margin: -.26em 0 0 10px;
+  height: 0;
+  text-align: center;
+}
+#dependencies .module {
+  padding: 0 0 5px 10px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+#dependencies .name span {
+  font-size: 90%;
+  color: #999;
+  margin-left: 5px;
+}
+#dependencies button {
+  margin: 0 5px 0 0;
+  font: 13px/.8em sans-serif;
+  color: #808080;
+  text-align: center;
+  width: 1em;
+  height: 1em;
+}
+#dependencies button:before {
+  content: none;
+}
+#dependencies button:hover {
+  color: white;
+}
+.suggest {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  z-index: 1;
+  background: white;
+  box-shadow: 0 3px 3px #999;
+}
+.suggest li {
+  padding: 3px 0 3px 25px;
+  cursor: pointer;
+}
+.suggest li.selected {
+  background: #a0c5e8;
+}
+.suggest li:hover {
+  background: #ebf2fc;
+}
+.jsonv {
+  padding: 4px 10px;
 }
 #docs pre {
   overflow: auto;
