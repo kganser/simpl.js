@@ -114,21 +114,25 @@ nav .changed .name:before {
   float: right;
 }
 button {
-  vertical-align: top;
-  position: relative;
+  background: #f7f7f7;
   text-align: left;
   padding: 0;
-  height: 25px;
-  width: 30px;
-  margin: 0 0 1px 1px;
   border: none;
-  color: #666;
-  background: #f7f7f7;
   outline: none;
   overflow: hidden;
   cursor: pointer;
 }
-button:before {
+nav button {
+  height: 25px;
+  width: 30px;
+}
+nav button, #actions button {
+  position: relative;
+  color: #666;
+  vertical-align: top;
+  margin: 0 0 1px 1px;
+}
+nav button:before, #actions button:before {
   font: 26px entypo;
   position: absolute;
   left: 0;
@@ -137,7 +141,7 @@ button:before {
   height: 0;
   text-align: center;
 }
-button:hover {
+nav button:hover, #actions button:hover {
   color: white;
 }
 button:active {
@@ -334,9 +338,7 @@ button:active {
 }
 #actions button {
   padding: 5px 10px 5px 30px;
-  margin: 0 0 3px 0;
-  width: auto;
-  height: auto;
+  margin-bottom: 3px;
 }
 #actions button:before {
   width: 30px;
@@ -369,37 +371,40 @@ button:active {
   color: #999;
   margin-left: 5px;
 }
-#dependencies button {
-  margin: 0 5px 0 0;
-  font: 13px/.8em sans-serif;
+#dependencies .delete {
+  margin-right: 5px;
+  line-height: .8em;
   color: #808080;
   text-align: center;
   width: 1em;
   height: 1em;
 }
-#dependencies button:before {
+#dependencies .delete:before {
   content: none;
 }
-#dependencies button:hover {
+#dependencies .delete:hover {
   color: white;
 }
 .suggest {
   position: absolute;
   left: 3px;
   right: 3px;
-  z-index: 1;
-  background: white;
   box-shadow: 0 3px 3px #999;
 }
-.suggest li {
+.suggest button {
+  background: white;
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
   padding: 3px 0 3px 25px;
-  cursor: pointer;
 }
-.suggest li.selected {
-  background: #a0c5e8;
+.suggest button:hover {
+  background: #def;
 }
-.suggest li:hover {
-  background: #ebf2fc;
+.suggest button:focus {
+  color: white;
+  background: #36c;
+  outline: none;
 }
 .jsonv {
   padding: 4px 10px;

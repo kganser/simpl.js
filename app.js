@@ -10,7 +10,7 @@ simpl.add('app', function(o) {
         module[i] = {minor: version};
       });
     });
-    var appList, moduleList, selected, code, config, major, minor, dependencies, log, docs, line, status,
+    var appList, moduleList, selected, code, config, major, minor, dependencies, search, suggest, log, docs, line, status,
         dom = o.html.dom;
     if (window.EventSource) new EventSource('/activity').onmessage = function(e) {
       try { var message = JSON.parse(e.data); } catch (e) { return; }
@@ -170,6 +170,8 @@ simpl.add('app', function(o) {
           code.setValue(entry.code); // TODO: use codemirror documents
           config.update(entry.config);
           deps(entry.dependencies);
+          search.value = '';
+          suggest();
           if (entry.minor == null) {
             major.style.display = 'none';
             minor.textContent = 'Publish 1.0';
@@ -362,25 +364,29 @@ simpl.add('app', function(o) {
             {section: {id: 'dependencies', children: [
               {h2: 'Dependencies'},
               {div: {className: 'search', children: [
-                {input: {type: 'text', placeholder: 'Search Modules', onkeyup: function() {
+                {input: {type: 'text', placeholder: 'Search Modules', children: function(e) { search = e; }, onkeyup: function() {
                   var results = [], value = this.value;
                   if (value) Object.keys(modules).forEach(function(name) {
                     if (~name.indexOf(value)) results.push.apply(results, modules[name].map(function(module, version) {
                       return {name: name, version: module.minor == null ? version-1 : version};
                     }).reverse());
                   });
-                  dom(results.map(function(module) {
-                    return {li: {className: 'name', children: [module.name, {span: ++module.version || null}], onclick: function() {
-                      this.parentNode.previousSibling.value = '';
-                      dom(null, this.parentNode, true);
-                      o.xhr(url()+'/dependencies', {method: 'POST', json: module}, function(e) {
-                        if (e.target.status != 200)
-                          status('failure', 'Error updating dependencies');
-                      });
-                    }}};
-                  }), this.nextSibling, true);
+                  suggest(results);
                 }}},
-                {ul: {className: 'suggest'}}
+                {ul: {className: 'suggest', children: function(e) {
+                  suggest = function(modules) {
+                    dom(modules && modules.map(function(module, i) {
+                      return {li: [{button: {className: 'name', children: [module.name, {span: ++module.version || null}], onclick: function() {
+                        search.value = '';
+                        suggest();
+                        o.xhr(url()+'/dependencies', {method: 'POST', json: module}, function(e) {
+                          if (e.target.status != 200)
+                            status('failure', 'Error updating dependencies');
+                        });
+                      }}}]};
+                    }), e, true);
+                  };
+                }}}
               ]}},
               {ul: function(e) { dependencies = e; }}
             ]}},
