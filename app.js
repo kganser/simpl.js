@@ -371,14 +371,18 @@ simpl.add('app', function(o) {
             {section: {id: 'dependencies', children: [
               {h2: 'Dependencies'},
               {div: {className: 'search', children: [
-                {input: {type: 'text', placeholder: 'Search Modules', children: function(e) { search = e; }, onkeyup: function() {
-                  var results = [], value = this.value;
-                  if (value) Object.keys(modules).forEach(function(name) {
-                    if (~name.indexOf(value)) results.push.apply(results, modules[name].map(function(module, version) {
-                      return {name: name, version: module.minor == null ? version-1 : version};
-                    }).reverse());
-                  });
-                  suggest(results);
+                {input: {type: 'text', placeholder: 'Search Modules', children: function(e) { search = e; }, onkeyup: function(e) {
+                  if (e.keyCode != 13) {
+                    var results = [], value = this.value;
+                    if (value) Object.keys(modules).forEach(function(name) {
+                      if (~name.indexOf(value)) results.push.apply(results, modules[name].map(function(module, version) {
+                        return {name: name, version: module.minor == null ? version-1 : version};
+                      }).reverse());
+                    });
+                    suggest(results);
+                  } else if (this.nextSibling.firstChild) {
+                    this.nextSibling.firstChild.firstChild.click();
+                  }
                 }}},
                 {ul: {className: 'suggest', children: function(e) {
                   suggest = function(modules) {

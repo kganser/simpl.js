@@ -401,7 +401,7 @@ button:active {
 .suggest button:hover {
   background: #def;
 }
-.suggest button:focus {
+.suggest button:focus, .search input:focus + ul li:first-child button {
   color: white;
   background: #36c;
   outline: none;
