@@ -62,13 +62,19 @@ simpl.add('app', function(o) {
           (data.app ? appList : moduleList).insertBefore(
             dom(li(data.name, version-1, 0, data.app)),
             versions[version-2].tab.nextSibling);
+          major.style.display = 'inline-block';
+          major.textContent = 'Publish '+(version+1)+'.0';
           break;
         case 'publish':
           entry.minor = entry.minor == null ? 0 : entry.minor+1;
-          entry.published = data.app ? {code: entry.code, config: entry.config} : {code: entry.code};
+          entry.published = {code: entry.code, config: entry.config, dependencies: entry.dependencies};
+          if (!data.app) delete entry.published.config;
           var version = (data.version+1)+'.'+entry.minor;
           entry.tab.lastChild.title = data.name+' '+version;
           entry.tab.lastChild.lastChild.textContent = version;
+          major.style.display = 'inline-block';
+          major.textContent = 'Publish '+(versions.length+1)+'.0';
+          minor.textContent = 'Publish '+(data.version+1)+'.'+(entry.minor+1);
           break;
         case 'config':
           entry.config = data.object;
@@ -178,7 +184,7 @@ simpl.add('app', function(o) {
           } else {
             major.style.display = 'inline-block';
             major.textContent = 'Publish '+(versions.length+1)+'.0';
-            minor.textContent = 'Publish '+versions.length+'.'+(entry.minor+1);
+            minor.textContent = 'Publish '+(version+1)+'.'+(entry.minor+1);
           }
           if (app) dom(entry.log.map(logLine), log, true);
           else doc(name, entry.code);
@@ -353,11 +359,12 @@ simpl.add('app', function(o) {
                 var button = this, type = selected.app ? 'app' : 'module';
                 if (!confirm('Are you sure you want to delete this '+type+'?')) return;
                 button.disabled = true;
-                status('info', 'Deleting '+type);
+                status('info', 'Deleting '+type+'...');
                 o.xhr(url(), {method: 'DELETE'}, function(e) {
                   button.disabled = false;
                   if (e.target.status != 200)
-                    status('failure', 'Error deleting '+type);
+                    return status('failure', 'Error deleting '+type);
+                  status('success', 'Deleted');
                 });
               }}}
             ]}},
