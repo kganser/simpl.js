@@ -79,8 +79,12 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0}, function(o
       
       ping = setInterval(broadcast, 15000);
       
-      o.http.serve({port: command.port}, function(request, response, socket) {
+      o.http.serve({port: command.port}, function(request, response, socket, match) {
         
+        if (match = request.path.match(/^\/([^.\/]*)\.(\d+)\.js$/))
+          return db.get('modules/'+match[1]+'/versions/'+match[2]).then(function(module) {
+            response.end(wrap(decodeURIComponent(match[1]), module.code, match[2], module.dependencies), 'js');
+          });
         if (/^\/(apps|modules)\/[^\/]*\/\d+(\/|$)/.test(request.path)) {
           var path = request.path.substr(1),
               parts = path.split('/'),
