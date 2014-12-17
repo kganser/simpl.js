@@ -183,7 +183,7 @@ simpl = function(s) {
         }, version);
       });
       return s.add(name, function() {
-        return module(channel(false, name));
+        return module({}, channel(false, name));
       }, version);
     },
     use: function(modules, callback) {

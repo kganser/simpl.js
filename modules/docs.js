@@ -1,4 +1,4 @@
-simpl.add('docs', function(o) {
+simpl.add('docs', function(modules) {
 
   var tokens = {
     id: /[a-zA-Z_$][a-zA-Z0-9_$]*/,
@@ -7,7 +7,7 @@ simpl.add('docs', function(o) {
     code: /`[^`]+`/,
     '': /\s+/
   };
-  var self, parse = o.parser.generate({
+  var self, parse = modules.parser.generate({
     spec: [
       'id', ':', 'types', {name: 0, type: 2}
     ],

@@ -1,15 +1,15 @@
-simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
+function(modules) {
 
-  var db = o.database.open('time-tracker', {entries: {}});
+  var db = modules.database.open('time-tracker', {entries: {}});
   
-  o.http.serve({port: config.port}, function(request, response) {
+  modules.http.serve({port: config.port}, function(request, response) {
     if (request.path == '/issues') {
       try {
         var credentials = atob(request.headers.Authorization.split(' ')[1] || '').split(':', 2);
       } catch (e) {
-        return response.end(o.http.statusMessage(401), {'WWW-Authenticate': 'Basic realm="'+config.redmineHost+' credentials"'}, 401);
+        return response.end(modules.http.statusMessage(401), {'WWW-Authenticate': 'Basic realm="'+config.redmineHost+' credentials"'}, 401);
       }
-      return o.xhr('http://'+config.redmineHost+'/issues.json?assigned_to_id=me&status_id=*&limit=100', {
+      return modules.xhr('http://'+config.redmineHost+'/issues.json?assigned_to_id=me&status_id=*&limit=100', {
         user: credentials[0],
         password: credentials[1],
         responseType: 'json'
@@ -49,7 +49,7 @@ simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
         this.delete(match[1]).then(response.ok);
       });
     if (request.path == '/')
-      return response.end(o.html.markup({html: [
+      return response.end(modules.html.markup({html: [
         {head: [
           {title: 'Time Tracker'},
           {meta: {charset: 'utf-8'}},
@@ -62,7 +62,7 @@ simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
           {script: {src: '/modules/xhr.js'}},
           {script: {src: '/modules/async.js'}},
           {script: function() {
-            simpl.use({html: 0, xhr: 0, async: 0}, function(o) {
+            simpl.use({html: 0, xhr: 0, async: 0}, function(modules) {
               var issues = {}, issue, hours, dates, entries, add, form, suggest, previous, report,
                   days = 'Sun Mon Tues Wed Thurs Fri Sat'.split(' '),
                   months = 'Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec'.split(' '),
@@ -79,14 +79,14 @@ simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
                   months[date.getMonth()]+' '+date.getDate()
                 ]}};
               };
-              o.async.join(
+              modules.async.join(
                 function(callback) {
-                  o.xhr('/entries', {responseType: 'json'}, function(e) {
+                  modules.xhr('/entries', {responseType: 'json'}, function(e) {
                     callback(e.target.response);
                   });
                 },
                 function(callback) {
-                  o.xhr('/issues', {responseType: 'json'}, function(e) {
+                  modules.xhr('/issues', {responseType: 'json'}, function(e) {
                     callback(issues = e.target.response);
                   });
                 },
@@ -98,11 +98,11 @@ simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
                   (previous.onclick = function() {
                     new Array(15).join(' ').split('').forEach(function(x, i) {
                       var date = dateString(new Date(now-(page*14+i)*24*60*60*1000));
-                      entries.insert(o.html.model(dates[date] || {}, function(hours, issue, index, items) {
+                      entries.insert(modules.html.model(dates[date] || {}, function(hours, issue, index, items) {
                         return {li: [
                           {button: {className: 'remove', children: '✕', onclick: function(e) {
                             this.disabled = true;
-                            o.xhr('/entries/'+date+'/'+encodeURIComponent(issue), {method: 'DELETE'}, function() {
+                            modules.xhr('/entries/'+date+'/'+encodeURIComponent(issue), {method: 'DELETE'}, function() {
                               items.remove(issue);
                               delete dates[date][issue];
                             });
@@ -116,7 +116,7 @@ simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
                   })();
                 }
               );
-              o.html.dom([
+              modules.html.dom([
                 {header: [
                   {nav: [
                     {span: {children: 'Record', onclick: function() { document.body.className = ''; }}},
@@ -134,11 +134,11 @@ simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
                           }).filter(function(item) {
                             return ~(item[1].id+item[1].name.toLowerCase()).indexOf(issue.toLowerCase());
                           });
-                          o.html.dom(items.map(function(item) {
+                          modules.html.dom(items.map(function(item) {
                             return {li: {children: item[1].name, onclick: function() {
                               issue = item[0];
                               e.target.value = item[1].name;
-                              o.html.dom(null, suggest, true);
+                              modules.html.dom(null, suggest, true);
                               hours.focus();
                             }}};
                           }), suggest, true);
@@ -160,7 +160,7 @@ simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
                         if (!time || time < 0) {
                           alert('Invalid number of hours');
                         } else {
-                          o.xhr('/entries', {
+                          modules.xhr('/entries', {
                             method: 'POST',
                             json: {date: date, time: time, issue: issue}
                           }, function() {
@@ -189,7 +189,7 @@ simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
                               totals[issue] = (totals[issue] || 0) + date[issue];
                             });
                           });
-                          o.html.dom({ul: Object.keys(totals).concat([1]).map(function(issue, i, arr) {
+                          modules.html.dom({ul: Object.keys(totals).concat([1]).map(function(issue, i, arr) {
                             var last = i == arr.length-1;
                             if (!last) total += totals[issue];
                             return {li: {className: last ? 'total' : '', children: [
@@ -204,12 +204,12 @@ simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
                 ]},
                 {div: {className: 'content', children: [
                   {div: {className: 'record', children: [
-                    {ul: (entries = o.html.model({}, function(value, date) {
+                    {ul: (entries = modules.html.model({}, function(value, date) {
                       date = date.split('-');
                       date = new Date(date[0], parseInt(date[1], 10)-1, parseInt(date[2], 10));
                       return {li: [
                         dateIcon(date, function() {
-                          form.replaceChild(o.html.dom(dateIcon(today = date)), form.firstChild);
+                          form.replaceChild(modules.html.dom(dateIcon(today = date)), form.firstChild);
                         }),
                         {ul: value.view}
                       ]};
@@ -223,7 +223,7 @@ simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
           }}
         ]}
       ]}), 'html');
-    o.xhr(location.origin+request.path, {responseType: 'arraybuffer'}, function(e) {
+    modules.xhr(location.origin+request.path, {responseType: 'arraybuffer'}, function(e) {
       if (e.target.status != 200)
         return response.generic(404);
       response.end(e.target.response, (request.path.match(/\.([^.]*)$/) || [])[1]);
@@ -232,4 +232,4 @@ simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
     if (error) console.error('Error listening on 0.0.0.0:'+config.port+'\n'+error);
     else console.log('Listening at http://localhost:'+config.port);
   });
-});
+}

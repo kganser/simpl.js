@@ -3,9 +3,9 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0}, function(o
   var server, port, ping, loader, lines,
       db = o.database.open('simpl', {});
   
-  db.get('apps').then(function(apps) {
-    if (apps) return;
-    var data = {};
+  db.get('apps').then(function(data) {
+    if (data) return;
+    data = {};
     [ {name: '1 Hello World', file: 'hello-world'},
       {name: '2 Web Server', file: 'web-server', config: {port: 8001}, dependencies: {http: 0}},
       {name: '3 Database Editor', file: 'database-editor', config: {port: 8002, database: 'simpl'}, dependencies: {database: 0, html: 0, http: 0, xhr: 0}},
@@ -14,29 +14,36 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0}, function(o
       {name: '6 Time Tracker', file: 'time-tracker', config: {port: 8004, redmineHost: 'redmine.slytrunk.com'}, dependencies: {http: 0, database: 0, html: 0, xhr: 0}}
     ].forEach(function(app, i, apps) {
       o.xhr('/apps/'+app.file+'.js', function(e) {
-        data[app.name] = {versions: [{code: e.target.responseText, config: app.config || {}, dependencies: app.dependencies || {}}]};
+        data[app.name] = {versions: [{
+          code: e.target.responseText,
+          config: app.config || {},
+          dependencies: app.dependencies || {}
+        }]};
         if (Object.keys(data).length == apps.length)
           db.put('apps', data);
       });
     });
   });
-  db.get('modules').then(function(modules) {
-    if (modules) return;
-    var data = {};
+  db.get('modules').then(function(data) {
+    if (data) return;
+    data = {};
     [ {name: 'async'},
       {name: 'crypto'},
       {name: 'database'},
       {name: 'docs', dependencies: {parser: 0}},
       {name: 'html'},
       {name: 'http', dependencies: {socket: 0, string: 0}},
-      {name: 'net'},
+      {name: 'net', proxy: true},
       {name: 'parser'},
-      {name: 'socket'},
+      {name: 'socket', proxy: true},
       {name: 'string'},
       {name: 'xhr'}
     ].forEach(function(module, i, modules) {
       o.xhr('/modules/'+module.name+'.js', function(e) {
-        data[module.name] = {versions: [{code: e.target.responseText, dependencies: module.dependencies || {}}]};
+        data[module.name] = {versions: [{
+          code: 'function(modules'+(module.proxy ? ', proxy' : '')+') {\n'+e.target.responseText.split(/\n/).slice(1, -1).join('\n')+'\n}',
+          dependencies: module.dependencies || {}
+        }]};
         if (Object.keys(data).length == modules.length)
           db.put('modules', data);
       });
@@ -58,7 +65,11 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0}, function(o
         return launcher.postMessage({action: 'stop'});
       }
       
-      var apps = {}, clients = {}, broadcast = function(event, data) {
+      var apps = {}, clients = {};
+      var wrap = function(name, code, version, dependencies) {
+        return 'simpl.add('+[JSON.stringify(name), code, version, JSON.stringify(dependencies)]+');';
+      };
+      var broadcast = function(event, data) {
         Object.keys(clients).forEach(function(socketId) {
           clients[socketId].send(o.string.toUTF8Buffer((event ? 'data: '+JSON.stringify({event: event, data: data}) : ':ping')+'\n\n').buffer, function(info) {
             if (info.resultCode) delete clients[socketId];
@@ -190,8 +201,10 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0}, function(o
               if ((action == 'run' || action == 'restart') && !apps[id])
                 return db.get('apps/'+id).then(function(app) {
                   if (!app) return response.error();
-                  apps[id] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\n'+app.code, function(module, callback) {
-                    db.get('modules/'+encodeURIComponent(module.name)+'/versions/'+module.version+'/code').then(callback);
+                  apps[id] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\nsimpl.use('+JSON.stringify(app.dependencies)+','+app.code+');', function(module, callback) {
+                    db.get('modules/'+encodeURIComponent(module.name)+'/versions/'+module.version).then(function(record) {
+                      callback(wrap(module.name, record.code, module.version, record.dependencies));
+                    });
                   }, function(level, args, module, line, column) {
                     broadcast('log', {app: name, version: version, level: level, message: args, module: module, line: line, column: column});
                   }, function(message, module, line) {
@@ -210,7 +223,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0}, function(o
           }).then(function(data) {
             Object.keys(data.apps).forEach(function(name) {
               data.apps[name] = data.apps[name].versions.map(function(v, i) {
-                return [v.minor == null ? null : v.minor, !!apps[name+'-'+i]];
+                return [v.minor == null ? null : v.minor, !!apps[encodeURIComponent(name)+'/versions/'+i]];
               });
             });
             Object.keys(data.modules).forEach(function(name) {
@@ -231,12 +244,12 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0}, function(o
                 ]},
                 {body: [
                   {script: {src: '/simpl.js'}},
-                  {script: {src: '/html.js'}},
-                  {script: {src: '/xhr.js'}},
-                  {script: {src: '/jsonv.js'}},
-                  {script: {src: '/parser.js'}},
-                  {script: {src: '/docs.js'}},
+                  {script: {src: '/modules/html.js'}},
+                  {script: {src: '/modules/xhr.js'}},
+                  {script: {src: '/modules/parser.js'}},
+                  {script: {src: '/modules/docs.js'}},
                   {script: {src: '/codemirror.js'}},
+                  {script: {src: '/jsonv.js'}},
                   {script: {src: '/app.js'}},
                   {script: function(apps, modules, offset) {
                     if (!apps) return [data.apps, data.modules, lines];
@@ -249,8 +262,6 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0}, function(o
             ]), 'html');
           });
         }
-        if (/^\/(html|xhr|parser|docs)\.js$/.test(request.path))
-          request.path = '/modules'+request.path;
         o.xhr(location.origin+request.path, {responseType: 'arraybuffer'}, function(e) {
           if (e.target.status != 200)
             return response.generic(404);

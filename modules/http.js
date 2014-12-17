@@ -1,4 +1,4 @@
-simpl.add('http', function(o) {
+simpl.add('http', function(modules) {
   
   var self, entity = function(status, headers, body, headersSent, chunk, end) {
     if (headersSent && (headers || status)) throw 'HTTP headers already sent';
@@ -7,7 +7,7 @@ simpl.add('http', function(o) {
     if (body instanceof ArrayBuffer)
       body = new Uint8Array(body);
     else if (!(body instanceof Uint8Array))
-      body = o.string.toUTF8Buffer(body ? String(body) : '');
+      body = modules.string.toUTF8Buffer(body ? String(body) : '');
     
     var pre = '';
     if (headers) {
@@ -25,7 +25,7 @@ simpl.add('http', function(o) {
     }
     
     if (chunk) pre += body.length.toString(16)+'\r\n';
-    pre = o.string.toUTF8Buffer(pre);
+    pre = modules.string.toUTF8Buffer(pre);
     var data = new Uint8Array(pre.length + body.length + (chunk ? end ? 7 : 2 : 0));
     data.set(pre, 0);
     data.set(body, pre.length);
@@ -84,13 +84,13 @@ simpl.add('http', function(o) {
       `ok` and `error` are nullary convenience methods that call `generic()` and `generic(400)`, respectively. */
   return self = {
     serve: function(options, onRequest, callback) {
-      o.socket.listen(options, function(socket) {
+      modules.socket.listen(options, function(socket) {
         var slurp = function(callback, format, maxSize) {
           var body = new Uint8Array(0);
           read = function(data) {
             if (!data) {
               if (format == 'utf8' || format == 'url' || format == 'json')
-                body = o.string.fromUTF8Buffer(body);
+                body = modules.string.fromUTF8Buffer(body);
               if (format == 'url')
                 return callback(self.parseQuery(body));
               if (format == 'json')
@@ -117,7 +117,7 @@ simpl.add('http', function(o) {
             // TODO: 414 Request-URI Too Long and 413 Request Entity Too Large while buffering headers
             if (!request.headers) {
               var split, offset = headers.length;
-              headers += o.string.fromUTF8Buffer(buffer);
+              headers += modules.string.fromUTF8Buffer(buffer);
               if ((split = headers.indexOf('\r\n\r\n')) > -1) {
                 headers = headers.substr(0, split).split('\r\n');
                 var line = headers.shift().split(' '),

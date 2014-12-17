@@ -1,4 +1,4 @@
-simpl.add('socket', function(proxy) {
+simpl.add('socket', function(modules, proxy) {
   var clients = {}, servers = {};
   
   proxy = proxy({
@@ -64,7 +64,7 @@ simpl.add('socket', function(proxy) {
     },
     getServerInfo: function(args, callback) {
       getServerInfo(args[0], callback);
-    },
+    }
   });
   
   if (simpl.worker) return {

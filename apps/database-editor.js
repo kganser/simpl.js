@@ -1,8 +1,8 @@
-simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
+function(modules) {
 
-  var db = o.database.open(config.database);
+  var db = modules.database.open(config.database);
   
-  o.http.serve({port: config.port}, function(request, response) {
+  modules.http.serve({port: config.port}, function(request, response) {
     if (request.headers.Accept == 'application/json' || request.query.format == 'json') {
       var path = request.path.substr(1),
           respond = function(error) {
@@ -27,13 +27,13 @@ simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
       return response.generic(501);
     }
     if (request.path.length > 1)
-      return o.xhr(location.origin+request.path, {responseType: 'arraybuffer'}, function(e) {
+      return modules.xhr(location.origin+request.path, {responseType: 'arraybuffer'}, function(e) {
         if (e.target.status != 200)
           return response.generic(404);
         response.end(e.target.response, (request.path.match(/\.([^.]*)$/) || [])[1]);
       });
     db.get().then(function(data) {
-      response.end(o.html.markup([
+      response.end(modules.html.markup([
         {'!doctype': {html: null}},
         {head: [
           {title: 'Database Editor'},
@@ -46,9 +46,9 @@ simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
           {script: {src: '/modules/html.js'}},
           {script: {src: '/jsonv.js'}},
           {script: function() {
-            simpl.use({jsonv: 0}, function(o) {
+            simpl.use({jsonv: 0}, function(modules) {
               var elem = document.getElementById('value');
-              o.jsonv(elem, undefined, function(method, path, data) {
+              modules.jsonv(elem, undefined, function(method, path, data) {
                 console.log(method, path, data);
                 var request = new XMLHttpRequest();
                 request.open(method, '/'+path);
@@ -65,4 +65,4 @@ simpl.use({http: 0, database: 0, html: 0, xhr: 0}, function(o) {
     if (error) console.error('Error listening on 0.0.0.0:'+config.port+'\n'+error);
     else console.log('Listening at http://localhost:'+config.port);
   });
-});
+}

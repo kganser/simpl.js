@@ -1,4 +1,4 @@
-simpl.add('net', function(proxy) {
+simpl.add('net', function(modules, proxy) {
 
   proxy = proxy({
     getInterfaces: function(args, callback) {

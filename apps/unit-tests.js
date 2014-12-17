@@ -1,34 +1,37 @@
-var passed = 0, assert = function(test, description) {
-  if (test) {
-    passed++;
-    console.log('✓ '+description);
-  } else {
-    console.error('✗ '+description);
-  }
-  return test;
-};
-var compare = function(a, b) {
-  if (a === b) return true;
-  var ta = typeof a, tb = typeof b;
-  if (ta != tb || ta != 'object' || !(a && b) || (ta = Array.isArray(a)) != Array.isArray(b))
-    return false;
-  if (ta) return a.length == b.length && !a.some(function(n, i) { return !compare(n, b[i]); });
-  var ka = Object.keys(a);
-  return compare(ka, Object.keys(b)) && !ka.some(function(k) { return !compare(a[k], b[k]); });
-};
-simpl.use({async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 0, xhr: 0}, function(o) {
-  var start = Date.now();
-  o.async.step(
+function(modules) {
+
+  var assert = function(test, description) {
+    if (test) {
+      passed++;
+      console.log('✓ '+description);
+    } else {
+      console.error('✗ '+description);
+    }
+    return test;
+  };
+  var compare = function(a, b) {
+    if (a === b) return true;
+    var ta = typeof a, tb = typeof b;
+    if (ta != tb || ta != 'object' || !(a && b) || (ta = Array.isArray(a)) != Array.isArray(b))
+      return false;
+    if (ta) return a.length == b.length && !a.some(function(n, i) { return !compare(n, b[i]); });
+    var ka = Object.keys(a);
+    return compare(ka, Object.keys(b)) && !ka.some(function(k) { return !compare(a[k], b[k]); });
+  };
+  
+  var passed = 0, start = Date.now();
+  
+  modules.async.step(
     function(next, pass) {
       next(assert(pass === undefined, 'async step no argument'));
     },
     function(next, pass) {
-      o.async.join(
+      modules.async.join(
         function(cb) { assert(pass === true, 'async step with argument'); cb(pass = 1); },
         function(cb) { cb(pass = pass === 1 && 2); },
         function(a, b) { assert(pass === 2, 'async join with sync functions'); }
       );
-      o.async.join(
+      modules.async.join(
         function(cb) { setTimeout(function() { cb(pass = pass === 3 && 5); }, 10); },
         function(cb) { setTimeout(function() { cb(pass = pass === 2 && 3, 4); }, 0); },
         function(a, b) {
@@ -38,18 +41,18 @@ simpl.use({async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 
       );
     },
     function(next) {
-      o.database.list(function(dbs) {
+      modules.database.list(function(dbs) {
         assert(typeof dbs == 'object' && dbs.toString() == '[object DOMStringList]',
           'database list: '+Array.prototype.slice.call(dbs).join(', '));
         if (!dbs.contains('unit-tests')) return next();
-        o.database.delete('unit-tests', function(error, blocked) {
+        modules.database.delete('unit-tests', function(error, blocked) {
           if (!blocked && !error) next();
         });
       });
     },
     function(next) {
       var data = {array: ['elem', 1, null], object: {boolean: true}, string: 'value'},
-          db = o.database.open('unit-tests', data);
+          db = modules.database.open('unit-tests', data);
       db.get().get('array').then(function(root, array) {
         assert(compare(root, data), 'database get root');
         assert(compare(array, data.array), 'database get path');
@@ -107,7 +110,7 @@ simpl.use({async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 
                 assert('e$caped "stríng"' in value && value['e$caped "stríng"'] === "'válue'",
                   'database put/get encoded paths, unicode values');
                 db.close();
-                o.database.delete('unit-tests', function(error, blocked) {
+                modules.database.delete('unit-tests', function(error, blocked) {
                   if (!blocked) next(assert(!error, 'database delete'));
                 });
               });
@@ -118,33 +121,33 @@ simpl.use({async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 
     },
     function(next) {
       var code = '/* comment */ var i = 0; // comment\n/** name: {fn: function(arg1:boolean|string, arg2=undefined:[number, ...]) -> {key:value}, str: string}\n\n first\n second\n\n third */',
-          doc = o.docs.generate(code);
+          doc = modules.docs.generate(code);
       assert(compare(doc,[{spec:{name:'name',type:{object:[{name:'fn',type:{function:{args:[{name:'arg1',type:['boolean','string']},{name:'arg2',default:'undefined',type:{array:[{type:'number'},'...']}}],returns:{object:{name:'key',type:'value'}}}}},{name:'str',type:'string'}]}},error:null,text:[['first second'],['third']]}]),
         'docs generate');
-      assert(o.docs.stringify(code) == 'name: {\n  fn: function(arg1: boolean|string, arg2=undefined: [number, ...]) → {key: value},\n  str: string\n}\n\nfirst second\n\nthird',
+      assert(modules.docs.stringify(code) == 'name: {\n  fn: function(arg1: boolean|string, arg2=undefined: [number, ...]) → {key: value},\n  str: string\n}\n\nfirst second\n\nthird',
         'docs stringify');
-      assert(o.docs.stringifySpec(doc[0].spec) == 'name: {\n  fn: function(arg1: boolean|string, arg2=undefined: [number, ...]) → {key: value},\n  str: string\n}',
+      assert(modules.docs.stringifySpec(doc[0].spec) == 'name: {\n  fn: function(arg1: boolean|string, arg2=undefined: [number, ...]) → {key: value},\n  str: string\n}',
         'docs stringifySpec');
       
-      assert(o.html.markup({div: 'hello'}) === '<div>hello</div>',
+      assert(modules.html.markup({div: 'hello'}) === '<div>hello</div>',
         'html markup basic');
-      assert(o.html.markup({div: [{a: {href: '#', children: 'link'}}, 'hello']}) === '<div><a href="#">link</a>hello</div>',
+      assert(modules.html.markup({div: [{a: {href: '#', children: 'link'}}, 'hello']}) === '<div><a href="#">link</a>hello</div>',
         'html markup nested');
-      assert(o.html.markup([{link: {rel: 'stylesheet'}}, {br: null}]) === '<link rel="stylesheet"><br>',
+      assert(modules.html.markup([{link: {rel: 'stylesheet'}}, {br: null}]) === '<link rel="stylesheet"><br>',
         'html markup self-closing tags');
-      assert(o.html.markup({script: function(a) { if (!a) return 'a'; }}) === '<script>(function (a) { if (!a) return \'a\'; }("a"));</script>',
+      assert(modules.html.markup({script: function(a) { if (!a) return 'a'; }}) === '<script>(function (a) { if (!a) return \'a\'; }("a"));</script>',
         'html markup inline code');
-      assert(o.html.markup({script: function() { code = true; }}) === '<script>(function () { code = true; }());</script>' && code !== true,
+      assert(modules.html.markup({script: function() { code = true; }}) === '<script>(function () { code = true; }());</script>' && code !== true,
         'html markup inline code no params');
-      assert(o.html.markup({script: function(a) { if (!a) return ['a', 'b']; }}) === '<script>(function (a) { if (!a) return [\'a\', \'b\']; }(["a","b"]));</script>',
+      assert(modules.html.markup({script: function(a) { if (!a) return ['a', 'b']; }}) === '<script>(function (a) { if (!a) return [\'a\', \'b\']; }(["a","b"]));</script>',
         'html markup inline code single param');
-      assert(o.html.markup({script: function(a, b) { if (!a) return ['a', 'b']; }}) === '<script>(function (a, b) { if (!a) return [\'a\', \'b\']; }("a","b"));</script>',
+      assert(modules.html.markup({script: function(a, b) { if (!a) return ['a', 'b']; }}) === '<script>(function (a, b) { if (!a) return [\'a\', \'b\']; }("a","b"));</script>',
         'html markup inline code multiple params');
-      assert(o.html.markup([{a: {title: '"hello & goodbye"', children: 'hello <& goodbye'}}, {script: function() { '</script>'; }}]) === '<a title="&quot;hello &amp; goodbye&quot;">hello &lt;&amp; goodbye</a><script>(function () { \'<\\/script>\'; }());</script>',
+      assert(modules.html.markup([{a: {title: '"hello & goodbye"', children: 'hello <& goodbye'}}, {script: function() { '</script>'; }}]) === '<a title="&quot;hello &amp; goodbye&quot;">hello &lt;&amp; goodbye</a><script>(function () { \'<\\/script>\'; }());</script>',
         'html markup escaped');
       
       var i = 1, j = 1;
-      o.http.serve({port: 9123, ip: '127.0.0.1'}, function(request, response, socket) {
+      modules.http.serve({port: 9123, ip: '127.0.0.1'}, function(request, response, socket) {
         if (i == 1 && i++) {
           assert(request.method === 'GET' && request.path === '/', 'http get request');
           return response.end('hello');
@@ -181,20 +184,20 @@ simpl.use({async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 
         assert(!error, 'http listen from port 9123');
         if (error) return next();
         var host = 'http://127.0.0.1:9123';
-        o.xhr(host, function(e) {
+        modules.xhr(host, function(e) {
           assert(i++ == 2 && e.target.status == 200 && e.target.responseText === 'hello',
             'http get response');
-          o.xhr(host+'/path?a=1&b=ab%20cd&a=2&c=3', {headers: {'Accept': 'text/plain; q=0.9'}}, function(e) {
+          modules.xhr(host+'/path?a=1&b=ab%20cd&a=2&c=3', {headers: {'Accept': 'text/plain; q=0.9'}}, function(e) {
             assert(i++ == 5 && e.target.status == 200 && e.target.responseText === 'hellogoodbye' && e.target.getResponseHeader('Transfer-Encoding') === 'chunked',
               'http chunked response receive');
-            o.xhr(host, {method: 'POST', data: 'yabadaba'}, function(e) {
+            modules.xhr(host, {method: 'POST', data: 'yabadaba'}, function(e) {
               assert(i++ == 8 && e.target.status == 200 && e.target.responseText === '200 OK',
                 'http response after slurp');
-              o.xhr(host+'/first', {method: 'POST', data: new Array(1000).join('yabadaba')}, function(e) {
+              modules.xhr(host+'/first', {method: 'POST', data: new Array(1000).join('yabadaba')}, function(e) {
                 assert(i++ == 10 && e.target.status == 413,
                   'http request too large error');
               });
-              o.xhr(host+'/second', {method: 'POST', data: '{"malformed": json}'}, function(e) {
+              modules.xhr(host+'/second', {method: 'POST', data: '{"malformed": json}'}, function(e) {
                 assert(i++ == 11 && e.target.status == 400 && e.target.responseText === '400 Bad Request',
                   'http response to malformed body');
                 server.disconnect();
@@ -224,7 +227,7 @@ simpl.use({async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 
       };
       var tokens = {number: /[0-9]+/, '': /\s+/};
       try {
-        var parse = o.parser.generate(grammar, 'addition', tokens);
+        var parse = modules.parser.generate(grammar, 'addition', tokens);
         assert(true, 'parser compile valid SLR grammar');
         try {
           assert(parse('(1 + 2) * 3 / 4 - 5') === -2.75, 'parser parse valid SLR input');
@@ -249,7 +252,7 @@ simpl.use({async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 
           parse = JSON.parse(JSON.stringify(parse()));
           assert(true, 'parser serialize state machine representation');
           try {
-            parse = o.parser.generate(grammar, parse, tokens);
+            parse = modules.parser.generate(grammar, parse, tokens);
             assert(true, 'parser deserialize state machine representation');
             try {
               assert(parse('(1 + 2) * 3 / 4 - 5') === -2.75, 'parser parse valid input after deserialization');
@@ -266,7 +269,7 @@ simpl.use({async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 
         assert(false, 'parser compile valid SLR grammar');
       }
       try {
-        var parse = o.parser.generate({
+        var parse = modules.parser.generate({
           S: ['L', '=', 'R', 0, 'R', 0],
           L: ['*', 'R', 0, 'id', 0],
           R: ['L', 0]
@@ -282,7 +285,7 @@ simpl.use({async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 
         assert(false, 'parser compile valid LALR grammar');
       }
       try {
-        o.parser.generate({
+        modules.parser.generate({
           S: ['A', 'S', 0, 'b', 0],
           A: ['S', 'A', 0, 'a', 0]
         }, 'S');
@@ -292,7 +295,7 @@ simpl.use({async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 
         assert(!e.indexOf('Shift-reduce conflict'), 'parser shift-reduce error detection');
       }
       try {
-        o.parser.generate({S: ['A', 0, 'A', 0]}, 'S');
+        modules.parser.generate({S: ['A', 0, 'A', 0]}, 'S');
         assert(false, 'parser reduce-reduce error detection');
       } catch (e) {
         assert(!e.indexOf('Reduce-reduce conflict'), 'parser reduce-reduce error detection');
@@ -300,10 +303,10 @@ simpl.use({async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 
       
       var uint8 = [116,101,115,116,32,49,50,51,32,195,161,195,169,195,173,195,179,195,186],
           str = 'test 123 áéíóú',
-          buf = o.string.toUTF8Buffer(str);
+          buf = modules.string.toUTF8Buffer(str);
       assert(buf.length == uint8.length && !uint8.some(function(n, i) { return n != buf[i]; }), 'string to buffer');
-      assert(o.string.fromUTF8Buffer(new Uint8Array(uint8).buffer) === str, 'string from buffer');
+      assert(modules.string.fromUTF8Buffer(new Uint8Array(uint8).buffer) === str, 'string from buffer');
       assert(passed == 60, 'tests complete ('+passed+'/60 in '+(Date.now()-start)+'ms)');
     }
   );
-})
+}

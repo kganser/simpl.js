@@ -278,7 +278,7 @@ simpl.add('app', function(o) {
               field.focus();
               alert(name ? 'App name taken' : 'Please enter app name');
             } else {
-              apps[name] = [{code: '', config: {}, dependencies: {}, log: []}];
+              apps[name] = [{code: 'function(modules) {\n  \n}', config: {}, dependencies: {}, log: []}];
               dom(li(name, 0, null, true), appList);
               toggle(name, 0, true);
             }
@@ -303,7 +303,7 @@ simpl.add('app', function(o) {
               field.focus();
               alert(name ? 'Module name taken' : 'Please enter module name');
             } else {
-              modules[name] = [{code: "simpl.add('"+name.replace(/\\/g, '\\').replace(/'/g, "\\'")+"', function() {\n  \n});\n", dependencies: {}}];
+              modules[name] = [{code: 'function(modules) {\n  \n}', dependencies: {}}];
               dom(li(name, 0), moduleList);
               toggle(name, 0, false, 'code');
             }
@@ -355,7 +355,7 @@ simpl.add('app', function(o) {
             {section: {id: 'actions', children: [
               {button: {className: 'publish', onclick: function() { publish(true); }, children: function(e) { major = e; }}}, {br: null},
               {button: {className: 'publish', onclick: function() { publish(); }, children: function(e) { minor = e; }}}, {br: null},
-              {button: {className: 'delete', children: 'Delete', onclick: function() {
+              {button: {className: 'delete', children: 'Delete', onclick: function() { // TODO: delete unavailable after a version is published
                 var button = this, type = selected.app ? 'app' : 'module';
                 if (!confirm('Are you sure you want to delete this '+type+'?')) return;
                 button.disabled = true;

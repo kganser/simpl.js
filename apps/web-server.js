@@ -1,8 +1,8 @@
-simpl.use({http: 0}, function(o) {
+function(modules) {
 
   var hits = 0;
   
-  o.http.serve({port: config.port}, function(request, response) {
+  modules.http.serve({port: config.port}, function(request, response) {
   
     if (request.path == '/')
       return response.end('<h1>My First Web App</h1>'+(++hits)+' hits', 'html');
@@ -14,4 +14,4 @@ simpl.use({http: 0}, function(o) {
     else console.log('Listening at http://localhost:'+config.port);
     
   });
-});
+}

@@ -1,32 +1,32 @@
-simpl.use({http: 0, database: 0, html: 0, crypto: 0}, function(o) {
+function(modules) {
   
-  var db = o.database.open('simple-login', {sessions: {}, users: {}}),
-      key = o.crypto.codec.utf8String.toBits(config.sessionKey),
-      fromBits = o.crypto.codec.base64.fromBits,
-      toBits = o.crypto.codec.base64.toBits;
+  var db = modules.database.open('simple-login', {sessions: {}, users: {}}),
+      key = modules.crypto.codec.utf8String.toBits(config.sessionKey),
+      fromBits = modules.crypto.codec.base64.fromBits,
+      toBits = modules.crypto.codec.base64.toBits;
   
   var sid = function() {
-    var data = o.crypto.random.randomWords(6, 0),
+    var data = modules.crypto.random.randomWords(6, 0),
         base64 = fromBits(data, true, true);
     return {
-      signed: base64+'.'+fromBits(new o.crypto.misc.hmac(key).mac(data), true, true),
+      signed: base64+'.'+fromBits(new modules.crypto.misc.hmac(key).mac(data), true, true),
       unsigned: base64
     };
   };
   var verify = function(signed) {
     try {
       signed = signed.split('.', 2);
-      return fromBits(new o.crypto.misc.hmac(key).mac(toBits(signed[0], true)), true, true) == signed[1];
+      return fromBits(new modules.crypto.misc.hmac(key).mac(toBits(signed[0], true)), true, true) == signed[1];
     } catch (e) {}
   };
   var pbkdf2 = function(password, salt) {
-    var value = o.crypto.misc.cachedPbkdf2(password, salt && {salt: toBits(salt, true)});
+    var value = modules.crypto.misc.cachedPbkdf2(password, salt && {salt: toBits(salt, true)});
     return {key: fromBits(value.key, true, true), salt: fromBits(value.salt, true, true)};
   };
   
-  o.http.serve({port: config.port}, function(request, response) {
+  modules.http.serve({port: config.port}, function(request, response) {
     var render = function(body, status) {
-      response.end(o.html.markup([
+      response.end(modules.html.markup([
         {'!doctype': {html: null}},
         {html: [
           {head: [{title: 'Simple Login'}]},
@@ -95,4 +95,4 @@ simpl.use({http: 0, database: 0, html: 0, crypto: 0}, function(o) {
     if (error) console.error('Error listening on 0.0.0.0:'+config.port+'\n'+error);
     else console.log('Listening at http://localhost:'+config.port);
   });
-});
+}
