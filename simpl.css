@@ -317,7 +317,7 @@ button:active {
   display: inline-block;
   vertical-align: top;
   box-sizing: border-box;
-  width: 40%;
+  width: 33.33%;
   min-height: 199px;
   padding-left: 1px;
   overflow: auto;
@@ -329,12 +329,11 @@ button:active {
   min-height: 0;
 }
 #settings #actions {
-  width: 20%;
   padding-top: 50px;
   text-align: center;
 }
-.show-module #settings #actions {
-  width: 60%;
+.show-module #settings section {
+  width: 50%;
 }
 #actions button {
   padding: 5px 10px 5px 30px;
