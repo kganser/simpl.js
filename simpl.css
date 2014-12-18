@@ -424,9 +424,9 @@ nav .selected button {
   height: 50%;
   width: 12px;
   top: 0;
-  left: 10px;
+  left: 12px;
   background: #ddd;
-  z-index: -2;
+  z-index: -1;
 }
 .timeline li:first-child:before,
 .timeline li:last-child:after {
@@ -436,27 +436,31 @@ nav .selected button {
   top: auto;
   bottom: 0;
 }
-.timeline li:hover,
-.timeline li:hover span {
+.timeline li:hover {
   color: black;
 }
 .timeline li span {
-  color: white;
+  display: inline-block;
+  vertical-align: middle;
+  height: 6px;
+  width: 6px;
+  background: white;
   margin-right: 5px;
+  border: 3px solid #ddd;
+  border-radius: 6px;
 }
-.timeline li span:before {
-  content: "●";
-  position: absolute;
-  z-index: -1;
-  -webkit-text-stroke: 6px #ddd;
+.timeline li:hover span {
+  background: black;
 }
-.timeline li.selected span:before,
-.timeline li.inner span:before {
-  -webkit-text-stroke-color: #e99;
+.timeline li.selected span,
+.timeline li.inner span {
+  border-color: #e99;
 }
-.timeline li.selected,
-.timeline li.selected span {
+.timeline li.selected {
   color: #c33;
+}
+.timeline li.selected span {
+  background: #c33;
 }
 .timeline li.first:after,
 .timeline li.inner:after {

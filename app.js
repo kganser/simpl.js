@@ -438,7 +438,7 @@ simpl.add('app', function(o) {
                 timeline = function(name, version, app, minor) {
                   first = last = null;
                   dom(new Array(minor+1).join().split(',').map(function(x, i) {
-                    return {li: [{span: '●'}, i ? (version+1)+'.'+(minor-i) : 'Current']};
+                    return {li: [{span: null}, i ? (version+1)+'.'+(minor-i) : 'Current']};
                   }), elem, true);
                 };
               }}}
