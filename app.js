@@ -10,7 +10,7 @@ simpl.add('app', function(o) {
         module[i] = {minor: version};
       });
     });
-    var appList, moduleList, selected, code, config, major, minor, dependencies, search, suggest, log, docs, line, status,
+    var appList, moduleList, selected, code, config, major, minor, del, dependencies, search, suggest, timeline, log, docs, line, status,
         dom = o.html.dom;
     if (window.EventSource) new EventSource('/activity').onmessage = function(e) {
       try { var message = JSON.parse(e.data); } catch (e) { return; }
@@ -64,6 +64,7 @@ simpl.add('app', function(o) {
             versions[version-2].tab.nextSibling);
           major.style.display = 'inline-block';
           major.textContent = 'Publish '+(version+1)+'.0';
+          del.style.display = 'none';
           break;
         case 'publish':
           entry.minor = entry.minor == null ? 0 : entry.minor+1;
@@ -75,6 +76,7 @@ simpl.add('app', function(o) {
           major.style.display = 'inline-block';
           major.textContent = 'Publish '+(versions.length+1)+'.0';
           minor.textContent = 'Publish '+(data.version+1)+'.'+(entry.minor+1);
+          del.style.display = 'none';
           break;
         case 'config':
           entry.config = data.object;
@@ -178,14 +180,12 @@ simpl.add('app', function(o) {
           deps(entry.dependencies);
           search.value = '';
           suggest();
-          if (entry.minor == null) {
-            major.style.display = 'none';
-            minor.textContent = 'Publish 1.0';
-          } else {
-            major.style.display = 'inline-block';
-            major.textContent = 'Publish '+(versions.length+1)+'.0';
-            minor.textContent = 'Publish '+(version+1)+'.'+(entry.minor+1);
-          }
+          var next = entry.minor == null ? 0 : entry.minor+1;
+          del.style.display = entry.minor == null ? 'inline-block' : 'none';
+          major.style.display = entry.minor == null ? 'none' : 'inline-block';
+          major.textContent = 'Publish '+(versions.length+1)+'.0';
+          minor.textContent = 'Publish '+(version+1)+'.'+next;
+          timeline(name, version, app, next);
           if (app) dom(entry.log.map(logLine), log, true);
           else doc(name, entry.code);
           entry.tab.classList.remove('loading');
@@ -353,9 +353,9 @@ simpl.add('app', function(o) {
         return [
           {div: {id: 'settings', children: [
             {section: {id: 'actions', children: [
-              {button: {className: 'publish', onclick: function() { publish(true); }, children: function(e) { major = e; }}}, {br: null},
-              {button: {className: 'publish', onclick: function() { publish(); }, children: function(e) { minor = e; }}}, {br: null},
-              {button: {className: 'delete', children: 'Delete', onclick: function() { // TODO: delete unavailable after a version is published
+              {button: {className: 'publish', children: function(e) { major = e; }, onclick: function() { publish(true); }}}, {br: null},
+              {button: {className: 'publish', children: function(e) { minor = e; }, onclick: function() { publish(); }}}, {br: null},
+              {button: {className: 'delete', children: function(e) { del = e; return 'Delete'; }, onclick: function() {
                 var button = this, type = selected.app ? 'app' : 'module';
                 if (!confirm('Are you sure you want to delete this '+type+'?')) return;
                 button.disabled = true;
@@ -413,7 +413,35 @@ simpl.add('app', function(o) {
               }}
             ]}},
             {section: {id: 'history', children: [
-              {h2: 'History'}
+              {h2: 'History'},
+              {ul: {className: 'timeline', children: function(elem) {
+                var first, last;
+                elem.onclick = function(e) {
+                  if (e.target == first) {
+                    first = last;
+                    last = null;
+                  } else if (e.target == last) {
+                    last = null;
+                  } else if (first) {
+                    last = e.target;
+                  } else {
+                    first = e.target;
+                  }
+                  var inner, span = first && last,
+                      node = this.firstChild;
+                  do {
+                    var selected = node == first || node == last;
+                    node.className = selected ? span ? inner ? 'last selected' : 'first selected' : 'selected' : inner ? 'inner' : '';
+                    if (selected && span) inner = !inner;
+                  } while (node = node.nextSibling);
+                };
+                timeline = function(name, version, app, minor) {
+                  first = last = null;
+                  dom(new Array(minor+1).join().split(',').map(function(x, i) {
+                    return {li: [{span: '●'}, i ? (version+1)+'.'+(minor-i) : 'Current']};
+                  }), elem, true);
+                };
+              }}}
             ]}}
           ]}},
           {pre: {id: 'log', children: function(e) { log = e; }, onclick: function(e) {

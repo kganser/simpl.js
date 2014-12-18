@@ -201,11 +201,11 @@ button:active {
 .selected .view, .running .restart, .running .stop {
   display: inline;
 }
-.selected {
+nav .selected {
   background: #f7f7f7;
   position: relative;
 }
-.selected:after {
+nav .selected:after {
   content: "";
   position: absolute;
   top: 0;
@@ -217,10 +217,10 @@ button:active {
   -webkit-transform: translate(6px, 6px) rotate(45deg) skew(22.5deg, 22.5deg);
   box-shadow: 0 0 3px rgba(0, 0, 0, .3);
 }
-.show-code .selected:after, .show-code .toggle {
+.show-code nav .selected:after, .show-code .toggle {
   background: #f7f7f7;
 }
-.selected button {
+nav .selected button {
   background: #e0e0e0;
 }
 .toggle {
@@ -231,7 +231,7 @@ button:active {
   background: white;
   box-shadow: 0 0 3px rgba(0, 0, 0, .3);
 }
-.collapsed nav h2, .collapsed .form, .collapsed nav li, .collapsed .selected:after {
+.collapsed nav h2, .collapsed .form, .collapsed nav li, .collapsed nav .selected:after {
   display: none;
 }
 .collapsed nav {
@@ -248,7 +248,7 @@ button:active {
   transform-origin: right top 0;
   -webkit-transform-origin: right top 0;
 }
-.collapsed .selected {
+.collapsed nav .selected {
   display: block;
   position: absolute;
   left: 0;
@@ -407,6 +407,64 @@ button:active {
 }
 .jsonv {
   padding: 4px 10px;
+}
+.timeline {
+  white-space: nowrap;
+}
+.timeline li {
+  padding: 10px 0 10px 12px;
+  position: relative;
+  cursor: pointer;
+}
+.timeline li:before,
+.timeline li:after {
+  content: "";
+  display: block;
+  position: absolute;
+  height: 50%;
+  width: 12px;
+  top: 0;
+  left: 10px;
+  background: #ddd;
+  z-index: -2;
+}
+.timeline li:first-child:before,
+.timeline li:last-child:after {
+  content: none;
+}
+.timeline li:after {
+  top: auto;
+  bottom: 0;
+}
+.timeline li:hover,
+.timeline li:hover span {
+  color: black;
+}
+.timeline li span {
+  color: white;
+  margin-right: 5px;
+}
+.timeline li span:before {
+  content: "●";
+  position: absolute;
+  z-index: -1;
+  -webkit-text-stroke: 6px #ddd;
+}
+.timeline li.selected span:before,
+.timeline li.inner span:before {
+  -webkit-text-stroke-color: #e99;
+}
+.timeline li.selected,
+.timeline li.selected span {
+  color: #c33;
+}
+.timeline li.first:after,
+.timeline li.inner:after {
+  background: #e99;
+}
+.timeline li.last:before,
+.timeline li.inner:before {
+  background: #e99;
 }
 #docs pre {
   overflow: auto;
