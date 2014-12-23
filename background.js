@@ -17,7 +17,8 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0}, function(o
         data[app.name] = {versions: [{
           code: e.target.responseText,
           config: app.config || {},
-          dependencies: app.dependencies || {}
+          dependencies: app.dependencies || {},
+          published: []
         }]};
         if (Object.keys(data).length == apps.length)
           db.put('apps', data);
@@ -42,7 +43,8 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0}, function(o
       o.xhr('/modules/'+module.name+'.js', function(e) {
         data[module.name] = {versions: [{
           code: 'function(modules'+(module.proxy ? ', proxy' : '')+') {\n'+e.target.responseText.split(/\n/).slice(1, -1).join('\n')+'\n}',
-          dependencies: module.dependencies || {}
+          dependencies: module.dependencies || {},
+          published: []
         }]};
         if (Object.keys(data).length == modules.length)
           db.put('modules', data);
@@ -120,8 +122,8 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0}, function(o
                   this.get(path).then(function(existing) {
                     if (existing) return response.error();
                     this.put(parts[0]+'/'+parts[1], {versions: [entry.app
-                      ? {code: code, config: {}, dependencies: {}}
-                      : {code: code, dependencies: {}}
+                      ? {code: code, config: {}, dependencies: {}, published: []}
+                      : {code: code, dependencies: {}, published: []}
                     ]}).then(response.ok);
                   });
                 });
@@ -130,29 +132,28 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0}, function(o
             path = parts.slice(0, 4).join('/');
             return db.get(path, true).then(function(version) {
               if (!version) return response.error();
-              var published = version.published;
+              var published = version.published[version.published.length-1];
               if (published && version.code == published.code &&
                   JSON.stringify(version.config) == JSON.stringify(published.config) &&
                   JSON.stringify(version.dependencies) == JSON.stringify(published.dependencies))
                 return response.generic(412);
               var record = {
-                minor: 0,
                 code: version.code,
                 config: version.config,
                 dependencies: version.dependencies,
-                published: {
+                published: [{
                   code: version.code,
                   config: version.config,
                   dependencies: version.dependencies
-                }
+                }]
               };
               if (!entry.app) {
                 delete record.config;
-                delete record.published.config;
+                delete record.published[0].config;
               }
               return (parts[4] == 'upgrade'
                 ? this.append(parts.slice(0, 3).join('/'), record)
-                : this.put(path+'/minor', version.minor == null ? 0 : version.minor+1).put(path+'/published', record.published)
+                : this.append(path+'/published', record.published[0])
               ).then(function() {
                 broadcast(parts[4], entry);
                 response.ok();
@@ -162,7 +163,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0}, function(o
             if (method == 'PUT' || method == 'INSERT')
               return request.slurp(function(body) {
                 if (body === undefined) return response.generic(415);
-                db[method.toLowerCase()](path, body).then(echo);
+                db[method.toLowerCase()](path, body).then(echo); // TODO: create app/module record if not exists
               }, 'json');
             if (method == 'DELETE')
               return db.delete(path).then(echo);
@@ -221,18 +222,18 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0}, function(o
               response.error();
             }, 'json');
           return db.get('', false, function(path) {
-            return path.length < 4 ? null : function(key) {
-              if (key != 'minor') return 'skip';
+            return path.length < 4 || path.length == 5 ? null : function(key) {
+              if (key != 'published') return 'skip';
             };
           }).then(function(data) {
             Object.keys(data.apps).forEach(function(name) {
               data.apps[name] = data.apps[name].versions.map(function(v, i) {
-                return [v.minor == null ? null : v.minor, !!apps[encodeURIComponent(name)+'/versions/'+i]];
+                return [v.published.length, !!apps[encodeURIComponent(name)+'/versions/'+i]];
               });
             });
             Object.keys(data.modules).forEach(function(name) {
               data.modules[name] = data.modules[name].versions.map(function(v) {
-                return v.minor == null ? null : v.minor;
+                return v.published.length;
               });
             });
             response.end(o.html.markup([

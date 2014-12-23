@@ -319,12 +319,12 @@ nav .selected button {
   box-sizing: border-box;
   width: 33.33%;
   min-height: 199px;
-  padding-left: 1px;
+  border-left: 1px solid white;
   overflow: auto;
 }
 #settings #history {
   display: block;
-  padding-left: 0;
+  border-left: none;
   width: auto;
   min-height: 0;
 }
@@ -450,7 +450,7 @@ nav .selected button {
   border-radius: 6px;
 }
 .timeline li:hover span {
-  background: black;
+  background: #666;
 }
 .timeline li.selected span,
 .timeline li.inner span {

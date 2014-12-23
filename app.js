@@ -58,7 +58,7 @@ simpl.add('app', function(o) {
           entry.tab.parentNode.removeChild(entry.tab);
           break;
         case 'upgrade':
-          var version = versions.push(data.app ? {minor: 0, log: []} : {minor: 0});
+          var version = versions.push(data.app ? {minor: 1, log: []} : {minor: 1});
           (data.app ? appList : moduleList).insertBefore(
             dom(li(data.name, version-1, 0, data.app)),
             versions[version-2].tab.nextSibling);
@@ -67,15 +67,16 @@ simpl.add('app', function(o) {
           del.style.display = 'none';
           break;
         case 'publish':
-          entry.minor = entry.minor == null ? 0 : entry.minor+1;
-          entry.published = {code: entry.code, config: entry.config, dependencies: entry.dependencies};
-          if (!data.app) delete entry.published.config;
-          var version = (data.version+1)+'.'+entry.minor;
+          entry.minor++;
+          entry.published.push(data.app
+            ? {code: entry.code, config: entry.config, dependencies: entry.dependencies}
+            : {code: entry.code, dependencies: entry.dependencies});
+          var version = (data.version+1)+'.'+(entry.minor-1);
           entry.tab.lastChild.title = data.name+' '+version;
           entry.tab.lastChild.lastChild.textContent = version;
           major.style.display = 'inline-block';
           major.textContent = 'Publish '+(versions.length+1)+'.0';
-          minor.textContent = 'Publish '+(data.version+1)+'.'+(entry.minor+1);
+          minor.textContent = 'Publish '+(data.version+1)+'.'+entry.minor;
           del.style.display = 'none';
           break;
         case 'config':
@@ -180,12 +181,11 @@ simpl.add('app', function(o) {
           deps(entry.dependencies);
           search.value = '';
           suggest();
-          var next = entry.minor == null ? 0 : entry.minor+1;
-          del.style.display = entry.minor == null ? 'inline-block' : 'none';
-          major.style.display = entry.minor == null ? 'none' : 'inline-block';
+          del.style.display = entry.minor ? 'none' : 'inline-block';
+          major.style.display = entry.minor ? 'inline-block' : 'none';
           major.textContent = 'Publish '+(versions.length+1)+'.0';
-          minor.textContent = 'Publish '+(version+1)+'.'+next;
-          timeline(name, version, app, next);
+          minor.textContent = 'Publish '+(version+1)+'.'+entry.minor;
+          timeline(name, version, app);
           if (app) dom(entry.log.map(logLine), log, true);
           else doc(name, entry.code);
           entry.tab.classList.remove('loading');
@@ -203,7 +203,6 @@ simpl.add('app', function(o) {
             entry.code = response.code;
             entry.config = response.config;
             entry.dependencies = response.dependencies;
-            entry.minor = response.minor;
             entry.published = response.published;
             if (entry == selected.entry) toggle(name, version, app, panel, ln, ch);
           });
@@ -228,7 +227,7 @@ simpl.add('app', function(o) {
     };
     var publish = function(upgrade) {
       var current = selected.entry,
-          published = current.published;
+          published = current.published[current.published.length-1];
       if (published && current.code == published.code &&
           JSON.stringify(current.config) == JSON.stringify(published.config) &&
           JSON.stringify(current.dependencies) == JSON.stringify(published.dependencies))
@@ -242,7 +241,7 @@ simpl.add('app', function(o) {
     };
     var li = function(name, major, minor, app) {
       var entry = (app ? apps : modules)[name][major],
-          version = minor == null ? '' : (major+1)+'.'+minor;
+          version = minor ? (major+1)+'.'+(minor-1) : '';
       return {li: function(elem) {
         entry.tab = elem;
         elem.onclick = function(e) {
@@ -376,7 +375,7 @@ simpl.add('app', function(o) {
                     var results = [], value = this.value;
                     if (value) Object.keys(modules).forEach(function(name) {
                       if (~name.indexOf(value)) results.push.apply(results, modules[name].map(function(module, version) {
-                        return {name: name, version: module.minor == null ? version-1 : version};
+                        return {name: name, version: module.minor ? version : version-1};
                       }).reverse());
                     });
                     suggest(results);
@@ -435,8 +434,9 @@ simpl.add('app', function(o) {
                     if (selected && span) inner = !inner;
                   } while (node = node.nextSibling);
                 };
-                timeline = function(name, version, app, minor) {
+                timeline = function(name, version, app) {
                   first = last = null;
+                  var minor = (app ? apps : modules)[name][version].minor;
                   dom(new Array(minor+1).join().split(',').map(function(x, i) {
                     return {li: [{span: null}, i ? (version+1)+'.'+(minor-i) : 'Current']};
                   }), elem, true);
