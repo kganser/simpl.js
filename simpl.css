@@ -14,7 +14,7 @@ body {
   margin: 0;
   font: 13px sans-serif;
 }
-html, body, .CodeMirror {
+html, body, #code, .CodeMirror {
   height: 100%;
 }
 pre {
@@ -150,7 +150,7 @@ button:active {
 .run:hover, .restart:hover, #status.success {
   background: #3c3;
 }
-.delete:hover, .stop:hover, #status.failure {
+nav .delete:hover, .stop:hover, #status.failure {
   background: #c33;
 }
 .code:hover, .settings:hover, .log:hover, .docs:hover, #status.info {
@@ -186,7 +186,7 @@ button:active {
 .stop:before {
   content: "■";
 }
-.delete:before {
+nav .delete:before {
   content: "";
 }
 .toggle:before {
@@ -307,10 +307,10 @@ nav .selected button {
 #log .error, #log .warn, #docs .error {
   color: red;
 }
-.CodeMirror, #settings, .show-module #configuration, #log, #docs, #loading {
+#code, #settings, .show-module #configuration, #log, #docs, #loading {
   display: none;
 }
-.show-code .CodeMirror, .show-settings #settings, .show-log #log, .show-docs #docs, .show-loading #loading {
+.show-code #code, .show-settings #settings, .show-log #log, .show-docs #docs, .show-loading #loading {
   display: block;
 }
 #settings section {
@@ -378,9 +378,6 @@ nav .selected button {
   width: 1em;
   height: 1em;
 }
-#dependencies .delete:before {
-  content: none;
-}
 #dependencies .delete:hover {
   color: white;
 }
@@ -410,11 +407,13 @@ nav .selected button {
 }
 .timeline {
   white-space: nowrap;
+  float: left;
 }
 .timeline li {
   padding: 10px 0 10px 12px;
   position: relative;
   cursor: pointer;
+  color: #999;
 }
 .timeline li:before,
 .timeline li:after {
@@ -436,9 +435,6 @@ nav .selected button {
   top: auto;
   bottom: 0;
 }
-.timeline li:hover {
-  color: black;
-}
 .timeline li span {
   display: inline-block;
   vertical-align: middle;
@@ -449,26 +445,56 @@ nav .selected button {
   border: 3px solid #ddd;
   border-radius: 6px;
 }
-.timeline li:hover span {
-  background: #666;
+.timeline li:hover,
+.timeline li.selected {
+  color: black;
+}
+.timeline li:hover span,
+.timeline li.selected span {
+  background: #333;
 }
 .timeline li.selected span,
 .timeline li.inner span {
-  border-color: #e99;
-}
-.timeline li.selected {
-  color: #c33;
-}
-.timeline li.selected span {
-  background: #c33;
+  border-color: #aaa;
 }
 .timeline li.first:after,
-.timeline li.inner:after {
-  background: #e99;
-}
+.timeline li.inner:after,
 .timeline li.last:before,
 .timeline li.inner:before {
-  background: #e99;
+  background: #aaa;
+}
+#history table {
+  margin-left: 83px;
+  font-family: monospace;
+  line-height: 1.2em;
+  white-space: pre-wrap;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+#history td {
+  vertical-align: top;
+  padding: 0 4px;
+}
+#history td:first-child {
+  color: #999;
+  background: #f7f7f7;
+  text-align: right;
+  padding: 0 3px 0 5px;
+  -webkit-user-select: none;
+}
+#history .delete {
+  color: black;
+  background: #fdd;
+}
+#history .insert {
+  color: black;
+  background: #dfd;
+}
+#history .delete span {
+  background: #faa;
+}
+#history .insert span {
+  background: #afa;
 }
 #docs pre {
   overflow: auto;

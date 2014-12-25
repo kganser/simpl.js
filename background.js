@@ -254,6 +254,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0}, function(o
                   {script: {src: '/modules/parser.js'}},
                   {script: {src: '/modules/docs.js'}},
                   {script: {src: '/codemirror.js'}},
+                  {script: {src: '/diff_match_patch.js'}},
                   {script: {src: '/jsonv.js'}},
                   {script: {src: '/app.js'}},
                   {script: function(apps, modules, offset) {

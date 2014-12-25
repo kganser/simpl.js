@@ -10,7 +10,7 @@ simpl.add('app', function(o) {
         module[i] = {minor: version};
       });
     });
-    var appList, moduleList, selected, code, config, major, minor, del, dependencies, search, suggest, timeline, log, docs, line, status,
+    var appList, moduleList, selected, code, config, major, minor, del, dependencies, search, suggest, timeline, history, log, docs, line, status,
         dom = o.html.dom;
     if (window.EventSource) new EventSource('/activity').onmessage = function(e) {
       try { var message = JSON.parse(e.data); } catch (e) { return; }
@@ -87,7 +87,7 @@ simpl.add('app', function(o) {
         case 'dependencies':
           entry.dependencies = data.object;
           if (selected && selected.entry == entry)
-            deps(entry.dependencies);
+            dependencies(entry.dependencies);
           break;
       }
     };
@@ -120,23 +120,6 @@ simpl.add('app', function(o) {
     };
     var doc = function(name, code) {
       dom([{h1: name}, o.docs.generateDom(code)], docs, true);
-    };
-    var deps = function(modules) {
-      dom(Object.keys(modules).map(function(module) {
-        var version = modules[module];
-        return {li: {className: 'module', children: [
-          {button: {className: 'delete', title: 'Remove', children: '×', onclick: function() {
-            var button = this;
-            button.disabled = true;
-            o.xhr(url()+'/dependencies/'+encodeURIComponent(module), {method: 'DELETE'}, function(e) {
-              button.disabled = false;
-              if (e.target.status != 200)
-                status('failure', 'Error updating dependencies');
-            });
-          }}},
-          {span: {className: 'name', children: [module, {span: !version || version}]}}
-        ]}};
-      }), dependencies, true);
     };
     var handler = function(action, name, version, app) {
       var entry = (app ? apps : modules)[name][version];
@@ -178,7 +161,7 @@ simpl.add('app', function(o) {
           code.setOption('readOnly', false);
           code.setValue(entry.code); // TODO: use codemirror documents
           config.update(entry.config);
-          deps(entry.dependencies);
+          dependencies(entry.dependencies);
           search.value = '';
           suggest();
           del.style.display = entry.minor ? 'none' : 'inline-block';
@@ -245,7 +228,8 @@ simpl.add('app', function(o) {
       return {li: function(elem) {
         entry.tab = elem;
         elem.onclick = function(e) {
-          toggle(name, major, app, (e.target == entry.view) && e.target.className.replace(/\s*view\s*/, ''));
+          if (!body.classList.contains('collapsed'))
+            toggle(name, major, app, (e.target == entry.view) && e.target.className.replace(/\s*view\s*/, ''));
         };
         if (entry.running)
           elem.classList.add('running');
@@ -317,156 +301,204 @@ simpl.add('app', function(o) {
           });
         }},
         {button: {className: 'toggle', onclick: function() {
-          document.body.classList.toggle('collapsed');
+          body.classList.toggle('collapsed');
           code.refresh();
         }}}
       ]},
-      {div: {id: 'main', children: function(e) {
-        code = CodeMirror(e, {
-          value: selected ? selected.entry.code : '',
-          lineNumbers: true,
-          matchBrackets: true,
-          highlightSelectionMatches: true
-        });
-        code.on('changes', function(e) {
-          if (!selected || e.options.readOnly) return;
-          selected.entry.dirty = true;
-          selected.entry.tab.classList.add('changed');
-        });
-        CodeMirror.commands.save = function() {
-          if (!selected || !selected.entry.dirty) return;
-          var entry = selected.entry;
-          status('info', 'Saving...');
-          o.xhr(url(), {
-            method: 'POST',
-            data: entry.code = code.getValue()
-          }, function(e) {
-            if (e.target.status != 200)
-              return status('failure', 'Error');
-            status('success', 'Saved');
-            entry.tab.classList.remove('changed');
-            if (selected && !selected.app && selected.entry == entry)
-              doc(selected.name, entry.code);
+      {div: {id: 'main', children: [
+        {div: {id: 'code', children: function(e) {
+          code = CodeMirror(e, {
+            value: selected ? selected.entry.code : '',
+            lineNumbers: true,
+            matchBrackets: true,
+            highlightSelectionMatches: true
           });
-        };
-        return [
-          {div: {id: 'settings', children: [
-            {section: {id: 'actions', children: [
-              {button: {className: 'publish', children: function(e) { major = e; }, onclick: function() { publish(true); }}}, {br: null},
-              {button: {className: 'publish', children: function(e) { minor = e; }, onclick: function() { publish(); }}}, {br: null},
-              {button: {className: 'delete', children: function(e) { del = e; return 'Delete'; }, onclick: function() {
-                var button = this, type = selected.app ? 'app' : 'module';
-                if (!confirm('Are you sure you want to delete this '+type+'?')) return;
-                button.disabled = true;
-                status('info', 'Deleting '+type+'...');
-                o.xhr(url(), {method: 'DELETE'}, function(e) {
-                  button.disabled = false;
-                  if (e.target.status != 200)
-                    return status('failure', 'Error deleting '+type);
-                  status('success', 'Deleted');
-                });
-              }}}
-            ]}},
-            {section: {id: 'dependencies', children: [
-              {h2: 'Dependencies'},
-              {div: {className: 'search', children: [
-                {input: {type: 'text', placeholder: 'Search Modules', children: function(e) { search = e; }, onkeyup: function(e) {
-                  if (e.keyCode != 13) {
-                    var results = [], value = this.value;
-                    if (value) Object.keys(modules).forEach(function(name) {
-                      if (~name.indexOf(value)) results.push.apply(results, modules[name].map(function(module, version) {
-                        return {name: name, version: module.minor ? version : version-1};
-                      }).reverse());
-                    });
-                    suggest(results);
-                  } else if (this.nextSibling.firstChild) {
-                    this.nextSibling.firstChild.firstChild.click();
-                  }
-                }}},
-                {ul: {className: 'suggest', children: function(e) {
-                  suggest = function(modules) {
-                    dom(modules && modules.map(function(module, i) {
-                      return {li: [{button: {className: 'name', children: [module.name, {span: ++module.version || null}], onclick: function() {
-                        search.value = '';
-                        suggest();
-                        o.xhr(url()+'/dependencies', {method: 'POST', json: module}, function(e) {
-                          if (e.target.status != 200)
-                            status('failure', 'Error updating dependencies');
-                        });
-                      }}}]};
-                    }), e, true);
-                  };
-                }}}
-              ]}},
-              {ul: function(e) { dependencies = e; }}
-            ]}},
-            {section: {id: 'configuration', children: [
-              {h2: 'Configuration'},
-              {pre: function(e) {
-                config = o.jsonv(e, selected ? selected.entry.config : null, function(method, path, data) {
-                  o.xhr(url()+'/config/'+path, {method: method, json: data}, function(e) {
-                    if (e.target.status != 200)
-                      status('failure', 'Error updating configuration');
-                  });
-                });
-              }}
-            ]}},
-            {section: {id: 'history', children: [
-              {h2: 'History'},
-              {ul: {className: 'timeline', children: function(elem) {
-                var first, last;
-                elem.onclick = function(e) {
-                  if (e.target == first) {
-                    first = last;
-                    last = null;
-                  } else if (e.target == last) {
-                    last = null;
-                  } else if (first) {
-                    last = e.target;
-                  } else {
-                    first = e.target;
-                  }
-                  var inner, span = first && last,
-                      node = this.firstChild;
-                  do {
-                    var selected = node == first || node == last;
-                    node.className = selected ? span ? inner ? 'last selected' : 'first selected' : 'selected' : inner ? 'inner' : '';
-                    if (selected && span) inner = !inner;
-                  } while (node = node.nextSibling);
-                };
-                timeline = function(name, version, app) {
-                  first = last = null;
-                  var minor = (app ? apps : modules)[name][version].minor;
-                  dom(new Array(minor+1).join().split(',').map(function(x, i) {
-                    return {li: [{span: null}, i ? (version+1)+'.'+(minor-i) : 'Current']};
-                  }), elem, true);
-                };
-              }}}
-            ]}}
+          code.on('changes', function(e) {
+            if (!selected || e.options.readOnly) return;
+            selected.entry.dirty = true;
+            selected.entry.tab.classList.add('changed');
+          });
+          CodeMirror.commands.save = function() {
+            if (!selected || !selected.entry.dirty) return;
+            var entry = selected.entry;
+            status('info', 'Saving...');
+            o.xhr(url(), {
+              method: 'POST',
+              data: entry.code = code.getValue()
+            }, function(e) {
+              if (e.target.status != 200)
+                return status('failure', 'Error');
+              status('success', 'Saved');
+              entry.tab.classList.remove('changed');
+              if (selected && !selected.app && selected.entry == entry)
+                doc(selected.name, entry.code);
+            });
+          };
+        }}},
+        {div: {id: 'settings', children: [
+          {section: {id: 'actions', children: [
+            {button: {className: 'publish', children: function(e) { major = e; }, onclick: function() { publish(true); }}}, {br: null},
+            {button: {className: 'publish', children: function(e) { minor = e; }, onclick: function() { publish(); }}}, {br: null},
+            {button: {className: 'delete', children: function(e) { del = e; return 'Delete'; }, onclick: function() {
+              var button = this, type = selected.app ? 'app' : 'module';
+              if (!confirm('Are you sure you want to delete this '+type+'?')) return;
+              button.disabled = true;
+              status('info', 'Deleting '+type+'...');
+              o.xhr(url(), {method: 'DELETE'}, function(e) {
+                button.disabled = false;
+                if (e.target.status != 200)
+                  return status('failure', 'Error deleting '+type);
+                status('success', 'Deleted');
+              });
+            }}}
           ]}},
-          {pre: {id: 'log', children: function(e) { log = e; }, onclick: function(e) {
-            if (e.target.className == 'location') {
-              var ref = e.target.dataset,
-                  name = ref.module || selected.name,
-                  version = ref.version ? parseInt(ref.version, 10) : selected.version;
-              toggle(name, version, !ref.module, 'code', ref.line, 0);
-            }
-          }}},
-          {div: {id: 'docs', children: function(e) { docs = e; }}},
-          {div: {id: 'status', children: function(e) {
-            var i = 0; clear = function() {
-              if (!--i) e.style.display = 'none';
-            };
-            status = function(type, text) {
-              e.style.display = 'block';
-              e.className = type;
-              e.textContent = text;
-              setTimeout(clear, 2000);
-              i++;
-            };
-          }}}
-        ];
-      }}}
+          {section: {id: 'dependencies', children: [
+            {h2: 'Dependencies'},
+            {div: {className: 'search', children: [
+              {input: {type: 'text', placeholder: 'Search Modules', children: function(e) { search = e; }, onkeyup: function(e) {
+                if (e.keyCode != 13) {
+                  var results = [], value = this.value;
+                  if (value) Object.keys(modules).forEach(function(name) {
+                    if (~name.indexOf(value)) results.push.apply(results, modules[name].map(function(module, version) {
+                      return {name: name, version: module.minor ? version : version-1};
+                    }).reverse());
+                  });
+                  suggest(results);
+                } else if (this.nextSibling.firstChild) {
+                  this.nextSibling.firstChild.firstChild.click();
+                }
+              }}},
+              {ul: {className: 'suggest', children: function(e) {
+                suggest = function(modules) {
+                  dom(modules && modules.map(function(module, i) {
+                    return {li: [{button: {className: 'name', children: [module.name, {span: ++module.version || null}], onclick: function() {
+                      search.value = '';
+                      suggest();
+                      o.xhr(url()+'/dependencies', {method: 'POST', json: module}, function(e) {
+                        if (e.target.status != 200)
+                          status('failure', 'Error updating dependencies');
+                      });
+                    }}}]};
+                  }), e, true);
+                };
+              }}}
+            ]}},
+            {ul: function(e) {
+              dependencies = function(modules) {
+                dom(Object.keys(modules).map(function(module) {
+                  var version = modules[module];
+                  return {li: {className: 'module', children: [
+                    {button: {className: 'delete', title: 'Remove', children: '×', onclick: function() {
+                      var button = this;
+                      button.disabled = true;
+                      o.xhr(url()+'/dependencies/'+encodeURIComponent(module), {method: 'DELETE'}, function(e) {
+                        button.disabled = false;
+                        if (e.target.status != 200)
+                          status('failure', 'Error updating dependencies');
+                      });
+                    }}},
+                    {span: {className: 'name', children: [module, {span: !version || version}]}}
+                  ]}};
+                }), e, true);
+              };
+            }}
+          ]}},
+          {section: {id: 'configuration', children: [
+            {h2: 'Configuration'},
+            {pre: function(e) {
+              config = o.jsonv(e, selected ? selected.entry.config : null, function(method, path, data) {
+                o.xhr(url()+'/config/'+path, {method: method, json: data}, function(e) {
+                  if (e.target.status != 200)
+                    status('failure', 'Error updating configuration');
+                });
+              });
+            }}
+          ]}},
+          {section: {id: 'history', children: [
+            {h2: 'History'},
+            {ul: {className: 'timeline', children: function(elem) {
+              var first, last, diff = function(dmp) {
+                return function(versions) {
+                  var diff = dmp.diff_main(versions[1], versions[0]);
+                  dmp.diff_cleanupSemantic(diff);
+                  return diff;
+                };
+              }(new diff_match_patch);
+              elem.onclick = function(e) {
+                var target = e.target.tagName == 'SPAN' ? e.target.parentNode : e.target;
+                if (target == first) {
+                  first = last;
+                  last = null;
+                } else if (target == last) {
+                  last = null;
+                } else if (first) {
+                  last = target;
+                } else {
+                  first = target;
+                }
+                var versions = [], span = first && last;
+                for (var i = 0, node = this.firstChild; node; node = node.nextSibling, i++) {
+                  if (node == first || node == last) {
+                    versions.push(i ? selected.entry.published[selected.entry.published.length-i].code : selected.entry.code);
+                    node.className = span ? versions.length > 1 ? 'last selected' : 'first selected' : 'selected';
+                  } else {
+                    node.className = span && versions.length == 1 ? 'inner' : '';
+                  }
+                }
+                if (span) {
+                  // TODO: line-based diff
+                  var line = [], lines = [];
+                  diff(versions).forEach(function(chunk) {
+                    var op = chunk[0], chunks = chunk[1].split('\n');
+                    line.push(op ? {span: {className: op > 0 ? 'insert' : 'delete', children: chunks.shift()}} : chunks.shift());
+                    while ((chunk = chunks.shift()) != null) {
+                      lines.push(line);
+                      line = [op ? {span: {className: op > 0 ? 'insert' : 'delete', children: chunk}} : chunk];
+                    }
+                  });
+                  dom((line.length ? lines.concat([line]) : lines).map(function(line, i) {
+                    return {tr: [{td: i+1}, {td: line}]};
+                  }), history, true);
+                } else {
+                  dom(versions[0].split('\n').map(function(line, i) {
+                    return {tr: [{td: i+1}, {td: line}]};
+                  }), history, true);
+                }
+              };
+              timeline = function(name, version, app) {
+                first = last = null;
+                dom(null, history, true);
+                var minor = (app ? apps : modules)[name][version].minor;
+                dom(new Array(minor+1).join().split(',').map(function(x, i) {
+                  return {li: [{span: null}, i ? (version+1)+'.'+(minor-i) : 'Current']};
+                }), elem, true);
+              };
+            }}},
+            {table: [{tbody: function(e) { history = e; }}]}
+          ]}}
+        ]}},
+        {pre: {id: 'log', children: function(e) { log = e; }, onclick: function(e) {
+          if (e.target.className == 'location') {
+            var ref = e.target.dataset,
+                name = ref.module || selected.name,
+                version = ref.version ? parseInt(ref.version, 10) : selected.version;
+            toggle(name, version, !ref.module, 'code', ref.line, 0);
+          }
+        }}},
+        {div: {id: 'docs', children: function(e) { docs = e; }}},
+        {div: {id: 'status', children: function(e) {
+          var i = 0; clear = function() {
+            if (!--i) e.style.display = 'none';
+          };
+          status = function(type, text) {
+            e.style.display = 'block';
+            e.className = type;
+            e.textContent = text;
+            setTimeout(clear, 2000);
+            i++;
+          };
+        }}}
+      ]}}
     ], body);
   };
 }, 0, {html: 0, xhr: 0, jsonv: 0, docs: 0});
