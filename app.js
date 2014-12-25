@@ -228,8 +228,9 @@ simpl.add('app', function(o) {
       return {li: function(elem) {
         entry.tab = elem;
         elem.onclick = function(e) {
-          if (!body.classList.contains('collapsed'))
-            toggle(name, major, app, (e.target == entry.view) && e.target.className.replace(/\s*view\s*/, ''));
+          var selected = this.classList.contains('selected');
+          if (!selected || e.target == entry.view)
+            toggle(name, major, app, selected && e.target.className.replace(/\s*view\s*/, ''));
         };
         if (entry.running)
           elem.classList.add('running');
