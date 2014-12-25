@@ -150,7 +150,7 @@ button:active {
 .run:hover, .restart:hover, #status.success {
   background: #3c3;
 }
-nav .delete:hover, .stop:hover, #status.failure {
+nav .delete:hover, #actions .delete:hover, .stop:hover, #status.failure {
   background: #c33;
 }
 .code:hover, .settings:hover, .log:hover, .docs:hover, #status.info {
@@ -186,7 +186,7 @@ nav .delete:hover, .stop:hover, #status.failure {
 .stop:before {
   content: "■";
 }
-nav .delete:before {
+nav .delete:before, #actions .delete:before {
   content: "";
 }
 .toggle:before {
@@ -483,11 +483,9 @@ nav .selected button {
   -webkit-user-select: none;
 }
 #history .delete {
-  color: black;
   background: #fdd;
 }
 #history .insert {
-  color: black;
   background: #dfd;
 }
 #history .delete span {
