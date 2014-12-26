@@ -253,7 +253,7 @@ simpl.add('app', function(o) {
       {nav: [
         {h2: 'Apps'},
         {div: {className: 'form', children: [
-          {input: {type: 'text', placeholder: 'New App'}},
+          {input: {type: 'text', placeholder: 'New App', onkeyup: function(e) { if (e.keyCode == 13) this.nextSibling.click(); }}},
           {button: {title: 'Add', onclick: function() {
             var field = this.previousSibling,
                 name = field.value;
@@ -278,7 +278,7 @@ simpl.add('app', function(o) {
         }},
         {h2: 'Modules'},
         {div: {className: 'form', children: [
-          {input: {type: 'text', placeholder: 'New Module'}},
+          {input: {type: 'text', placeholder: 'New Module', onkeyup: function(e) { if (e.keyCode == 13) this.nextSibling.click(); }}},
           {button: {title: 'Add', onclick: function() {
             var field = this.previousSibling,
                 name = field.value;
