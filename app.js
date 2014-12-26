@@ -52,7 +52,10 @@ simpl.add('app', function(o) {
           }
           break;
         case 'delete':
-          if (selected && selected.entry == entry) selected = null;
+          if (selected && selected.entry == entry) {
+            body.classList.remove('show-'+selected.panel);
+            selected = null;
+          }
           delete versions[data.version];
           if (!versions.length) delete (data.app ? apps : modules)[data.name];
           entry.tab.parentNode.removeChild(entry.tab);
@@ -118,9 +121,6 @@ simpl.add('app', function(o) {
         {div: {className: 'message', children: message}}
       ]}};
     };
-    var doc = function(name, code) {
-      dom([{h1: name}, o.docs.generateDom(code)], docs, true);
-    };
     var handler = function(action, name, version, app) {
       var entry = (app ? apps : modules)[name][version];
       return function(e) {
@@ -170,7 +170,7 @@ simpl.add('app', function(o) {
           minor.textContent = 'Publish '+(version+1)+'.'+entry.minor;
           timeline(name, version, app);
           if (app) dom(entry.log.map(logLine), log, true);
-          else doc(name, entry.code);
+          else docs(name, entry.code);
           entry.tab.classList.remove('loading');
         } else if (!refresh) {
           code.setOption('readOnly', 'nocursor');
@@ -262,7 +262,7 @@ simpl.add('app', function(o) {
               field.focus();
               alert(name ? 'App name taken' : 'Please enter app name');
             } else {
-              apps[name] = [{code: 'function(modules) {\n  \n}', config: {}, dependencies: {}, log: []}];
+              apps[name] = [{minor: 0, code: 'function(modules) {\n  \n}', config: {}, dependencies: {}, log: []}];
               dom(li(name, 0, null, true), appList);
               toggle(name, 0, true);
             }
@@ -287,7 +287,7 @@ simpl.add('app', function(o) {
               field.focus();
               alert(name ? 'Module name taken' : 'Please enter module name');
             } else {
-              modules[name] = [{code: 'function(modules) {\n  \n}', dependencies: {}}];
+              modules[name] = [{minor: 0, code: 'function(modules) {\n  \n}', dependencies: {}}];
               dom(li(name, 0), moduleList);
               toggle(name, 0, false, 'code');
             }
@@ -332,7 +332,7 @@ simpl.add('app', function(o) {
               status('success', 'Saved');
               entry.tab.classList.remove('changed');
               if (selected && !selected.app && selected.entry == entry)
-                doc(selected.name, entry.code);
+                docs(selected.name, entry.code);
             });
           };
         }}},
@@ -461,7 +461,7 @@ simpl.add('app', function(o) {
                     return {tr: [{td: i+1}, {td: line}]};
                   }), history, true);
                 } else {
-                  dom(versions[0].split('\n').map(function(line, i) {
+                  dom(versions[0] != null && versions[0].split('\n').map(function(line, i) {
                     return {tr: [{td: i+1}, {td: line}]};
                   }), history, true);
                 }
@@ -486,7 +486,11 @@ simpl.add('app', function(o) {
             toggle(name, version, !ref.module, 'code', ref.line, 0);
           }
         }}},
-        {div: {id: 'docs', children: function(e) { docs = e; }}},
+        {div: {id: 'docs', children: function(e) {
+          docs = function(name, code) {
+            dom([{h1: name}, o.docs.generateDom(code)], e, true);
+          };
+        }}},
         {div: {id: 'status', children: function(e) {
           var i = 0; clear = function() {
             if (!--i) e.style.display = 'none';
