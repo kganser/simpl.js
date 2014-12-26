@@ -452,7 +452,7 @@ simpl.add('app', function(o) {
                 }
                 if (span) {
                   // TODO: line-based diff
-                  var line = [], lines = [];
+                  var line = [], lines = [], firstLn = 1, lastLn = 1;
                   diff(versions).forEach(function(chunk) {
                     var op = chunk[0], chunks = chunk[1].split('\n');
                     line.push(op ? {span: {className: op > 0 ? 'insert' : 'delete', children: chunks.shift()}} : chunks.shift());
@@ -461,13 +461,18 @@ simpl.add('app', function(o) {
                       line = [op ? {span: {className: op > 0 ? 'insert' : 'delete', children: chunk}} : chunk];
                     }
                   });
-                  dom((line.length ? lines.concat([line]) : lines).map(function(line, i) {
-                    return {tr: [{td: i+1}, {td: line}]};
-                  }), history, true);
+                  dom({tbody: (line.length ? lines.concat([line]) : lines).map(function(line) {
+                    var type = line.length > 1 || (line[0].span || {}).className;
+                    return {tr: [
+                      {td: {className: 'line', children: type != 'insert' ? firstLn++ : ''}},
+                      {td: {className: 'line', children: type != 'delete' ? lastLn++ : ''}},
+                      {td: line}
+                    ]};
+                  })}, history, true);
                 } else {
-                  dom(versions[0] != null && versions[0].split('\n').map(function(line, i) {
-                    return {tr: [{td: i+1}, {td: line}]};
-                  }), history, true);
+                  dom(versions[0] != null && {tbody: versions[0].split('\n').map(function(line, i) {
+                    return {tr: [{td: {className: 'line', children: i+1}}, {td: line}]};
+                  })}, history, true);
                 }
               };
               timeline = function(name, version, app) {
@@ -483,7 +488,7 @@ simpl.add('app', function(o) {
                 }), elem, true);
               };
             }}},
-            {table: [{tbody: function(e) { history = e; }}]}
+            {table: function(e) { history = e; }}
           ]}}
         ]}},
         {pre: {id: 'log', children: function(e) { log = e; }, onclick: function(e) {

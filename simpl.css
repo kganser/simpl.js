@@ -150,7 +150,7 @@ button:active {
 .run:hover, .restart:hover, #status.success {
   background: #3c3;
 }
-nav .delete:hover, #actions .delete:hover, .stop:hover, #status.failure {
+nav .delete:hover, #actions .delete:hover, #dependencies .delete:hover, .stop:hover, #status.failure {
   background: #c33;
 }
 .code:hover, .settings:hover, .log:hover, .docs:hover, #status.info {
@@ -473,13 +473,14 @@ nav .selected button {
 }
 #history td {
   vertical-align: top;
-  padding: 0 4px;
+  padding: 0 4px 0 2px;
 }
-#history td:first-child {
+#history .line {
   color: #999;
   background: #f7f7f7;
   text-align: right;
-  padding: 0 3px 0 5px;
+  padding-left: 5px;
+  border-right: 2px solid white;
   -webkit-user-select: none;
 }
 #history .delete {
