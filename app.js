@@ -70,13 +70,13 @@ simpl.add('app', function(o) {
           del.style.display = 'none';
           break;
         case 'publish':
-          entry.minor++;
           entry.published.push(data.app
             ? {code: entry.code, config: entry.config, dependencies: entry.dependencies}
             : {code: entry.code, dependencies: entry.dependencies});
-          var version = (data.version+1)+'.'+(entry.minor-1);
+          var version = (data.version+1)+'.'+(entry.minor++);
           entry.tab.lastChild.title = data.name+' '+version;
           entry.tab.lastChild.lastChild.textContent = version;
+          timeline(version);
           major.style.display = 'inline-block';
           major.textContent = 'Publish '+(versions.length+1)+'.0';
           minor.textContent = 'Publish '+(data.version+1)+'.'+entry.minor;
@@ -253,7 +253,9 @@ simpl.add('app', function(o) {
       {nav: [
         {h2: 'Apps'},
         {div: {className: 'form', children: [
-          {input: {type: 'text', placeholder: 'New App', onkeyup: function(e) { if (e.keyCode == 13) this.nextSibling.click(); }}},
+          {input: {type: 'text', placeholder: 'New App', onkeyup: function(e) {
+            if (e.keyCode == 13) this.nextSibling.click();
+          }}},
           {button: {title: 'Add', onclick: function() {
             var field = this.previousSibling,
                 name = field.value;
@@ -278,7 +280,9 @@ simpl.add('app', function(o) {
         }},
         {h2: 'Modules'},
         {div: {className: 'form', children: [
-          {input: {type: 'text', placeholder: 'New Module', onkeyup: function(e) { if (e.keyCode == 13) this.nextSibling.click(); }}},
+          {input: {type: 'text', placeholder: 'New Module', onkeyup: function(e) {
+            if (e.keyCode == 13) this.nextSibling.click();
+          }}},
           {button: {title: 'Add', onclick: function() {
             var field = this.previousSibling,
                 name = field.value;
@@ -467,6 +471,10 @@ simpl.add('app', function(o) {
                 }
               };
               timeline = function(name, version, app) {
+                if (arguments.length == 1)
+                  return elem.insertBefore(
+                    dom({li: [{span: null}, 'Current']}),
+                    dom([{span: null}, name], elem.firstChild, true));
                 first = last = null;
                 dom(null, history, true);
                 var minor = (app ? apps : modules)[name][version].minor;
