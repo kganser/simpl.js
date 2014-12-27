@@ -1,5 +1,4 @@
 simpl.add('app', function(o) {
-  Array.prototype.last = function() { return this[this.length-1]; };
   return function(apps, modules, offset, body) {
     Object.keys(apps).forEach(function(name) {
       apps[name].forEach(function(version, i, app) {
@@ -211,7 +210,7 @@ simpl.add('app', function(o) {
     };
     var publish = function(upgrade) {
       var current = selected.entry,
-          published = current.published.last();
+          published = current.published.slice(-1).pop();
       if (published && current.code == published.code &&
           JSON.stringify(current.config) == JSON.stringify(published.config) &&
           JSON.stringify(current.dependencies) == JSON.stringify(published.dependencies))
@@ -491,7 +490,7 @@ simpl.add('app', function(o) {
                   if (!section.change) gap = gap.concat(section.lines);
                   if (gap.length) sections.push({change: false, lines: gap});
                   if (section.change && section.lines.length) sections.push(section);
-                  var ellipses = sections.last().lines.last().number.map(function(n) { return String(n).replace(/./g, '·'); });
+                  var ellipses = sections.slice(-1).pop().lines.slice(-1).pop().number.map(function(n) { return String(n).replace(/./g, '·'); });
                   history(sections.map(function(section) {
                     if (!section.change) section.lines.push(null);
                     return {tbody: {className: section.change ? 'changed' : 'unchanged', children: section.lines.map(function(line) {
