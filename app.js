@@ -463,13 +463,8 @@ simpl.add('app', function(o) {
                     line.spans.push({change: change, text: chunks.shift()});
                     while ((chunk = chunks.shift()) != null) {
                       section.lines.push(line);
-                      line = {
-                        number: [change <= 0 && a++, change >= 0 && b++],
-                        change: change,
-                        spans: [{change: change, text: chunk}]
-                      };
-                      if (change) {
-                        i = 0;
+                      if (line.change) {
+                        i = 1;
                       } else if (i < 3) {
                         i++;
                       } else if (section.change) {
@@ -481,10 +476,15 @@ simpl.add('app', function(o) {
                           sections.push(section);
                           section = {change: change, lines: []};
                         }
-                        i = 0;
+                        i = 1;
                       } else {
                         gap.push(section.lines.shift());
                       }
+                      line = {
+                        number: [change <= 0 && a++, change >= 0 && b++],
+                        change: change,
+                        spans: [{change: change, text: chunk}]
+                      };
                     }
                   });
                   if (line.spans.length) section.lines.push(line);
