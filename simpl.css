@@ -443,7 +443,7 @@ nav .selected button {
   vertical-align: middle;
   height: 6px;
   width: 6px;
-  background: white;
+  background: #ddd;
   margin-right: 5px;
   border: 3px solid #ddd;
   border-radius: 6px;
@@ -452,19 +452,19 @@ nav .selected button {
 .timeline li.selected {
   color: black;
 }
-.timeline li:hover span,
-.timeline li.selected span {
-  background: #333;
-}
 .timeline li.selected span,
 .timeline li.inner span {
-  border-color: #f90;
+  border-color: #36c;
+  background: #36c;
+}
+.timeline li:hover span {
+  background: white;
 }
 .timeline li.first:after,
 .timeline li.inner:after,
 .timeline li.last:before,
 .timeline li.inner:before {
-  background: #f90;
+  background: #36c;
 }
 #history table {
   width: 100%;
