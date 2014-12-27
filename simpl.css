@@ -406,8 +406,11 @@ nav .selected button {
   padding: 4px 10px;
 }
 .timeline {
+  position: relative;
   white-space: nowrap;
   float: left;
+  margin-right: -100%;
+  z-index: 1;
 }
 .timeline li {
   padding: 10px 0 10px 12px;
@@ -455,27 +458,32 @@ nav .selected button {
 }
 .timeline li.selected span,
 .timeline li.inner span {
-  border-color: #aaa;
+  border-color: #f90;
 }
 .timeline li.first:after,
 .timeline li.inner:after,
 .timeline li.last:before,
 .timeline li.inner:before {
-  background: #aaa;
+  background: #f90;
 }
 #history table {
-  margin-left: 83px;
+  width: 100%;
   font-family: monospace;
   line-height: 1.2em;
   white-space: pre-wrap;
-  border-collapse: separate;
+  border-collapse: collapse;
   border-spacing: 0;
+}
+#history tbody {
+  border-bottom: 2px solid white;
+  border-left: 83px solid white;
 }
 #history td {
   vertical-align: top;
   padding: 0 4px 0 2px;
 }
 #history .line {
+  width: 1%;
   color: #999;
   background: #f7f7f7;
   text-align: right;
@@ -494,6 +502,28 @@ nav .selected button {
 }
 #history .insert span {
   background: #afa;
+}
+#history .unchanged tr,
+#history .unchanged.expanded .placeholder {
+  display: none;
+}
+#history .unchanged.expanded tr,
+#history .unchanged .placeholder {
+  display: table-row;
+}
+#history .unchanged .placeholder td {
+  color: white;
+  cursor: pointer;
+  -webkit-user-select: none;
+}
+#history .unchanged,
+#history .unchanged .placeholder .line,
+#history .unchanged .placeholder:hover td {
+  color: #999;
+}
+#history .unchanged .placeholder:hover .line {
+  background: #aaa;
+  color: white;
 }
 #docs pre {
   overflow: auto;

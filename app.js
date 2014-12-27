@@ -1,4 +1,5 @@
 simpl.add('app', function(o) {
+  Array.prototype.last = function() { return this[this.length-1]; };
   return function(apps, modules, offset, body) {
     Object.keys(apps).forEach(function(name) {
       apps[name].forEach(function(version, i, app) {
@@ -210,7 +211,7 @@ simpl.add('app', function(o) {
     };
     var publish = function(upgrade) {
       var current = selected.entry,
-          published = current.published[current.published.length-1];
+          published = current.published.last();
       if (published && current.code == published.code &&
           JSON.stringify(current.config) == JSON.stringify(published.config) &&
           JSON.stringify(current.dependencies) == JSON.stringify(published.dependencies))
@@ -452,27 +453,65 @@ simpl.add('app', function(o) {
                 }
                 if (span) {
                   // TODO: line-based diff
-                  var line = [], lines = [], firstLn = 1, lastLn = 1;
+                  var line = {number: [], spans: []}, section = {lines: []}, gap = [], sections = [], i = 0, a = 1, b = 1;
                   diff(versions).forEach(function(chunk) {
-                    var op = chunk[0], chunks = chunk[1].split('\n');
-                    line.push(op ? {span: {className: op > 0 ? 'insert' : 'delete', children: chunks.shift()}} : chunks.shift());
+                    var change = chunk[0], chunks = chunk[1].split('\n');
+                    if (change <= 0 && !line.number[0]) line.number[0] = a++;
+                    if (change >= 0 && !line.number[1]) line.number[1] = b++;
+                    if (!line.change) line.change = change;
+                    if (!section.change) section.change = line.change;
+                    line.spans.push({change: change, text: chunks.shift()});
                     while ((chunk = chunks.shift()) != null) {
-                      lines.push(line);
-                      line = [op ? {span: {className: op > 0 ? 'insert' : 'delete', children: chunk}} : chunk];
+                      section.lines.push(line);
+                      line = {
+                        number: [change <= 0 && a++, change >= 0 && b++],
+                        change: change,
+                        spans: [{change: change, text: chunk}]
+                      };
+                      if (change) {
+                        i = 0;
+                      } else if (i < 3) {
+                        i++;
+                      } else if (section.change) {
+                        if (section.lines.length > 3) {
+                          if (gap.length) {
+                            sections.push({change: false, lines: gap});
+                            gap = [];
+                          }
+                          sections.push(section);
+                          section = {change: change, lines: []};
+                        }
+                        i = 0;
+                      } else {
+                        gap.push(section.lines.shift());
+                      }
                     }
                   });
-                  dom({tbody: (line.length ? lines.concat([line]) : lines).map(function(line) {
-                    var type = line.length > 1 || (line[0].span || {}).className;
-                    return {tr: [
-                      {td: {className: 'line', children: type != 'insert' ? firstLn++ : ''}},
-                      {td: {className: 'line', children: type != 'delete' ? lastLn++ : ''}},
-                      {td: line}
-                    ]};
-                  })}, history, true);
+                  if (line.spans.length) section.lines.push(line);
+                  if (!section.change) gap = gap.concat(section.lines);
+                  if (gap.length) sections.push({change: false, lines: gap});
+                  if (section.change && section.lines.length) sections.push(section);
+                  var ellipses = sections.last().lines.last().number.map(function(n) { return String(n).replace(/./g, '·'); });
+                  history(sections.map(function(section) {
+                    if (!section.change) section.lines.push(null);
+                    return {tbody: {className: section.change ? 'changed' : 'unchanged', children: section.lines.map(function(line) {
+                      return line ? {tr: [
+                        {td: {className: 'line', children: line.number[0]}},
+                        {td: {className: 'line', children: line.number[1]}},
+                        {td: line.spans.map(function(span) {
+                          return {span: {className: ['delete', 'match', 'insert'][span.change+1], children: span.text}};
+                        })}
+                      ]} : {tr: {className: 'placeholder', children: [
+                        {td: {className: 'line', children: ellipses[0]}},
+                        {td: {className: 'line', children: ellipses[1]}},
+                        {td: 'Expand'}
+                      ]}};
+                    })}};
+                  }));
                 } else {
-                  dom(versions[0] != null && {tbody: versions[0].split('\n').map(function(line, i) {
+                  history(versions[0] != null && {tbody: versions[0].split('\n').map(function(line, i) {
                     return {tr: [{td: {className: 'line', children: i+1}}, {td: line}]};
-                  })}, history, true);
+                  })});
                 }
               };
               timeline = function(name, version, app) {
@@ -481,14 +520,21 @@ simpl.add('app', function(o) {
                     dom({li: [{span: null}, 'Current']}),
                     dom([{span: null}, name], elem.firstChild, true));
                 first = last = null;
-                dom(null, history, true);
+                history();
                 var minor = (app ? apps : modules)[name][version].minor;
                 dom(new Array(minor+1).join().split(',').map(function(x, i) {
                   return {li: [{span: null}, i ? (version+1)+'.'+(minor-i) : 'Current']};
                 }), elem, true);
               };
             }}},
-            {table: function(e) { history = e; }}
+            {table: function(e) {
+              history = function(data) { dom(data, e, true); };
+              e.onclick = function(e) {
+                var target = e.target;
+                while (target != this && target.tagName != 'TBODY') target = target.parentNode;
+                if (target.className == 'unchanged') target.className += ' expanded';
+              };
+            }}
           ]}}
         ]}},
         {pre: {id: 'log', children: function(e) { log = e; }, onclick: function(e) {
