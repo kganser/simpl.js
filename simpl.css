@@ -409,7 +409,8 @@ nav .selected button {
   position: relative;
   white-space: nowrap;
   float: left;
-  margin-right: -100%;
+  width: 83px;
+  margin-right: -83px;
   z-index: 1;
 }
 .timeline li {
