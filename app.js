@@ -453,11 +453,11 @@ simpl.add('app', function(o) {
                 }
                 if (span) {
                   // TODO: line-based diff
-                  var line = {number: [], spans: []}, section = {lines: []}, gap = [], sections = [], i = 0, a = 1, b = 1;
+                  var line = {number: [], spans: []}, section = {lines: []}, gap = [], sections = [], i = 0, a = 0, b = 0;
                   diff(versions).forEach(function(chunk) {
                     var change = chunk[0], chunks = chunk[1].split('\n');
-                    if (change <= 0 && !line.number[0]) line.number[0] = a++;
-                    if (change >= 0 && !line.number[1]) line.number[1] = b++;
+                    if (change <= 0 && !line.number[0] && !a) line.number[0] = ++a;
+                    if (change >= 0 && !line.number[1] && !b) line.number[1] = ++b;
                     if (!line.change) line.change = change;
                     if (!section.change) section.change = line.change;
                     line.spans.push({change: change, text: chunks.shift()});
@@ -481,7 +481,7 @@ simpl.add('app', function(o) {
                         gap.push(section.lines.shift());
                       }
                       line = {
-                        number: [change <= 0 && a++, change >= 0 && b++],
+                        number: [change <= 0 && ++a, change >= 0 && ++b],
                         change: change,
                         spans: [{change: change, text: chunk}]
                       };
