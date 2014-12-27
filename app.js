@@ -474,8 +474,10 @@ simpl.add('app', function(o) {
                           }
                           sections.push(section);
                           section = {change: change, lines: []};
+                          i = 0;
+                        } else {
+                          i = 1;
                         }
-                        i = 1;
                       } else {
                         gap.push(section.lines.shift());
                       }
@@ -500,10 +502,10 @@ simpl.add('app', function(o) {
                         {td: line.spans.map(function(span) {
                           return {span: {className: ['delete', 'match', 'insert'][span.change+1], children: span.text}};
                         })}
-                      ]} : {tr: {className: 'placeholder', children: [
+                      ]} : {tr: {className: sections.length == 1 ? 'placeholder unchanged' : 'placeholder', children: [
                         {td: {className: 'line', children: ellipses[0]}},
                         {td: {className: 'line', children: ellipses[1]}},
-                        {td: 'Expand'}
+                        {td: sections.length == 1 ? 'No Changes' : 'Expand'}
                       ]}};
                     })}};
                   }));

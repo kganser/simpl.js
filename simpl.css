@@ -512,14 +512,15 @@ nav .selected button {
 #history .unchanged .placeholder {
   display: table-row;
 }
-#history .unchanged .placeholder td {
+#history .unchanged .placeholder {
   color: white;
   cursor: pointer;
   -webkit-user-select: none;
 }
 #history .unchanged,
 #history .unchanged .placeholder .line,
-#history .unchanged .placeholder:hover td {
+#history .unchanged .placeholder:hover,
+#history .unchanged .placeholder.unchanged {
   color: #999;
 }
 #history .unchanged .placeholder:hover .line {
