@@ -476,6 +476,15 @@ simpl.add('app', function(o) {
                         i = 0;
                       } else if (i < 3) {
                         // after changed line inside changed section
+                        var lastLine = section.lines.slice(-1)[0],
+                            lastIns = insLines.slice(-1)[0];
+                        // collapse trailing \n case
+                        if (lastLine && lastIns && lastLine.spans.length == 2 && lastIns.spans.length == 1 && !lastLine.spans[0].text) {
+                          section.lines.pop();
+                          lastIns.change = 0;
+                          lastIns.number[0] = lastLine.number[0];
+                          i++;
+                        }
                         section.lines = section.lines.concat(insLines);
                         insLines = [];
                         i++;
@@ -501,16 +510,22 @@ simpl.add('app', function(o) {
                       }
                     });
                   });
-                  if (ins.length) insLines.push({
-                    change: 1,
-                    number: [!line.change && a, b],
-                    spans: ins
-                  });
-                  if (line.spans.length) (line.change ? section.lines : insLines).push({
-                    change: line.change,
-                    number: [a, !line.change && b],
-                    spans: line.spans
-                  });
+                  if (ins.length) insLines.push({change: 1, number: [!line.change && a, b], spans: ins});
+                  if (line.spans.length) {
+                    line = {change: line.change, number: [a, !line.change && b], spans: line.spans};
+                    if (line.change) {
+                      var lastIns = insLines.slice(-1)[0];
+                      if (lastIns && !line.spans[0].text) {
+                        // collapse trailing \n case
+                        lastIns.change = 0;
+                        lastIns.number[0] = line.number[0];
+                      } else {
+                        section.lines.push(line);
+                      }
+                    } else {
+                      insLines.push(line);
+                    }
+                  }
                   section.lines = section.lines.concat(insLines);
                   if (!section.change) gap = gap.concat(section.lines);
                   if (gap.length) sections.push({change: 0, lines: gap});
