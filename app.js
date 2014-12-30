@@ -451,58 +451,82 @@ simpl.add('app', function(o) {
                   }
                 }
                 if (span) {
-                  // TODO: line-based diff
-                  var line = {number: [], spans: []}, section = {lines: []}, gap = [], sections = [], i = 0, a = 0, b = 0;
+                  var line = {spans: []}, section = {lines: []},
+                      ins = [], insLines = [], gap = [], sections = [], i = 0, a = 1, b = 1;
                   diff(versions).forEach(function(chunk) {
+                    // current line
                     var change = chunk[0], chunks = chunk[1].split('\n');
-                    if (change <= 0 && !line.number[0] && !a) line.number[0] = ++a;
-                    if (change >= 0 && !line.number[1] && !b) line.number[1] = ++b;
-                    if (!line.change) line.change = change;
-                    if (!section.change) section.change = line.change;
-                    line.spans.push({change: change, text: chunks.shift()});
-                    while ((chunk = chunks.shift()) != null) {
-                      section.lines.push(line);
+                    if (!section.change) section.change = change;
+                    if (!line.change && change) {
+                      line.change = -1;
+                      ins = line.spans.slice();
+                    }
+                    chunk = {change: change, text: chunks.shift()};
+                    if (change <= 0) line.spans.push(chunk);
+                    if (line.change && change >= 0) ins.push(chunk);
+                    chunks.forEach(function(chunk) {
+                      // new line
+                      chunk = {change: change, text: chunk};
+                      if (change >= 0 && ins.length) {
+                        insLines.push({change: 1, number: [!line.change && a, b++], spans: ins});
+                        ins = change > 0 ? [chunk] : [];
+                      }
                       if (line.change) {
-                        i = 1;
+                        // changed line
+                        i = 0;
                       } else if (i < 3) {
+                        // after changed line inside changed section
+                        section.lines = section.lines.concat(insLines);
+                        insLines = [];
                         i++;
                       } else if (section.change) {
+                        // inside changed section
                         if (section.lines.length > 3) {
+                          // last line
                           if (gap.length) {
-                            sections.push({change: false, lines: gap});
+                            sections.push({change: 0, lines: gap});
                             gap = [];
                           }
                           sections.push(section);
                           section = {change: change, lines: []};
-                          i = 0;
-                        } else {
-                          i = 1;
                         }
+                        i = 1;
                       } else {
+                        // changed section overflow
                         gap.push(section.lines.shift());
                       }
-                      line = {
-                        number: [change <= 0 && ++a, change >= 0 && ++b],
-                        change: change,
-                        spans: [{change: change, text: chunk}]
-                      };
-                    }
+                      if (change <= 0 && line.spans.length) {
+                        section.lines.push({change: line.change, number: [a++, !line.change && b++], spans: line.spans});
+                        line = {change: change && -1, spans: change <= 0 ? [chunk] : []};
+                      }
+                    });
                   });
-                  if (line.spans.length) section.lines.push(line);
+                  if (ins.length) insLines.push({
+                    change: 1,
+                    number: [!line.change && a, b],
+                    spans: ins
+                  });
+                  if (line.spans.length) (line.change ? section.lines : insLines).push({
+                    change: line.change,
+                    number: [a, !line.change && b],
+                    spans: line.spans
+                  });
+                  section.lines = section.lines.concat(insLines);
                   if (!section.change) gap = gap.concat(section.lines);
                   if (gap.length) sections.push({change: false, lines: gap});
                   if (section.change && section.lines.length) sections.push(section);
-                  var ellipses = sections.slice(-1).pop().lines.slice(-1).pop().number.map(function(n) { return String(n).replace(/./g, '·'); });
+                  var ellipses = [a, b].map(function(n) { return String(n).replace(/./g, '·'); });
                   history(sections.map(function(section) {
                     if (!section.change) section.lines.push(null);
                     return {tbody: {className: section.change ? 'changed' : 'unchanged', children: section.lines.map(function(line) {
-                      return line ? {tr: [
+                      if (line && line.change) console.log(JSON.stringify(line));
+                      return line ? {tr: {className: ['delete', 'unchanged', 'insert'][line.change+1], children: [
                         {td: {className: 'line', children: line.number[0]}},
                         {td: {className: 'line', children: line.number[1]}},
                         {td: line.spans.map(function(span) {
-                          return {span: {className: ['delete', 'match', 'insert'][span.change+1], children: span.text}};
+                          return span.change ? {span: span.text} : span.text;
                         })}
-                      ]} : {tr: {className: sections.length == 1 ? 'placeholder unchanged' : 'placeholder', children: [
+                      ]}} : {tr: {className: sections.length == 1 ? 'placeholder unchanged' : 'placeholder', children: [
                         {td: {className: 'line', children: ellipses[0]}},
                         {td: {className: 'line', children: ellipses[1]}},
                         {td: sections.length == 1 ? 'No Changes' : 'Expand'}
