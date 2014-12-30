@@ -451,7 +451,7 @@ simpl.add('app', function(o) {
                   }
                 }
                 if (span) {
-                  var line = {spans: []}, section = {lines: []},
+                  var line = {change: 0, spans: []}, section = {lines: []},
                       ins = [], insLines = [], gap = [], sections = [], i = 0, a = 1, b = 1;
                   diff(versions).forEach(function(chunk) {
                     // current line
@@ -513,13 +513,12 @@ simpl.add('app', function(o) {
                   });
                   section.lines = section.lines.concat(insLines);
                   if (!section.change) gap = gap.concat(section.lines);
-                  if (gap.length) sections.push({change: false, lines: gap});
+                  if (gap.length) sections.push({change: 0, lines: gap});
                   if (section.change && section.lines.length) sections.push(section);
                   var ellipses = [a, b].map(function(n) { return String(n).replace(/./g, '·'); });
                   history(sections.map(function(section) {
                     if (!section.change) section.lines.push(null);
                     return {tbody: {className: section.change ? 'changed' : 'unchanged', children: section.lines.map(function(line) {
-                      if (line && line.change) console.log(JSON.stringify(line));
                       return line ? {tr: {className: ['delete', 'unchanged', 'insert'][line.change+1], children: [
                         {td: {className: 'line', children: line.number[0]}},
                         {td: {className: 'line', children: line.number[1]}},
