@@ -478,13 +478,17 @@ simpl.add('app', function(o) {
                       } else if (i < 3) {
                         // after changed line inside changed section
                         var lastLine = section.lines.slice(-1)[0],
-                            lastIns = insLines.slice(-1)[0];
-                        // collapse trailing \n case
-                        if (lastLine && lastIns && lastLine.spans.length == 2 && lastIns.spans.length == 1 && !lastLine.spans[0].text) {
+                            lastIns = insLines.slice(-1)[0],
+                            firstIns = insLines[0],
+                            collapsed;
+                        // collapse trailing, leading \n case (TODO: cleaner implementation?)
+                        if (lastLine && firstIns && lastLine.spans.length == 2 && (
+                            (collapsed = lastIns).spans.length == 1 && !collapsed.spans[0].text ||
+                            (collapsed = firstIns).spans.length == 2 && !collapsed.spans[1].text)) {
                           section.lines.pop();
-                          lastIns.change = 0;
-                          lastIns.number[0] = lastLine.number[0];
-                          i++;
+                          collapsed.change = 0;
+                          collapsed.number[0] = lastLine.number[0];
+                          if (collapsed == lastIns) i++;
                         }
                         section.lines = section.lines.concat(insLines);
                         insLines = [];

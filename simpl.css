@@ -473,6 +473,7 @@ nav .selected button {
 #history table {
   width: 100%;
   font-family: Consolas, monospace;
+  line-height: 15px;
   white-space: pre-wrap;
   border-collapse: collapse;
   border-spacing: 0;
