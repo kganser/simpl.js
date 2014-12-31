@@ -183,6 +183,7 @@ simpl.add('app', function(o) {
               return status('failure', 'Error retrieving '+(app ? 'app' : 'module'));
             }
             var response = e.target.response;
+            if (typeof response != 'object') try { response = JSON.parse(response); } catch(e) {}
             entry.code = response.code;
             entry.config = response.config;
             entry.dependencies = response.dependencies;
