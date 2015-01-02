@@ -452,6 +452,7 @@ simpl.add('app', function(o) {
                   }
                 }
                 if (span) {
+                  // TODO: collapse lines differing only by trailing and leading \n chunks
                   var line = {change: 0, spans: []}, section = {lines: []},
                       ins = [], insLines = [], gap = [], sections = [], i = 0, a = 1, b = 1;
                   diff(versions).forEach(function(chunk) {
@@ -467,70 +468,37 @@ simpl.add('app', function(o) {
                     if (line.change && change >= 0) ins.push(chunk);
                     chunks.forEach(function(chunk) {
                       // new line
-                      chunk = {change: change, text: chunk};
+                      chunk = [{change: change, text: chunk}];
                       if (change >= 0 && ins.length) {
                         insLines.push({change: 1, number: [!line.change && a, b++], spans: ins});
-                        ins = change > 0 ? [chunk] : [];
+                        ins = change ? chunk : [];
                       }
                       if (line.change) {
-                        // changed line
                         i = 0;
-                      } else if (i < 3) {
-                        // after changed line inside changed section
-                        var lastLine = section.lines.slice(-1)[0],
-                            lastIns = insLines.slice(-1)[0],
-                            firstIns = insLines[0],
-                            collapsed;
-                        // collapse trailing, leading \n case (TODO: cleaner implementation?)
-                        if (lastLine && firstIns && lastLine.spans.length == 2 && (
-                            (collapsed = lastIns).spans.length == 1 && !collapsed.spans[0].text ||
-                            (collapsed = firstIns).spans.length == 2 && !collapsed.spans[1].text)) {
-                          section.lines.pop();
-                          collapsed.change = 0;
-                          collapsed.number[0] = lastLine.number[0];
-                          if (collapsed == lastIns) i++;
-                        }
-                        section.lines = section.lines.concat(insLines);
-                        insLines = [];
-                        i++;
-                      } else if (section.change) {
-                        // inside changed section
-                        if (section.lines.length > 3) {
-                          // last line
+                      } else if (i == 3) {
+                        if (section.change) {
                           if (gap.length) {
                             sections.push({change: 0, lines: gap});
                             gap = [];
                           }
                           sections.push(section);
                           section = {change: change, lines: []};
+                          i = 1;
+                        } else {
+                          gap.push(section.lines.shift());
                         }
-                        i = 1;
-                      } else {
-                        // changed section overflow
-                        gap.push(section.lines.shift());
+                      } else if (!i++) {
+                        section.lines = section.lines.concat(insLines);
+                        insLines = [];
                       }
                       if (change <= 0 && line.spans.length) {
                         section.lines.push({change: line.change, number: [a++, !line.change && b++], spans: line.spans});
-                        line = {change: change && -1, spans: change <= 0 ? [chunk] : []};
+                        line = {change: change && -1, spans: chunk};
                       }
                     });
                   });
                   if (ins.length) insLines.push({change: 1, number: [!line.change && a, b], spans: ins});
-                  if (line.spans.length) {
-                    line = {change: line.change, number: [a, !line.change && b], spans: line.spans};
-                    if (line.change) {
-                      var lastIns = insLines.slice(-1)[0];
-                      if (lastIns && !line.spans[0].text) {
-                        // collapse trailing \n case
-                        lastIns.change = 0;
-                        lastIns.number[0] = line.number[0];
-                      } else {
-                        section.lines.push(line);
-                      }
-                    } else {
-                      insLines.push(line);
-                    }
-                  }
+                  if (line.spans.length) (line.change ? section.lines : insLines).push({change: line.change, number: [a, !line.change && b], spans: line.spans});
                   section.lines = section.lines.concat(insLines);
                   if (!section.change) gap = gap.concat(section.lines);
                   if (gap.length) sections.push({change: 0, lines: gap});
