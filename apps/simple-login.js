@@ -5,9 +5,9 @@ function(modules) {
       fromBits = modules.crypto.codec.base64.fromBits,
       toBits = modules.crypto.codec.base64.toBits;
   
-  var sid = function() {
-    var data = modules.crypto.random.randomWords(6, 0);
-    return fromBits(data, true, true)+'.'+fromBits(new modules.crypto.misc.hmac(key).mac(data), true, true);
+  var token = function() {
+    var rand = modules.crypto.random.randomWords(6, 0);
+    return fromBits(rand, true, true)+'.'+fromBits(new modules.crypto.misc.hmac(key).mac(rand), true, true);
   };
   var verify = function(signed) {
     try {
@@ -34,14 +34,14 @@ function(modules) {
       if (sid) db.delete('sessions/'+sid).then(function() { logoff(); });
       else response.generic(303, {'Set-Cookie': 'sid=; Expires='+new Date().toUTCString(), Location: '/'});
     };
-    var session;
+    var sid;
     switch (request.path) {
       case '/':
-        if (session = verify(request.cookie.sid))
-          return db.get('sessions/'+session).then(function(username) {
+        if (sid = verify(request.cookie.sid))
+          return db.get('sessions/'+sid).then(function(username) {
             if (!username) return logoff();
             this.get('users/'+encodeURIComponent(username)).then(function(user) {
-              if (!user) return logoff(session);
+              if (!user) return logoff(sid);
               render(['Welcome, '+user.name+'! ', {a: {href: '/logoff', children: 'Log off'}}]);
             });
           });
@@ -52,8 +52,8 @@ function(modules) {
             db.get('users/'+encodeURIComponent(body.username), true).then(function(user) {
               if (!user || user.password !== pbkdf2(body.password, user.salt).key)
                 return render(['Invalid login. ', {a: {href: '/login', children: 'Try again'}}], 401);
-              this.put('sessions/'+(session = sid()), body.username).then(function() {
-                response.generic(303, {'Set-Cookie': 'sid='+session, Location: '/'});
+              this.put('sessions/'+(sid = token()), body.username).then(function() {
+                response.generic(303, {'Set-Cookie': 'sid='+sid, Location: '/'});
               });
             });
           }, 'url');
@@ -72,8 +72,8 @@ function(modules) {
               if (user) return render(['Username '+body.username+' is already taken. ', {a: {href: '/register', children: 'Try again'}}], 401);
               var hash = pbkdf2(body.password);
               this.put(path, {name: body.name, password: hash.key, salt: hash.salt})
-                  .put('sessions/'+(session = sid()), body.username)
-                  .then(function() { response.generic(303, {'Set-Cookie': 'sid='+session, Location: '/'}); });
+                  .put('sessions/'+(sid = token()), body.username)
+                  .then(function() { response.generic(303, {'Set-Cookie': 'sid='+sid, Location: '/'}); });
             });
           }, 'url');
         return render([{form: {method: 'post', action: '/register', children: [
