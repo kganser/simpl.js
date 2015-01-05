@@ -69,7 +69,8 @@ function(modules) {
           {input: {type: 'submit', value: 'Log In'}}
         ]}}]);
       case '/logoff':
-        return logoff(request.cookie.sid.split('.')[0], 'Logged off');
+        var session = request.cookie.sid;
+        return logoff(verify(session) && session.split('.')[0], 'Logged off');
       case '/register':
         if (request.method == 'POST' && (request.headers['Content-Type'] || '').split(';')[0] == 'application/x-www-form-urlencoded')
           return request.slurp(function(body) {
