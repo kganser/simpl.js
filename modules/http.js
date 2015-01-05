@@ -71,7 +71,7 @@ simpl.add('http', function(modules) {
   /** Response: {
         send: function(body='':ArrayBuffer|string, headers=`{}`:object|string, status=200:number, callback:function(error:string|undefined)),
         end: function(body='':ArrayBuffer|string, headers=`{}`:object|string, status=200:number, callback:function(error:string|undefined)),
-        generic: function(status=200:number),
+        generic: function(status=200:number, headers=`{}`:object|string),
         ok: function,
         error: function
       }
@@ -80,8 +80,8 @@ simpl.add('http', function(modules) {
       chunked` header unless overridden in the `headers` object, after which `headers` and `status` default to (and
       must be) null in calls to `send` and `end`. If `headers` is a string, it is interpreted as an extension and
       substituted with the corresponding `Content-Type` header. A response initiated with `send` must be completed with
-      a call to `end`. `generic` is a convenience method that calls `end(statusMessage(status), null, status || 200)`.
-      `ok` and `error` are nullary convenience methods that call `generic()` and `generic(400)`, respectively. */
+      a call to `end`. `generic` is a convenience method that uses `statusMessage(status)` as the response body. `ok`
+      and `error` are nullary convenience methods that call `generic()` and `generic(400)`, respectively. */
   return self = {
     serve: function(options, onRequest, callback) {
       modules.socket.listen(options, function(socket) {
@@ -150,8 +150,8 @@ simpl.add('http', function(modules) {
                   end: function(body, headers, status, callback) {
                     socket.send(entity(status, headers, body, headersSent, headersSent, true), callback);
                   },
-                  generic: function(status) {
-                    response.end(self.statusMessage(status), null, status || 200);
+                  generic: function(status, headers) {
+                    response.end(self.statusMessage(status), headers, status || 200);
                   },
                   ok: function() {
                     response.generic();

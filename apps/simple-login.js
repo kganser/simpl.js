@@ -6,17 +6,13 @@ function(modules) {
       toBits = modules.crypto.codec.base64.toBits;
   
   var sid = function() {
-    var data = modules.crypto.random.randomWords(6, 0),
-        base64 = fromBits(data, true, true);
-    return {
-      signed: base64+'.'+fromBits(new modules.crypto.misc.hmac(key).mac(data), true, true),
-      unsigned: base64
-    };
+    var data = modules.crypto.random.randomWords(6, 0);
+    return fromBits(data, true, true)+'.'+fromBits(new modules.crypto.misc.hmac(key).mac(data), true, true);
   };
   var verify = function(signed) {
     try {
-      signed = signed.split('.', 2);
-      return fromBits(new modules.crypto.misc.hmac(key).mac(toBits(signed[0], true)), true, true) == signed[1];
+      var parts = signed.split('.');
+      return fromBits(new modules.crypto.misc.hmac(key).mac(toBits(parts[0], true)), true, true) == parts[1] && signed;
     } catch (e) {}
   };
   var pbkdf2 = function(password, salt) {
@@ -34,22 +30,21 @@ function(modules) {
         ]}
       ]), 'html', status);
     };
-    var logoff = function(cookie, message) {
-      if (cookie) db.delete('sessions/'+encodeURIComponent(cookie)).then(function() { logoff(null, message); });
-      else response.end(message, {'Set-Cookie': 'sid=; Expires='+new Date().toUTCString(), Location: '/'}, 303);
+    var logoff = function(sid) {
+      if (sid) db.delete('sessions/'+sid).then(function() { logoff(); });
+      else response.generic(303, {'Set-Cookie': 'sid=; Expires='+new Date().toUTCString(), Location: '/'});
     };
+    var session;
     switch (request.path) {
       case '/':
-        if (verify(request.cookie.sid)) {
-          var session = request.cookie.sid.split('.')[0];
-          return db.get('sessions/'+encodeURIComponent(session)).then(function(username) {
-            if (!username) return logoff(null, 'Invalid session');
+        if (session = verify(request.cookie.sid))
+          return db.get('sessions/'+session).then(function(username) {
+            if (!username) return logoff();
             this.get('users/'+encodeURIComponent(username)).then(function(user) {
-              if (!user) return logoff(session, 'Unknown user');
+              if (!user) return logoff(session);
               render(['Welcome, '+user.name+'! ', {a: {href: '/logoff', children: 'Log off'}}]);
             });
           });
-        }
         return render(['Please ', {a: {href: '/register', children: 'Register'}}, ' or ', {a: {href: '/login', children: 'Log in'}}, '.']);
       case '/login':
         if (request.method == 'POST' && (request.headers['Content-Type'] || '').split(';')[0] == 'application/x-www-form-urlencoded')
@@ -57,9 +52,8 @@ function(modules) {
             db.get('users/'+encodeURIComponent(body.username), true).then(function(user) {
               if (!user || user.password !== pbkdf2(body.password, user.salt).key)
                 return render(['Invalid login. ', {a: {href: '/login', children: 'Try again'}}], 401);
-              var session = sid();
-              this.put('sessions/'+session.unsigned, body.username).then(function() {
-                response.end('Login successful', {'Set-Cookie': 'sid='+session.signed, Location: '/'}, 303);
+              this.put('sessions/'+(session = sid()), body.username).then(function() {
+                response.generic(303, {'Set-Cookie': 'sid='+session, Location: '/'});
               });
             });
           }, 'url');
@@ -69,19 +63,17 @@ function(modules) {
           {input: {type: 'submit', value: 'Log In'}}
         ]}}]);
       case '/logoff':
-        var session = request.cookie.sid;
-        return logoff(verify(session) && session.split('.')[0], 'Logged off');
+        return logoff(verify(request.cookie.sid));
       case '/register':
         if (request.method == 'POST' && (request.headers['Content-Type'] || '').split(';')[0] == 'application/x-www-form-urlencoded')
           return request.slurp(function(body) {
             var path = 'users/'+encodeURIComponent(body.username);
             db.get(path, true).then(function(user) {
               if (user) return render(['Username '+body.username+' is already taken. ', {a: {href: '/register', children: 'Try again'}}], 401);
-              var session = sid(),
-                  hash = pbkdf2(body.password);
+              var hash = pbkdf2(body.password);
               this.put(path, {name: body.name, password: hash.key, salt: hash.salt})
-                  .put('sessions/'+session.unsigned, body.username)
-                  .then(function() { response.end('User created', {'Set-Cookie': 'sid='+session.signed, Location: '/'}, 303); });
+                  .put('sessions/'+(session = sid()), body.username)
+                  .then(function() { response.generic(303, {'Set-Cookie': 'sid='+session, Location: '/'}); });
             });
           }, 'url');
         return render([{form: {method: 'post', action: '/register', children: [
