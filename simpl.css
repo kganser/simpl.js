@@ -61,6 +61,15 @@ h2 {
   height: 25px;
   margin: -5px 10px 0 0;
 }
+.logout {
+  float: right;
+  position: relative;
+  color: white;
+  margin: -5px 0 0 1px;
+}
+.logout:before {
+  content: "";
+}
 .user.unknown:before {
   content: "👤";
   font: 26px/13px entypo;
@@ -71,10 +80,6 @@ h2 {
   width: 30px;
   height: 25px;
   margin: -5px 10px 0 0;
-}
-.user.unknown:hover:before {
-  color: white;
-  background: #93c;
 }
 .form {
   position: relative;
@@ -146,7 +151,7 @@ nav .changed .name:before {
 .controls {
   float: right;
 }
-button {
+button, .logout {
   background: #f7f7f7;
   text-align: left;
   padding: 0;
@@ -155,7 +160,7 @@ button {
   overflow: hidden;
   cursor: pointer;
 }
-nav button {
+nav button, .logout {
   height: 25px;
   width: 30px;
 }
@@ -165,7 +170,7 @@ nav button, #actions button {
   vertical-align: top;
   margin: 0 0 1px 1px;
 }
-nav button:before, #actions button:before {
+nav button:before, .logout:before, #actions button:before {
   font: 26px entypo;
   position: absolute;
   top: 0;
@@ -183,7 +188,7 @@ button:active {
 .run:hover, .restart:hover, #status.success {
   background: #3c3;
 }
-nav .delete:hover, #actions .delete:hover, #dependencies .delete:hover, .stop:hover, #status.failure {
+.logout, nav .delete:hover, #actions .delete:hover, #dependencies .delete:hover, .stop:hover, #status.failure {
   background: #c33;
 }
 .code:hover, .settings:hover, .log:hover, .docs:hover, #status.info {

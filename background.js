@@ -99,6 +99,10 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
       o.http.serve({port: command.port}, function(request, response, socket) {
         
         var match, sid;
+        var logout = function(sid) {
+          if (sid) db.delete('sessions/'+sid).then(function() { logout(); });
+          else response.generic(303, {'Set-Cookie': 'sid=; Expires='+new Date().toUTCString(), Location: '/'});
+        };
         
         if (match = request.path.match(/^\/([^.\/]*)\.(\d+)\.js$/))
           return db.get('modules/'+match[1]+'/versions/'+match[2]).then(function(module) {
@@ -209,10 +213,10 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
           var code = request.query.authorization_code;
           // TODO: check request.query.state
           if (!code) return response.error();
-          return o.xhr('http://localhost:8005/token?authorization_code='+code, function(e) {
+          return o.xhr('http://127.0.0.1:8005/token?authorization_code='+code, function(e) {
             if (e.target.status != 200) return response.error();
             code = e.target.responseText;
-            o.xhr('http://localhost:8005/api/user?access_token='+code, {responseType: 'json'}, function(e) {
+            o.xhr('http://127.0.0.1:8005/api/user?access_token='+code, {responseType: 'json'}, function(e) {
               if (e.target.status != 200) return response.error();
               db.put('sessions/'+(sid = token()), {accessToken: code, name: e.target.response.name, email: e.target.response.email}).then(function() {
                 response.generic(303, {'Set-Cookie': 'sid='+sid, Location: '/'});
@@ -220,6 +224,8 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
             });
           });
         }
+        if (request.path == '/logout')
+          return logout(verify(request.cookie.sid));
         if (request.path == '/') {
           if (request.method == 'POST')
             return request.slurp(function(body) {
@@ -295,8 +301,8 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
                   {script: {src: '/codemirror.js'}},
                   {script: {src: '/diff_match_patch.js'}},
                   {script: {src: '/jsonv.js'}},
+                  {script: {src: '/md5.js'}},
                   {script: {src: '/app.js'}},
-                  {script: {src: 'http://rawgit.com/blueimp/JavaScript-MD5/master/js/md5.min.js'}},
                   {script: function(apps, modules, offset, email, user) {
                     if (!apps) return [data.apps, data.modules, lines, session.email, session.name];
                     simpl.use({app: 0}, function(o) {
