@@ -35,15 +35,15 @@ function(modules) {
         ]}
       ]), 'html', status);
     };
-    var logoff = function(sid) {
-      if (sid) db.delete('sessions/'+sid).then(function() { logoff(); });
+    var logout = function(sid) {
+      if (sid) db.delete('sessions/'+sid).then(function() { logout(); });
       else response.generic(303, {'Set-Cookie': 'sid=; Expires='+new Date().toUTCString(), Location: '/'});
     };
     var authenticate = function(sid, callback, token) {
       return verify(sid) && !db.get('sessions/'+sid).then(function(username) {
-        if (!username) return logoff();
+        if (!username) return logout();
         this.get('accounts/'+encodeURIComponent(username)).then(function(account) {
-          if (!account) return logoff(sid);
+          if (!account) return logout(sid);
           account.username = username;
           callback(account);
         });
@@ -60,7 +60,7 @@ function(modules) {
     switch (request.path) {
       case '/':
         return authenticate(request.cookie.sid, function(account) {
-          render(['Welcome, '+account.name+'! ', {a: {href: '/logoff', children: 'Log off'}}]);
+          render(['Welcome, '+account.name+'! ', {a: {href: '/logout', children: 'Log out'}}]);
         }) || render(['Please ', {a: {href: '/register', children: 'Register'}}, ' or ', {a: {href: '/login', children: 'Log in'}}, '.']);
       case '/authorize':
         // prompt owner for access; redirect to client with authorization_code if granted
@@ -122,8 +122,8 @@ function(modules) {
           {input: {type: 'hidden', name: 'redirect', value: request.query.redirect || '/'}},
           {input: {type: 'submit', value: 'Log In'}}
         ]}}]);
-      case '/logoff':
-        return logoff(verify(request.cookie.sid));
+      case '/logout':
+        return logout(verify(request.cookie.sid));
       case '/register':
         if (request.method == 'POST' && (request.headers['Content-Type'] || '').split(';')[0] == 'application/x-www-form-urlencoded')
           return request.slurp(function(body) {

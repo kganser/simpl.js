@@ -30,8 +30,8 @@ function(modules) {
         ]}
       ]), 'html', status);
     };
-    var logoff = function(sid) {
-      if (sid) db.delete('sessions/'+sid).then(function() { logoff(); });
+    var logout = function(sid) {
+      if (sid) db.delete('sessions/'+sid).then(function() { logout(); });
       else response.generic(303, {'Set-Cookie': 'sid=; Expires='+new Date().toUTCString(), Location: '/'});
     };
     var sid;
@@ -39,10 +39,10 @@ function(modules) {
       case '/':
         if (sid = verify(request.cookie.sid))
           return db.get('sessions/'+sid).then(function(username) {
-            if (!username) return logoff();
+            if (!username) return logout();
             this.get('users/'+encodeURIComponent(username)).then(function(user) {
-              if (!user) return logoff(sid);
-              render(['Welcome, '+user.name+'! ', {a: {href: '/logoff', children: 'Log off'}}]);
+              if (!user) return logout(sid);
+              render(['Welcome, '+user.name+'! ', {a: {href: '/logout', children: 'Log out'}}]);
             });
           });
         return render(['Please ', {a: {href: '/register', children: 'Register'}}, ' or ', {a: {href: '/login', children: 'Log in'}}, '.']);
@@ -62,8 +62,8 @@ function(modules) {
           {label: 'Password: '}, {input: {type: 'password', name: 'password'}}, {br: null},
           {input: {type: 'submit', value: 'Log In'}}
         ]}}]);
-      case '/logoff':
-        return logoff(verify(request.cookie.sid));
+      case '/logout':
+        return logout(verify(request.cookie.sid));
       case '/register':
         if (request.method == 'POST' && (request.headers['Content-Type'] || '').split(';')[0] == 'application/x-www-form-urlencoded')
           return request.slurp(function(body) {
