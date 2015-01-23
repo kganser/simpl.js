@@ -1,5 +1,5 @@
 simpl.add('app', function(o) {
-  return function(apps, modules, offset, body) {
+  return function(apps, modules, offset, email, user, body) {
     Object.keys(apps).forEach(function(name) {
       apps[name].forEach(function(version, i, app) {
         app[i] = {minor: version[0], running: version[1], log: []};
@@ -252,6 +252,13 @@ simpl.add('app', function(o) {
     };
     dom([
       {nav: [
+        {a: {
+          className: email ? 'user' : 'user unknown',
+          children: user
+            ? [{img: {src: 'http://www.gravatar.com/avatar/'+md5(email.trim().toLowerCase())}}, user]
+            : 'Log In or Register',
+          href: email ? 'http://localhost:8005' : 'http://localhost:8005/authorize?client_id=simpljs-chrome&redirect_uri='+encodeURIComponent(location.href+'auth')
+        }},
         {h2: 'Apps'},
         {div: {className: 'form', children: [
           {input: {type: 'text', placeholder: 'New App', onkeyup: function(e) {

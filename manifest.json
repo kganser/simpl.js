@@ -24,6 +24,7 @@
         "modules/xhr.js",
         "modules/database.js",
         "modules/net.js",
+        "modules/crypto.js",
         "background.js"
       ]
     }

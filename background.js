@@ -1,7 +1,21 @@
-simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0}, function(o, proxy) {
+simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0}, function(o, proxy) {
 
   var server, port, ping, loader, lines,
-      db = o.database.open('simpl', {});
+      db = o.database.open('simpl', {sessions: {}}),
+      key = o.crypto.codec.utf8String.toBits(o.crypto.random.randomWords(6, 0)),
+      fromBits = o.crypto.codec.base64.fromBits,
+      toBits = o.crypto.codec.base64.toBits;
+  
+  var token = function() {
+    var rand = o.crypto.random.randomWords(6, 0);
+    return fromBits(rand, true, true)+'.'+fromBits(new o.crypto.misc.hmac(key).mac(rand), true, true);
+  };
+  var verify = function(signed) {
+    try {
+      var parts = signed.split('.');
+      return fromBits(new o.crypto.misc.hmac(key).mac(toBits(parts[0], true)), true, true) == parts[1] && signed;
+    } catch (e) {}
+  };
   
   db.get('apps').then(function(data) {
     if (data) return;
@@ -11,7 +25,8 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0}, function(o
       {name: '3 Database Editor', file: 'database-editor', config: {port: 8002, database: 'simpl'}, dependencies: {database: 0, html: 0, http: 0, xhr: 0}},
       {name: '4 Simple Login', file: 'simple-login', config: {port: 8003, sessionKey: 'yabadabadoo'}, dependencies: {crypto: 0, database: 0, html: 0, http: 0}},
       {name: '5 Unit Tests', file: 'unit-tests', dependencies: {async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 0, xhr: 0}},
-      {name: '6 Time Tracker', file: 'time-tracker', config: {port: 8004, redmineHost: 'redmine.slytrunk.com'}, dependencies: {http: 0, database: 0, html: 0, xhr: 0}}
+      {name: 'Time Tracker', file: 'time-tracker', config: {port: 8004, redmineHost: 'redmine.slytrunk.com'}, dependencies: {http: 0, database: 0, html: 0, xhr: 0}},
+      {name: 'Simpl.js Server', file: 'simpljs-server', config: {port: 8005, sessionKey: 'abracadabra'}, dependencies: {crypto: 0, database: 0, html: 0, http: 0}}
     ].forEach(function(app, i, apps) {
       o.xhr('/apps/'+app.file+'.js', function(e) {
         data[app.name] = {versions: [{
@@ -81,7 +96,9 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0}, function(o
       
       ping = setInterval(broadcast, 15000);
       
-      o.http.serve({port: command.port}, function(request, response, socket, match) {
+      o.http.serve({port: command.port}, function(request, response, socket) {
+        
+        var match, sid;
         
         if (match = request.path.match(/^\/([^.\/]*)\.(\d+)\.js$/))
           return db.get('modules/'+match[1]+'/versions/'+match[2]).then(function(module) {
@@ -188,6 +205,21 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0}, function(o
             'Content-Length': null
           });
         }
+        if (request.path == '/auth') {
+          var code = request.query.authorization_code;
+          // TODO: check request.query.state
+          if (!code) return response.error();
+          return o.xhr('http://localhost:8005/token?authorization_code='+code, function(e) {
+            if (e.target.status != 200) return response.error();
+            code = e.target.responseText;
+            o.xhr('http://localhost:8005/api/user?access_token='+code, {responseType: 'json'}, function(e) {
+              if (e.target.status != 200) return response.error();
+              db.put('sessions/'+(sid = token()), {accessToken: code, name: e.target.response.name, email: e.target.response.email}).then(function() {
+                response.generic(303, {'Set-Cookie': 'sid='+sid, Location: '/'});
+              });
+            });
+          });
+        }
         if (request.path == '/') {
           if (request.method == 'POST')
             return request.slurp(function(body) {
@@ -221,11 +253,18 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0}, function(o
                 });
               response.error();
             }, 'json');
-          return db.get('', false, function(path) {
-            return path.length < 4 || path.length == 5 ? null : function(key) {
-              if (key != 'published') return 'skip';
-            };
-          }).then(function(data) {
+          return db.get('sessions/'+verify(request.cookie.sid)).get('', function(path) {
+            // apps,modules,sessions/<name>/versions/<#>/code,config,dependencies,published/<#>
+            return [
+              function(key) { if (key != 'apps' && key != 'modules') return 'skip'; },
+              true,
+              true,
+              true,
+              function(key) { if (key != 'published') return 'skip'; },
+              true
+            ][path.length] || false;
+          }).then(function(session, data) {
+            if (!session) session = {email: null, name: null};
             Object.keys(data.apps).forEach(function(name) {
               data.apps[name] = data.apps[name].versions.map(function(v, i) {
                 return [v.published.length, !!apps[encodeURIComponent(name)+'/versions/'+i]];
@@ -257,10 +296,11 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0}, function(o
                   {script: {src: '/diff_match_patch.js'}},
                   {script: {src: '/jsonv.js'}},
                   {script: {src: '/app.js'}},
-                  {script: function(apps, modules, offset) {
-                    if (!apps) return [data.apps, data.modules, lines];
+                  {script: {src: 'http://rawgit.com/blueimp/JavaScript-MD5/master/js/md5.min.js'}},
+                  {script: function(apps, modules, offset, email, user) {
+                    if (!apps) return [data.apps, data.modules, lines, session.email, session.name];
                     simpl.use({app: 0}, function(o) {
-                      o.app(apps, modules, offset, document.body);
+                      o.app(apps, modules, offset, email, user, document.body);
                     });
                   }}
                 ]}

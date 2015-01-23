@@ -47,6 +47,35 @@ h2 {
   background: #333;
   color: #ddd;
 }
+.user {
+  display: block;
+  padding-top: 5px;
+  height: 20px;
+  margin-bottom: 1px;
+  color: black;
+  text-decoration: none;
+}
+.user img {
+  float: left;
+  width: 30px;
+  height: 25px;
+  margin: -5px 10px 0 0;
+}
+.user.unknown:before {
+  content: "👤";
+  font: 26px/13px entypo;
+  color: #666;
+  text-align: center;
+  background: #f7f7f7;
+  float: left;
+  width: 30px;
+  height: 25px;
+  margin: -5px 10px 0 0;
+}
+.user.unknown:hover:before {
+  color: white;
+  background: #93c;
+}
 .form {
   position: relative;
   margin-bottom: 1px;
@@ -235,7 +264,7 @@ nav .selected button {
   background: white;
   box-shadow: 0 0 3px rgba(0, 0, 0, .3);
 }
-.collapsed nav h2, .collapsed .form, .collapsed nav li, .collapsed nav .selected:after {
+.collapsed .user, .collapsed nav h2, .collapsed .form, .collapsed nav li, .collapsed nav .selected:after {
   display: none;
 }
 .collapsed nav {
