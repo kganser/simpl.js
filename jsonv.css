@@ -1,5 +1,5 @@
 .jsonv {
-  font-family: Consolas, monospace;
+  font: 13px Consolas, monospace;
 }
 .jsonv-object ul, .jsonv-array ol {
   display: inline;
@@ -18,11 +18,11 @@
 .jsonv .jsonv-delete {
   display: none;
   width: .95em;
-  height: .95em;
+  height: .85em;
   margin: 0 .25em 0 -1.2em;
   text-align: center;
   color: #808080;
-  font: .9em/1 sans-serif;
+  font: 1em/.9 sans-serif;
   cursor: pointer;
 }
 .jsonv-editable .jsonv-delete:hover {
