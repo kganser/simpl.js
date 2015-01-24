@@ -1,5 +1,5 @@
 simpl.add('app', function(o) {
-  return function(apps, modules, offset, email, user, body) {
+  return function(apps, modules, offset, user, body) {
     Object.keys(apps).forEach(function(name) {
       apps[name].forEach(function(version, i, app) {
         app[i] = {minor: version[0], running: version[1], log: []};
@@ -253,9 +253,9 @@ simpl.add('app', function(o) {
     dom([
       {nav: [user
         ? {div: {className: 'user', children: [
-            {img: {src: 'http://www.gravatar.com/avatar/'+md5(email.trim().toLowerCase())}},
-            {a: {className: 'logout', href: '/logout'}},
-            user
+            {img: {src: 'http://www.gravatar.com/avatar/'+md5(user.email.toLowerCase())}},
+            {a: {className: 'logout', href: '/logout', title: 'Log Out'}},
+            user.name
           ]}}
         : {a: {
             className: 'user unknown',

@@ -50,9 +50,9 @@ function(modules) {
       });
     };
     var authenticateAPI = function(token, callback, authCode) {
-      if (!verify(token)) return response.generic(403);
+      if (!verify(token)) return response.generic(401);
       db.get('sessions/'+token).then(function(session) {
-        if (!session || !session.owner || !session.accessToken == !authCode) return response.generic(403);
+        if (!session || !session.owner || !session.accessToken == !authCode) return response.generic(401);
         callback(session);
       });
     };
@@ -66,41 +66,46 @@ function(modules) {
         // prompt owner for access; redirect to client with authorization_code if granted
         // TODO: CSRF token
         // TODO: client registration
+        // TODO: implement scopes
+        // TODO: session timestamp/expiration
+        // TODO: default to client's default redirect_uri
+        // TODO: redirect on deny
         if (request.method == 'POST' && (request.headers['Content-Type'] || '').split(';')[0] == 'application/x-www-form-urlencoded')
           return request.slurp(function(body) {
             if (!authenticate(request.cookie.sid, function(account) {
-              // TODO: add client, scopes to account's authorized list; bypass authorization form if scopes already authorized for client
-              db.put('sessions/'+(sid = token()), {
-                client: body.client_id, // TODO: check client_id
-                owner: account.username
-                // TODO: timestamp, expiration
-              }).then(function() {
-                // TODO: default to client's default redirect_uri
-                // TODO: redirect on deny
-                response.generic(303, {Location: body.redirect_uri+'?authorization_code='+sid+'&state='+encodeURIComponent(body.state)});
-              });
+              var username = account.username,
+                  client = body.client_id;
+              db.put('accounts/'+encodeURIComponent(username)+'/clients/'+encodeURIComponent(client), true)
+                .put('sessions/'+(sid = token()), {client: client, owner: username})
+                .then(function() { response.generic(303, {Location: body.redirect_uri+'?authorization_code='+sid+'&state='+encodeURIComponent(body.state)}); });
             })) response.error();
           }, 'url');
         return authenticate(request.cookie.sid, function(account) {
+          var client = request.query.client_id,
+              redirect = request.query.redirect_uri,
+              scope = request.query.scope,
+              state = request.query.state;
+          if (client in account.clients)
+            return db.put('sessions/'+(sid = token()), {client: client, owner: account.username})
+              .then(function() { response.generic(303, {Location: redirect+'?authorization_code='+sid+'&state='+encodeURIComponent(state)}); });
           render([
-            {p: request.query.client_id+' would like access to your account information.'},
+            {p: client+' would like access to your account information.'},
             {form: {method: 'post', action: '/authorize', children: [
-              {input: {type: 'hidden', name: 'client_id', value: request.query.client_id}},
-              {input: {type: 'hidden', name: 'redirect_uri', value: request.query.redirect_uri}},
-              {input: {type: 'hidden', name: 'scope', value: request.query.scope}}, // TODO: implement
-              {input: {type: 'hidden', name: 'state', value: request.query.state}},
+              {input: {type: 'hidden', name: 'client_id', value: client}},
+              {input: {type: 'hidden', name: 'redirect_uri', value: redirect}},
+              {input: {type: 'hidden', name: 'scope', value: scope}},
+              {input: {type: 'hidden', name: 'state', value: state}},
               {input: {type: 'submit', value: 'Authorize'}} // TODO: deny button
             ]}}
           ]);
         }) || response.generic(302, {Location: '/login?redirect='+encodeURIComponent(request.uri)});
       case '/token':
         // exchange authorization_code for access_token
-        // TODO: need app secret?
-        return authenticateAPI(request.query.authorization_code, function(session) {
-          var accessToken = token();
+        // TODO: require client secret
+        return authenticateAPI(sid = request.query.authorization_code, function(session) {
           session.accessToken = true;
-          db.delete('sessions/'+sid).put('sessions/'+accessToken, session).then(function() {
-            response.end(accessToken);
+          db.delete('sessions/'+sid).put('sessions/'+(sid = token()), session).then(function() {
+            response.end(sid);
           });
         }, true);
       case '/login':
@@ -132,9 +137,14 @@ function(modules) {
               if (account) return render(['Username '+body.username+' is already taken. ', {a: {href: '/register', children: 'Try again'}}], 401);
               var hash = pbkdf2(body.password);
               // TODO: populate default apps, modules
-              this.put(path, {name: body.name, email: body.email, password: hash.key, salt: hash.salt, workspace: {apps: {}, modules: {}}})
-                  .put('sessions/'+(sid = token()), body.username)
-                  .then(function() { response.generic(303, {'Set-Cookie': 'sid='+sid, Location: '/'}); });
+              this.put('sessions/'+(sid = token()), body.username).put(path, {
+                name: body.name,
+                email: body.email,
+                password: hash.key,
+                salt: hash.salt,
+                workspace: {apps: {}, modules: {}},
+                clients: {}
+              }).then(function() { response.generic(303, {'Set-Cookie': 'sid='+sid, Location: '/'}); });
             });
           }, 'url');
         return render([{form: {method: 'post', action: '/register', children: [
@@ -144,7 +154,7 @@ function(modules) {
           {label: 'Password: '}, {input: {type: 'password', name: 'password'}}, {br: null},
           {input: {type: 'submit', value: 'Register'}}
         ]}}]);
-      case '/api/user':
+      case '/v1/user':
         return authenticateAPI(request.query.access_token, function(session) {
           db.get('accounts/'+encodeURIComponent(session.owner), false, function(path) {
             return !path.length && function(key) {
@@ -155,14 +165,18 @@ function(modules) {
             response.end(JSON.stringify(data), 'json');
           });
         });
-      case '/api/workspace':
+      case '/v1/workspace':
         return authenticateAPI(request.query.access_token, function(session) {
           db.get('accounts/'+encodeURIComponent(session.owner)+'/workspace').then(function(data) {
             response.end(JSON.stringify(data), 'json');
           });
         });
     }
-    response.generic(404);
+    modules.xhr(location.origin+request.path, {responseType: 'arraybuffer'}, function(e) {
+      if (e.target.status != 200)
+        return response.generic(404);
+      response.end(e.target.response, (request.path.match(/\.([^.]*)$/) || [])[1]);
+    });
   }, function(error) {
     if (error) console.error('Error listening on 0.0.0.0:'+config.port+'\n'+error);
     else console.log('Listening at http://localhost:'+config.port);

@@ -26,7 +26,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
       {name: '4 Simple Login', file: 'simple-login', config: {port: 8003, sessionKey: 'yabadabadoo'}, dependencies: {crypto: 0, database: 0, html: 0, http: 0}},
       {name: '5 Unit Tests', file: 'unit-tests', dependencies: {async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 0, xhr: 0}},
       {name: 'Time Tracker', file: 'time-tracker', config: {port: 8004, redmineHost: 'redmine.slytrunk.com'}, dependencies: {http: 0, database: 0, html: 0, xhr: 0}},
-      {name: 'Simpl.js Server', file: 'simpljs-server', config: {port: 8005, sessionKey: 'abracadabra'}, dependencies: {crypto: 0, database: 0, html: 0, http: 0}}
+      {name: 'Simpl.js Server', file: 'simpljs-server', config: {port: 8005, sessionKey: 'abracadabra'}, dependencies: {crypto: 0, database: 0, html: 0, http: 0, xhr: 0}}
     ].forEach(function(app, i, apps) {
       o.xhr('/apps/'+app.file+'.js', function(e) {
         data[app.name] = {versions: [{
@@ -216,7 +216,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
           return o.xhr('http://127.0.0.1:8005/token?authorization_code='+code, function(e) {
             if (e.target.status != 200) return response.error();
             code = e.target.responseText;
-            o.xhr('http://127.0.0.1:8005/api/user?access_token='+code, {responseType: 'json'}, function(e) {
+            o.xhr('http://127.0.0.1:8005/v1/user?access_token='+code, {responseType: 'json'}, function(e) {
               if (e.target.status != 200) return response.error();
               db.put('sessions/'+(sid = token()), {accessToken: code, name: e.target.response.name, email: e.target.response.email}).then(function() {
                 response.generic(303, {'Set-Cookie': 'sid='+sid, Location: '/'});
@@ -270,7 +270,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
               true
             ][path.length] || false;
           }).then(function(session, data) {
-            if (!session) session = {email: null, name: null};
+            session = session ? {email: session.email, name: session.name} : null;
             Object.keys(data.apps).forEach(function(name) {
               data.apps[name] = data.apps[name].versions.map(function(v, i) {
                 return [v.published.length, !!apps[encodeURIComponent(name)+'/versions/'+i]];
@@ -303,10 +303,10 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
                   {script: {src: '/jsonv.js'}},
                   {script: {src: '/md5.js'}},
                   {script: {src: '/app.js'}},
-                  {script: function(apps, modules, offset, email, user) {
-                    if (!apps) return [data.apps, data.modules, lines, session.email, session.name];
+                  {script: function(apps, modules, offset, user) {
+                    if (!apps) return [data.apps, data.modules, lines, session];
                     simpl.use({app: 0}, function(o) {
-                      o.app(apps, modules, offset, email, user, document.body);
+                      o.app(apps, modules, offset, user, document.body);
                     });
                   }}
                 ]}
