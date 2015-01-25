@@ -233,7 +233,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
               if (body.app == null || typeof body.version != 'number') return response.error();
               var name = body.app,
                   version = body.version,
-                  id = encodeURIComponent(name)+'/versions/'+version,
+                  id = name+version,
                   action = body.action;
               if ((action == 'stop' || action == 'restart') && apps[id]) {
                 apps[id].terminate();
@@ -242,7 +242,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
                 if (action == 'stop') return response.ok();
               }
               if ((action == 'run' || action == 'restart') && !apps[id])
-                return db.get('apps/'+id).then(function(app) {
+                return db.get('apps/'+encodeURIComponent(name)+'/versions/'+version).then(function(app) {
                   if (!app) return response.error();
                   apps[id] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\nsimpl.use('+JSON.stringify(app.dependencies)+','+app.code+');', function(module, callback) {
                     db.get('modules/'+encodeURIComponent(module.name)+'/versions/'+module.version).then(function(record) {
@@ -259,26 +259,39 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
                 });
               response.error();
             }, 'json');
-          return db.get('sessions/'+verify(request.cookie.sid)).get('', function(path) {
-            // apps,modules,sessions/<name>/versions/<#>/code,config,dependencies,published/<#>
-            return [
-              function(key) { if (key != 'apps' && key != 'modules') return 'skip'; },
-              true,
-              true,
-              true,
-              function(key) { if (key != 'published') return 'skip'; },
-              true
-            ][path.length] || false;
-          }).then(function(session, data) {
-            session = session ? {email: session.email, name: session.name} : null;
-            Object.keys(data.apps).forEach(function(name) {
-              data.apps[name] = data.apps[name].versions.map(function(v, i) {
-                return [v.published.length, !!apps[encodeURIComponent(name)+'/versions/'+i]];
+          return function(callback) {
+            if (sid = verify(request.cookie.sid))
+              return db.get('sessions/'+sid).then(function(session) {
+                if (!session) return logout(sid);
+                o.xhr('http://127.0.0.1:8005/v1/workspace?access_token='+session.accessToken, {responseType: 'json'}, function(e) {
+                  if (e.target.status != 200) return logout(sid);
+                  callback(e.target.response, {email: session.email, name: session.name});
+                });
               });
+            db.get('', false, function(path) {
+              // apps,modules,sessions/<name>/versions/<#>/code,config,dependencies,published/<#>
+              return [
+                function(key) { if (key != 'apps' && key != 'modules') return 'skip'; },
+                true, true, true,
+                function(key) { if (key != 'published') return 'skip'; },
+                true
+              ][path.length] || false;
+            }).then(function(data) {
+              Object.keys(data).forEach(function(group) {
+                Object.keys(data[group]).forEach(function(name) {
+                  (name = data[group][name]).versions = name.versions.map(function(version) {
+                    return version.published.length;
+                  });
+                });
+              });
+              callback(data, null);
             });
-            Object.keys(data.modules).forEach(function(name) {
-              data.modules[name] = data.modules[name].versions.map(function(v) {
-                return v.published.length;
+          }(function(data, session) {
+            Object.keys(data).forEach(function(group) {
+              Object.keys(data[group]).forEach(function(name) {
+                data[group][name] = data[group][name].versions.map(function(version) {
+                  return group == 'apps' ? [version, !!apps[name+version]] : version;
+                });
               });
             });
             response.end(o.html.markup([

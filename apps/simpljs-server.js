@@ -135,16 +135,54 @@ function(modules) {
             var path = 'accounts/'+encodeURIComponent(body.username);
             db.get(path, true).then(function(account) {
               if (account) return render(['Username '+body.username+' is already taken. ', {a: {href: '/register', children: 'Try again'}}], 401);
-              var hash = pbkdf2(body.password);
-              // TODO: populate default apps, modules
-              this.put('sessions/'+(sid = token()), body.username).put(path, {
-                name: body.name,
-                email: body.email,
-                password: hash.key,
-                salt: hash.salt,
-                workspace: {apps: {}, modules: {}},
-                clients: {}
-              }).then(function() { response.generic(303, {'Set-Cookie': 'sid='+sid, Location: '/'}); });
+              var apps = {}, mods = {}, count = 0;
+              [ {name: '1 Hello World', file: 'hello-world'},
+                {name: '2 Web Server', file: 'web-server', config: {port: 8001}, dependencies: {http: 0}},
+                {name: '3 Database Editor', file: 'database-editor', config: {port: 8002, database: 'simpl'}, dependencies: {database: 0, html: 0, http: 0, xhr: 0}},
+                {name: '4 Simple Login', file: 'simple-login', config: {port: 8003, sessionKey: 'yabadabadoo'}, dependencies: {crypto: 0, database: 0, html: 0, http: 0}},
+                {name: '5 Unit Tests', file: 'unit-tests', dependencies: {async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 0, xhr: 0}},
+                {name: 'async'},
+                {name: 'crypto'},
+                {name: 'database'},
+                {name: 'docs', dependencies: {parser: 0}},
+                {name: 'html'},
+                {name: 'http', dependencies: {socket: 0, string: 0}},
+                {name: 'net', proxy: true},
+                {name: 'parser'},
+                {name: 'socket', proxy: true},
+                {name: 'string'},
+                {name: 'xhr'}
+              ].forEach(function(item, i, items) {
+                modules.xhr(location.origin+(item.file ? '/apps/'+item.file : '/modules/'+item.name)+'.js', function(e) {
+                  var code = e.target.responseText;
+                  if (item.file) {
+                    apps[item.name] = {versions: [{
+                      code: code,
+                      config: item.config || {},
+                      dependencies: item.dependencies || {},
+                      published: []
+                    }]};
+                  } else {
+                    mods[item.name] = {versions: [{
+                      code: 'function(modules'+(item.proxy ? ', proxy' : '')+') {\n'+code.split(/\n/).slice(1, -1).join('\n')+'\n}',
+                      dependencies: item.dependencies || {},
+                      published: []
+                    }]};
+                  }
+                  if (++count < items.length) return;
+                  var hash = pbkdf2(body.password);
+                  db.put('sessions/'+(sid = token()), body.username).put(path, {
+                    name: body.name,
+                    email: body.email,
+                    password: hash.key,
+                    salt: hash.salt,
+                    workspace: {apps: apps, modules: mods},
+                    clients: {}
+                  }).then(function() {
+                    response.generic(303, {'Set-Cookie': 'sid='+sid, Location: '/'});
+                  });
+                });
+              });
             });
           }, 'url');
         return render([{form: {method: 'post', action: '/register', children: [
@@ -161,13 +199,26 @@ function(modules) {
               if (key != 'name' && key != 'email') return 'skip';
             };
           }).then(function(data) {
-            //data.username = session.owner;
             response.end(JSON.stringify(data), 'json');
           });
         });
       case '/v1/workspace':
         return authenticateAPI(request.query.access_token, function(session) {
-          db.get('accounts/'+encodeURIComponent(session.owner)+'/workspace').then(function(data) {
+          db.get('accounts/'+encodeURIComponent(session.owner)+'/workspace', false, function(path) {
+            // apps,modules/<name>/versions/<#>/code,config,dependencies,published/<#>
+            return [
+              true, true, true, true,
+              function(key) { if (key != 'published') return 'skip'; },
+              true
+            ][path.length] || false;
+          }).then(function(data) {
+            Object.keys(data).forEach(function(group) {
+              Object.keys(data[group]).forEach(function(name) {
+                (name = data[group][name]).versions = name.versions.map(function(version) {
+                  return version.published.length;
+                });
+              });
+            });
             response.end(JSON.stringify(data), 'json');
           });
         });
