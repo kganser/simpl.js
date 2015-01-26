@@ -53,7 +53,7 @@ function(modules) {
       if (!verify(token)) return response.generic(401);
       db.get('sessions/'+token).then(function(session) {
         if (!session || !session.owner || !session.accessToken == !authCode) return response.generic(401);
-        callback(session);
+        callback(session, 'accounts/'+encodeURIComponent(session.owner));
       });
     };
     var sid;
@@ -114,6 +114,8 @@ function(modules) {
             db.get('accounts/'+encodeURIComponent(body.username), true).then(function(account) {
               if (!account || account.password !== pbkdf2(body.password, account.salt).key)
                 return render(['Invalid login. ', {a: {href: '/login', children: 'Try again'}}], 401);
+              // TODO: reuse unexpired session id for user account
+              // TODO: garbage collect expired sessions
               this.put('sessions/'+(sid = token()), body.username).then(function() {
                 var redirect = body.redirect || '/';
                 response.generic(303, {'Set-Cookie': 'sid='+sid, Location: redirect[0] == '/' ? redirect : '/'});
@@ -193,8 +195,8 @@ function(modules) {
           {input: {type: 'submit', value: 'Register'}}
         ]}}]);
       case '/v1/user':
-        return authenticateAPI(request.query.access_token, function(session) {
-          db.get('accounts/'+encodeURIComponent(session.owner), false, function(path) {
+        return authenticateAPI(request.query.access_token, function(session, namespace) {
+          db.get(namespace, false, function(path) {
             return !path.length && function(key) {
               if (key != 'name' && key != 'email') return 'skip';
             };
@@ -203,8 +205,8 @@ function(modules) {
           });
         });
       case '/v1/workspace':
-        return authenticateAPI(request.query.access_token, function(session) {
-          db.get('accounts/'+encodeURIComponent(session.owner)+'/workspace', false, function(path) {
+        return authenticateAPI(request.query.access_token, function(session, namespace) {
+          db.get(namespace+'/workspace', false, function(path) {
             // apps,modules/<name>/versions/<#>/code,config,dependencies,published/<#>
             return [
               true, true, true, true,
@@ -222,6 +224,103 @@ function(modules) {
             response.end(JSON.stringify(data), 'json');
           });
         });
+    }
+    if (/^\/v1\/(apps|modules)\/[^\/]*\/\d+(\/|$)/.test(request.path)) {
+      var path = request.path.substr(4),
+          parts = path.split('/'),
+          app = parts[0] == 'apps',
+          method = request.method;
+      
+      parts.splice(2, 0, 'versions');
+      path = parts.join('/');
+      
+      if (parts.length == 4) {
+        if (method == 'GET')
+          return authenticateAPI(request.query.access_token, function(session, namespace) {
+            db.get(namespace+'/workspace/'+path).then(function(resource) {
+              if (resource === undefined) return response.generic(404);
+              response.end(JSON.stringify(resource), 'json');
+            });
+          });
+        if (method == 'DELETE')
+          return authenticateAPI(request.query.access_token, function(session, namespace) {
+            db.delete(namespace+'/workspace/'+path).then(response.ok);
+          });
+        if (method == 'POST')
+          return request.slurp(function(code) {
+            authenticateAPI(request.query.access_token, function(session, namespace) {
+              path = namespace+'/workspace/'+path;
+              db.put(path+'/code', code).then(function(error) { // TODO: check If-Match header
+                if (!error) return response.ok();
+                if (parts[3] != '0') return response.error();
+                this.get(path).then(function(existing) {
+                  if (existing) return response.error();
+                  this.put(parts[0]+'/'+parts[1], {versions: [app
+                    ? {code: code, config: {}, dependencies: {}, published: []}
+                    : {code: code, dependencies: {}, published: []}
+                  ]}).then(response.ok);
+                });
+              });
+            });
+          }, 'utf8', 65536);
+      } else if (parts.length == 5 && method == 'POST' && (parts[4] == 'publish' || parts[4] == 'upgrade')) {
+        return authenticateAPI(request.query.access_token, function(session, namespace) {
+          path = namespace+'/workspace/'+parts.slice(0, 4).join('/');
+          db.get(path, true).then(function(version) {
+            if (!version) return response.error();
+            var published = version.published[version.published.length-1];
+            if (published && version.code == published.code &&
+                JSON.stringify(version.config) == JSON.stringify(published.config) &&
+                JSON.stringify(version.dependencies) == JSON.stringify(published.dependencies))
+              return response.generic(412);
+            var record = {
+              code: version.code,
+              config: version.config,
+              dependencies: version.dependencies,
+              published: [{
+                code: version.code,
+                config: version.config,
+                dependencies: version.dependencies
+              }]
+            };
+            if (!app) {
+              delete record.config;
+              delete record.published[0].config;
+            }
+            return (parts[4] == 'upgrade'
+              ? this.append(namespace+'/workspace/'+parts.slice(0, 3).join('/'), record)
+              : this.append(path+'/published', record.published[0])
+            ).then(response.ok);
+          });
+        });
+      } else if (parts[4] == 'config') {
+        if (method == 'PUT' || method == 'INSERT')
+          return request.slurp(function(body) {
+            if (body === undefined) return response.generic(415);
+            authenticateAPI(request.query.access_token, function(session, namespace) {
+              db[method.toLowerCase()](namespace+'/workspace/'+path, body).then(response.ok); // TODO: create app/module record if not exists
+            });
+          }, 'json');
+        if (method == 'DELETE')
+          return authenticateAPI(request.query.access_token, function(session, namespace) {
+            db.delete(namespace+'/workspace/'+path).then(response.ok);
+          });
+      } else if (parts[4] == 'dependencies') {
+        if (method == 'DELETE')
+          return parts.length == 6
+            ? authenticateAPI(request.query.access_token, function(session, namespace) {
+                db.delete(namespace+'/workspace/'+path).then(response.ok);
+              })
+            : response.error();
+        if (method == 'POST' && parts.length == 5)
+          return request.slurp(function(body) {
+            if (body === undefined) return response.generic(415);
+            if (body.name == null || typeof body.version != 'number') return response.error();
+            authenticateAPI(request.query.access_token, function(session, namespace) {
+              db.put(namespace+'/workspace/'+path+'/'+encodeURIComponent(body.name), body.version).then(response.ok);
+            });
+          }, 'json');
+      }
     }
     modules.xhr(location.origin+request.path, {responseType: 'arraybuffer'}, function(e) {
       if (e.target.status != 200)
