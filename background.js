@@ -103,6 +103,22 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
           if (sid) db.delete('sessions/'+sid).then(function() { logout(); });
           else response.generic(303, {'Set-Cookie': 'sid=; Expires='+new Date().toUTCString(), Location: '/'});
         };
+        var forward = function(sid, path, fallback, callback, method, body, text) {
+          if (sid = verify(request.cookie.sid))
+            return db.get('sessions/'+sid).then(function(session) {
+              if (!session) return logout(sid);
+              o.xhr('http://127.0.0.1:8005/v1/'+path+'?access_token='+session.accessToken, {
+                method: method,
+                responseType: 'json',
+                json: text ? undefined : body,
+                data: text ? body : undefined
+              }, function(e) {
+                if (e.target.status != 200) return logout(sid);
+                callback(e.target.response, {email: session.email, name: session.name});
+              });
+            });
+          fallback(callback);
+        };
         
         if (match = request.path.match(/^\/([^.\/]*)\.(\d+)\.js$/))
           return db.get('modules/'+match[1]+'/versions/'+match[2]).then(function(module) {
@@ -111,93 +127,95 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
         if (/^\/(apps|modules)\/[^\/]*\/\d+(\/|$)/.test(request.path)) {
           var path = request.path.substr(1),
               parts = path.split('/'),
-              entry = {app: parts[0] == 'apps', name: decodeURIComponent(parts[1]), version: parseInt(parts[2], 10)},
-              method = request.method,
-              echo = function() {
-                this.get(parts.slice(0, 5).join('/')).then(function(object) {
-                  entry.object = object;
-                  broadcast(parts[4], entry);
-                  response.ok();
-                });
-              };
+              app = parts[0] == 'apps',
+              method = request.method;
           
           parts.splice(2, 0, 'versions');
-          path = parts.join('/');
+          var entry = parts.join('/');
           
           if (parts.length == 4) {
             if (method == 'GET')
-              return db.get(path).then(function(resource) {
-                if (resource === undefined) return response.generic(404);
-                response.end(JSON.stringify(resource), 'json');
+              return forward(request.cookie.sid, path, function(callback) {
+                db.get(entry).then(callback);
+              }, function(data) {
+                if (!data) return response.generic(404);
+                response.end(JSON.stringify(data), 'json');
               });
             if (method == 'DELETE')
-              return db.delete(path).then(function() {
-                broadcast('delete', entry);
-                response.ok();
-              });
+              return forward(request.cookie.sid, path, function(callback) {
+                db.delete(entry).then(callback);
+              }, response.ok, method);
             if (method == 'POST')
               return request.slurp(function(code) {
-                db.put(path+'/code', code).then(function(error) { // TODO: check If-Match header
-                  if (!error) return response.ok();
-                  if (parts[3] != '0') return response.error();
-                  this.get(path).then(function(existing) {
-                    if (existing) return response.error();
-                    this.put(parts[0]+'/'+parts[1], {versions: [entry.app
-                      ? {code: code, config: {}, dependencies: {}, published: []}
-                      : {code: code, dependencies: {}, published: []}
-                    ]}).then(response.ok);
+                forward(request.cookie.sid, path, function(callback) {
+                  db.put(entry+'/code', code).then(function(error) { // TODO: check If-Match header
+                    if (!error) return callback();
+                    if (parts[3] != '0') return response.error();
+                    this.get(entry).then(function(existing) {
+                      if (existing) return response.error();
+                      this.put(parts[0]+'/'+parts[1], {versions: [app
+                        ? {code: code, config: {}, dependencies: {}, published: []}
+                        : {code: code, dependencies: {}, published: []}
+                      ]}).then(callback);
+                    });
                   });
-                });
+                }, response.ok, method, code, true);
               }, 'utf8', 65536);
           } else if (parts.length == 5 && method == 'POST' && (parts[4] == 'publish' || parts[4] == 'upgrade')) {
-            path = parts.slice(0, 4).join('/');
-            return db.get(path, true).then(function(version) {
-              if (!version) return response.error();
-              var published = version.published[version.published.length-1];
-              if (published && version.code == published.code &&
-                  JSON.stringify(version.config) == JSON.stringify(published.config) &&
-                  JSON.stringify(version.dependencies) == JSON.stringify(published.dependencies))
-                return response.generic(412);
-              var record = {
-                code: version.code,
-                config: version.config,
-                dependencies: version.dependencies,
-                published: [{
+            return forward(request.cookie.sid, path, function(callback) {
+              path = parts.slice(0, 4).join('/');
+              db.get(path, true).then(function(version) {
+                if (!version) return response.error();
+                var published = version.published[version.published.length-1];
+                if (published && version.code == published.code &&
+                    JSON.stringify(version.config) == JSON.stringify(published.config) &&
+                    JSON.stringify(version.dependencies) == JSON.stringify(published.dependencies))
+                  return response.generic(412);
+                var record = {
                   code: version.code,
                   config: version.config,
-                  dependencies: version.dependencies
-                }]
-              };
-              if (!entry.app) {
-                delete record.config;
-                delete record.published[0].config;
-              }
-              return (parts[4] == 'upgrade'
-                ? this.append(parts.slice(0, 3).join('/'), record)
-                : this.append(path+'/published', record.published[0])
-              ).then(function() {
-                broadcast(parts[4], entry);
-                response.ok();
+                  dependencies: version.dependencies,
+                  published: [{
+                    code: version.code,
+                    config: version.config,
+                    dependencies: version.dependencies
+                  }]
+                };
+                if (!app) {
+                  delete record.config;
+                  delete record.published[0].config;
+                }
+                return (parts[4] == 'upgrade'
+                  ? this.append(parts.slice(0, 3).join('/'), record)
+                  : this.append(path+'/published', record.published[0])
+                ).then(callback);
               });
-            });
+            }, response.ok, method);
           } else if (parts[4] == 'config') {
             if (method == 'PUT' || method == 'INSERT')
               return request.slurp(function(body) {
-                if (body === undefined) return response.generic(415);
-                db[method.toLowerCase()](path, body).then(echo); // TODO: create app/module record if not exists
+                forward(request.cookie.sid, path, function(callback) {
+                  if (body === undefined) return response.generic(415);
+                  db[method.toLowerCase()](entry, body).then(callback); // TODO: create app/module record if not exists
+                }, response.ok, method, body);
               }, 'json');
             if (method == 'DELETE')
-              return db.delete(path).then(echo);
+              return forward(request.cookie.sid, path, function(callback) {
+                db.delete(entry).then(callback);
+              }, response.ok, method);
           } else if (parts[4] == 'dependencies') {
             if (method == 'DELETE')
-              return parts.length == 6
-                ? db.delete(path).then(echo)
-                : response.error();
+              return forward(request.cookie.sid, path, function(callback) {
+                if (parts.length != 6) return response.error();
+                db.delete(entry).then(callback);
+              }, response.ok, method);
             if (method == 'POST' && parts.length == 5)
               return request.slurp(function(body) {
-                if (body === undefined) return response.generic(415);
-                if (body.name == null || typeof body.version != 'number') return response.error();
-                db.put(path+'/'+encodeURIComponent(body.name), body.version).then(echo);
+                forward(request.cookie.sid, path, function(callback) {
+                  if (body === undefined) return response.generic(415);
+                  if (body.name == null || typeof body.version != 'number') return response.error();
+                  db.put(entry+'/'+encodeURIComponent(body.name), body.version).then(response.ok);
+                }, response.ok, method, body);
               }, 'json');
           }
         }
@@ -259,15 +277,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
                 });
               response.error();
             }, 'json');
-          return function(callback) {
-            if (sid = verify(request.cookie.sid))
-              return db.get('sessions/'+sid).then(function(session) {
-                if (!session) return logout(sid);
-                o.xhr('http://127.0.0.1:8005/v1/workspace?access_token='+session.accessToken, {responseType: 'json'}, function(e) {
-                  if (e.target.status != 200) return logout(sid);
-                  callback(e.target.response, {email: session.email, name: session.name});
-                });
-              });
+          return forward(request.cookie.sid, 'workspace', function(callback) {
             db.get('', false, function(path) {
               // apps,modules,sessions/<name>/versions/<#>/code,config,dependencies,published/<#>
               return [
@@ -277,7 +287,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
                 true
               ][path.length] || false;
             }).then(function(data) {
-              Object.keys(data).forEach(function(group) {
+              Object.keys(data || {}).forEach(function(group) {
                 Object.keys(data[group]).forEach(function(name) {
                   (name = data[group][name]).versions = name.versions.map(function(version) {
                     return version.published.length;
@@ -286,7 +296,8 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
               });
               callback(data, null);
             });
-          }(function(data, session) {
+          }, function(data, session) {
+            if (!data) return response.generic(500);
             Object.keys(data).forEach(function(group) {
               Object.keys(data[group]).forEach(function(name) {
                 data[group][name] = data[group][name].versions.map(function(version) {

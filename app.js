@@ -51,38 +51,7 @@ simpl.add('app', function(o) {
               log.textContent = '';
           }
           break;
-        case 'delete':
-          if (selected && selected.entry == entry) {
-            body.classList.remove('show-'+selected.panel);
-            selected = null;
-          }
-          delete versions[data.version];
-          if (!versions.length) delete (data.app ? apps : modules)[data.name];
-          entry.tab.parentNode.removeChild(entry.tab);
-          break;
-        case 'upgrade':
-          var version = versions.push(data.app ? {minor: 1, log: []} : {minor: 1});
-          (data.app ? appList : moduleList).insertBefore(
-            dom(li(data.name, version-1, 0, data.app)),
-            versions[version-2].tab.nextSibling);
-          major.style.display = 'inline-block';
-          major.textContent = 'Publish '+(version+1)+'.0';
-          del.style.display = 'none';
-          break;
-        case 'publish':
-          entry.published.push(data.app
-            ? {code: entry.code, config: entry.config, dependencies: entry.dependencies}
-            : {code: entry.code, dependencies: entry.dependencies});
-          var version = (data.version+1)+'.'+(entry.minor++);
-          entry.tab.lastChild.title = data.name+' '+version;
-          entry.tab.lastChild.lastChild.textContent = version;
-          timeline(version);
-          major.style.display = 'inline-block';
-          major.textContent = 'Publish '+(versions.length+1)+'.0';
-          minor.textContent = 'Publish '+(data.version+1)+'.'+entry.minor;
-          del.style.display = 'none';
-          break;
-        case 'config':
+        /*case 'config':
           entry.config = data.object;
           if (selected && selected.entry == entry)
             config.update(entry.config);
@@ -91,7 +60,7 @@ simpl.add('app', function(o) {
           entry.dependencies = data.object;
           if (selected && selected.entry == entry)
             dependencies(entry.dependencies);
-          break;
+          break;*/
       }
     };
     var url = function(app, name, version) {
@@ -210,17 +179,41 @@ simpl.add('app', function(o) {
       }
     };
     var publish = function(upgrade) {
-      var current = selected.entry,
-          published = current.published.slice(-1).pop();
-      if (published && current.code == published.code &&
-          JSON.stringify(current.config) == JSON.stringify(published.config) &&
-          JSON.stringify(current.dependencies) == JSON.stringify(published.dependencies))
+      var current = selected,
+          entry = selected.entry,
+          published = entry.published.slice(-1).pop();
+      if (published && entry.code == published.code &&
+          JSON.stringify(entry.config) == JSON.stringify(published.config) &&
+          JSON.stringify(entry.dependencies) == JSON.stringify(published.dependencies))
         return alert('No changes to publish');
       status('info', 'Publishing...');
       o.xhr(url()+(upgrade ? '/upgrade' : '/publish'), {method: 'POST'}, function(e) {
         if (e.target.status != 200)
           return status('failure', 'Error');
         status('success', 'Published');
+        var versions = (current.app ? apps : modules)[current.name],
+            version = upgrade
+              ? versions.push(current.app ? {minor: 1, log: []} : {minor: 1})
+              : (current.version+1)+'.'+(entry.minor++);
+        if (upgrade) {
+          (current.app ? appList : moduleList).insertBefore(
+            dom(li(current.name, version-1, 1, current.app)),
+            versions[version-2].tab.nextSibling);
+          major.style.display = 'inline-block';
+          major.textContent = 'Publish '+(version+1)+'.0';
+          del.style.display = 'none';
+        } else {
+          entry.published.push(current.app
+            ? {code: entry.code, config: entry.config, dependencies: entry.dependencies}
+            : {code: entry.code, dependencies: entry.dependencies});
+          entry.tab.lastChild.title = current.name+' '+version;
+          entry.tab.lastChild.lastChild.textContent = version;
+          timeline(version);
+          major.style.display = 'inline-block';
+          major.textContent = 'Publish '+(versions.length+1)+'.0';
+          minor.textContent = 'Publish '+(current.version+1)+'.'+entry.minor;
+          del.style.display = 'none';
+        }
       });
     };
     var li = function(name, major, minor, app) {
@@ -356,7 +349,9 @@ simpl.add('app', function(o) {
             {button: {className: 'publish', children: function(e) { major = e; }, onclick: function() { publish(true); }}}, {br: null},
             {button: {className: 'publish', children: function(e) { minor = e; }, onclick: function() { publish(); }}}, {br: null},
             {button: {className: 'delete', children: function(e) { del = e; return 'Delete'; }, onclick: function() {
-              var button = this, type = selected.app ? 'app' : 'module';
+              var button = this,
+                  current = selected,
+                  type = selected.app ? 'app' : 'module';
               if (!confirm('Are you sure you want to delete this '+type+'?')) return;
               button.disabled = true;
               status('info', 'Deleting '+type+'...');
@@ -365,6 +360,15 @@ simpl.add('app', function(o) {
                 if (e.target.status != 200)
                   return status('failure', 'Error deleting '+type);
                 status('success', 'Deleted');
+                var items = current.app ? apps : modules,
+                    versions = items[current.name];
+                delete versions[current.version];
+                if (!versions.length) delete items[current.name];
+                current.entry.tab.parentNode.removeChild(current.entry.tab);
+                if (selected && selected.entry == current.entry) {
+                  body.classList.remove('show-'+selected.panel);
+                  selected = null;
+                }
               });
             }}}
           ]}},
