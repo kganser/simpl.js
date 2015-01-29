@@ -14,19 +14,15 @@ simpl.add('app', function(o) {
         dom = o.html.dom;
     if (window.EventSource) new EventSource('/activity').onmessage = function(e) {
       try { var message = JSON.parse(e.data); } catch (e) { return; }
-      var event = message.event,
-          data = message.data || {},
-          versions = event in {run: 1, stop: 1, log: 1, error: 1} ? apps[data.app] : (data.app ? apps : modules)[data.name],
-          entry = versions && versions[data.version];
+      var data = message.data || {},
+          entry = (apps[data.app] || {})[data.version];
       if (!entry) return;
-      switch (event) {
-        case 'log':
+      switch (message.event) {
         case 'error':
-          if (event == 'error') {
-            entry.running = false;
-            entry.tab.classList.add(data.level = 'error');
-            data.message = [data.message];
-          }
+          entry.running = false;
+          entry.tab.classList.add(data.level = 'error');
+          data.message = [data.message];
+        case 'log':
           if (entry.log.push(message = {
             level: data.level == 'log' ? 'debug' : data.level,
             message: data.message,
@@ -42,10 +38,10 @@ simpl.add('app', function(o) {
           break;
         case 'run':
         case 'stop':
-          entry.running = event == 'run';
-          entry.tab.classList[event == 'run' ? 'add' : 'remove']('running');
+          entry.running = message.event == 'run';
+          entry.tab.classList[entry.running ? 'add' : 'remove']('running');
           entry.tab.classList.remove('error');
-          if (event == 'run') {
+          if (entry.running) {
             entry.log = [];
             if (selected && selected.entry == entry)
               log.textContent = '';
@@ -425,22 +421,19 @@ simpl.add('app', function(o) {
             {h2: 'Configuration'},
             {pre: function(e) {
               config = o.jsonv(e, selected ? selected.entry.config : null, function(method, path, data) {
-                var entry = selected.entry;
-                o.xhr(url()+'/config/'+path, {method: method, json: data}, function(e) {
+                var entry = selected.entry,
+                    config = entry.config;
+                path.split('/').map(decodeURIComponent).forEach(function(key, i, path) {
+                  if (Array.isArray(config)) key = parseInt(key, 10);
+                  if (i < path.length-1) config = config[key];
+                  else if (method == 'put') config[key] = data;
+                  else if (method == 'insert') config.splice(key, 0, data);
+                  else if (typeof key == 'number') config.splice(key, 1);
+                  else delete config[key];
+                });
+                o.xhr(url()+'/config', {method: 'PUT', json: entry.config}, function(e) {
                   if (e.target.status != 200)
-                    return status('failure', 'Error updating configuration');
-                  var config = entry.config;
-                  path.split('/').map(decodeURIComponent).forEach(function(key, i, path) {
-                    if (Array.isArray(config)) key = parseInt(key, 10);
-                    if (i == path.length-1) {
-                      if (method == 'put') config[key] = data;
-                      else if (method == 'insert') config.splice(key, 0, data);
-                      else if (typeof key == 'number') config.splice(key, 1);
-                      else delete config[key];
-                    } else {
-                      config = config[key];
-                    }
-                  });
+                    status('failure', 'Error updating configuration');
                 });
               });
             }}
