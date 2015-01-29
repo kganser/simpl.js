@@ -51,16 +51,6 @@ simpl.add('app', function(o) {
               log.textContent = '';
           }
           break;
-        /*case 'config':
-          entry.config = data.object;
-          if (selected && selected.entry == entry)
-            config.update(entry.config);
-          break;
-        case 'dependencies':
-          entry.dependencies = data.object;
-          if (selected && selected.entry == entry)
-            dependencies(entry.dependencies);
-          break;*/
       }
     };
     var url = function(app, name, version) {
@@ -392,11 +382,15 @@ simpl.add('app', function(o) {
                 suggest = function(modules) {
                   dom(modules && modules.map(function(module, i) {
                     return {li: [{button: {className: 'name', children: [module.name, {span: ++module.version || null}], onclick: function() {
+                      var entry = selected.entry;
                       search.value = '';
                       suggest();
                       o.xhr(url()+'/dependencies', {method: 'POST', json: module}, function(e) {
                         if (e.target.status != 200)
-                          status('failure', 'Error updating dependencies');
+                          return status('failure', 'Error updating dependencies');
+                        entry.dependencies[module.name] = module.version;
+                        if (selected && selected.entry == entry)
+                          dependencies(entry.dependencies);
                       });
                     }}}]};
                   }), e, true);
@@ -409,12 +403,16 @@ simpl.add('app', function(o) {
                   var version = modules[module];
                   return {li: {className: 'module', children: [
                     {button: {className: 'delete', title: 'Remove', children: '×', onclick: function() {
-                      var button = this;
+                      var button = this,
+                          entry = selected.entry;
                       button.disabled = true;
                       o.xhr(url()+'/dependencies/'+encodeURIComponent(module), {method: 'DELETE'}, function(e) {
                         button.disabled = false;
                         if (e.target.status != 200)
-                          status('failure', 'Error updating dependencies');
+                          return status('failure', 'Error updating dependencies');
+                        delete entry.dependencies[module];
+                        if (selected && selected.entry == entry)
+                          button.parentNode.parentNode.removeChild(button.parentNode);
                       });
                     }}},
                     {span: {className: 'name', children: [module, {span: !version || version}]}}
@@ -427,9 +425,22 @@ simpl.add('app', function(o) {
             {h2: 'Configuration'},
             {pre: function(e) {
               config = o.jsonv(e, selected ? selected.entry.config : null, function(method, path, data) {
+                var entry = selected.entry;
                 o.xhr(url()+'/config/'+path, {method: method, json: data}, function(e) {
                   if (e.target.status != 200)
-                    status('failure', 'Error updating configuration');
+                    return status('failure', 'Error updating configuration');
+                  var config = entry.config;
+                  path.split('/').map(decodeURIComponent).forEach(function(key, i, path) {
+                    if (Array.isArray(config)) key = parseInt(key, 10);
+                    if (i == path.length-1) {
+                      if (method == 'put') config[key] = data;
+                      else if (method == 'insert') config.splice(key, 0, data);
+                      else if (typeof key == 'number') config.splice(key, 1);
+                      else delete config[key];
+                    } else {
+                      config = config[key];
+                    }
+                  });
                 });
               });
             }}
