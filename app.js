@@ -173,7 +173,7 @@ simpl.add('app', function(o) {
           JSON.stringify(entry.dependencies) == JSON.stringify(published.dependencies))
         return alert('No changes to publish');
       status('info', 'Publishing...');
-      o.xhr(url()+(upgrade ? '/upgrade' : '/publish'), {method: 'POST'}, function(e) {
+      o.xhr(upgrade ? (current.app ? '/apps/' : '/modules/')+encodeURIComponent(current.name)+'?version='+current.version : url(), {method: 'POST'}, function(e) {
         if (e.target.status != 200)
           return status('failure', 'Error');
         status('success', 'Published');
@@ -318,7 +318,7 @@ simpl.add('app', function(o) {
             var entry = selected.entry;
             status('info', 'Saving...');
             o.xhr(url(), {
-              method: 'POST',
+              method: 'PUT',
               data: entry.code = code.getValue()
             }, function(e) {
               if (e.target.status != 200)

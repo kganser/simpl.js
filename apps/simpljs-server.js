@@ -225,7 +225,7 @@ function(modules) {
           });
         });
     }
-    if (/^\/v1\/(apps|modules)\/[^\/]*\/\d+(\/|$)/.test(request.path)) {
+    if (/^\/v1\/(apps|modules)\/[^\/]*(\/\d+(\/|$)|$)/.test(request.path)) {
       var path = request.path.substr(4),
           parts = path.split('/'),
           app = parts[0] == 'apps',
@@ -234,41 +234,13 @@ function(modules) {
       parts.splice(2, 0, 'versions');
       path = parts.join('/');
       
-      if (parts.length == 4) {
-        if (method == 'GET')
-          return authenticateAPI(request.query.access_token, function(session, namespace) {
-            db.get(namespace+'/workspace/'+path).then(function(resource) {
-              if (resource === undefined) return response.generic(404);
-              response.end(JSON.stringify(resource), 'json');
-            });
-          });
-        if (method == 'DELETE')
-          return authenticateAPI(request.query.access_token, function(session, namespace) {
-            db.delete(namespace+'/workspace/'+path).then(response.ok);
-          });
-        if (method == 'POST')
-          return request.slurp(function(code) {
-            authenticateAPI(request.query.access_token, function(session, namespace) {
-              path = namespace+'/workspace/'+path;
-              db.put(path+'/code', code).then(function(error) { // TODO: check If-Match header
-                if (!error) return response.ok();
-                if (parts[3] != '0') return response.error();
-                this.get(path).then(function(existing) {
-                  if (existing) return response.error();
-                  this.put(parts[0]+'/'+parts[1], {versions: [app
-                    ? {code: code, config: {}, dependencies: {}, published: []}
-                    : {code: code, dependencies: {}, published: []}
-                  ]}).then(response.ok);
-                });
-              });
-            });
-          }, 'utf8', 65536);
-      } else if (parts.length == 5 && method == 'POST' && (parts[4] == 'publish' || parts[4] == 'upgrade')) {
+      if (parts.length < 5 && method == 'POST') {
+        var upgrade = parts.length == 3;
+        if (upgrade && !request.query.version) return response.error();
         return authenticateAPI(request.query.access_token, function(session, namespace) {
-          path = namespace+'/workspace/'+parts.slice(0, 4).join('/');
-          db.get(path, true).then(function(version) {
+          db.get(namespace+'/workspace/'+path+(upgrade ? '/'+request.query.version : ''), true).then(function(version) {
             if (!version) return response.error();
-            var published = version.published[version.published.length-1];
+            var published = version.published.pop();
             if (published && version.code == published.code &&
                 JSON.stringify(version.config) == JSON.stringify(published.config) &&
                 JSON.stringify(version.dependencies) == JSON.stringify(published.dependencies))
@@ -287,18 +259,46 @@ function(modules) {
               delete record.config;
               delete record.published[0].config;
             }
-            return (parts[4] == 'upgrade'
-              ? this.append(namespace+'/workspace/'+parts.slice(0, 3).join('/'), record)
-              : this.append(path+'/published', record.published[0])
+            return (upgrade
+              ? this.append(namespace+'/workspace/'+path, record)
+              : this.append(namespace+'/workspace/'+path+'/published', record.published[0])
             ).then(response.ok);
           });
         });
-      } else if (parts[4] == 'config') {
-        if (method == 'PUT' || method == 'INSERT')
+      } else if (parts.length == 4) {
+        if (method == 'GET')
+          return authenticateAPI(request.query.access_token, function(session, namespace) {
+            db.get(namespace+'/workspace/'+path).then(function(data) {
+              if (!data) return response.generic(404);
+              response.end(JSON.stringify(data), 'json');
+            });
+          });
+        if (method == 'PUT')
+          return request.slurp(function(code) {
+            authenticateAPI(request.query.access_token, function(session, namespace) {
+              db.put(namespace+'/workspace/'+path+'/code', code).then(function(error) { // TODO: check If-Match header
+                if (!error) return response.ok();
+                if (parts[3] != '0') return response.error();
+                this.get(namespace+'/workspace/'+path).then(function(existing) {
+                  if (existing) return response.error();
+                  this.put(parts[0]+'/'+parts[1], {versions: [app
+                    ? {code: code, config: {}, dependencies: {}, published: []}
+                    : {code: code, dependencies: {}, published: []}
+                  ]}).then(response.ok);
+                });
+              });
+            });
+          }, 'utf8', 65536);
+        if (method == 'DELETE')
+          return authenticateAPI(request.query.access_token, function(session, namespace) {
+            db.delete(namespace+'/workspace/'+path).then(response.ok);
+          });
+      } else if (parts.length == 5 && parts[4] == 'config') {
+        if (method == 'PUT')
           return request.slurp(function(body) {
             if (body === undefined) return response.generic(415);
             authenticateAPI(request.query.access_token, function(session, namespace) {
-              db[method.toLowerCase()](namespace+'/workspace/'+path, body).then(response.ok); // TODO: create app/module record if not exists
+              db.put(namespace+'/workspace/'+path, body).then(response.ok); // TODO: create app/module record if not exists
             });
           }, 'json');
         if (method == 'DELETE')
@@ -306,12 +306,6 @@ function(modules) {
             db.delete(namespace+'/workspace/'+path).then(response.ok);
           });
       } else if (parts[4] == 'dependencies') {
-        if (method == 'DELETE')
-          return parts.length == 6
-            ? authenticateAPI(request.query.access_token, function(session, namespace) {
-                db.delete(namespace+'/workspace/'+path).then(response.ok);
-              })
-            : response.error();
         if (method == 'POST' && parts.length == 5)
           return request.slurp(function(body) {
             if (body === undefined) return response.generic(415);
@@ -320,6 +314,10 @@ function(modules) {
               db.put(namespace+'/workspace/'+path+'/'+encodeURIComponent(body.name), body.version).then(response.ok);
             });
           }, 'json');
+        if (method == 'DELETE' && parts.length == 6)
+          return authenticateAPI(request.query.access_token, function(session, namespace) {
+            db.delete(namespace+'/workspace/'+path).then(response.ok);
+          });
       }
     }
     modules.xhr(location.origin+request.path, {responseType: 'arraybuffer'}, function(e) {
