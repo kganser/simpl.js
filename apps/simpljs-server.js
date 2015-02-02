@@ -53,7 +53,7 @@ function(modules) {
       if (!verify(token)) return response.generic(401);
       db.get('sessions/'+token).then(function(session) {
         if (!session || !session.owner || !session.accessToken == !authCode) return response.generic(401);
-        callback(session, 'accounts/'+encodeURIComponent(session.owner));
+        callback(authCode ? session : 'accounts/'+encodeURIComponent(session.owner));
       });
     };
     var sid;
@@ -195,7 +195,7 @@ function(modules) {
           {input: {type: 'submit', value: 'Register'}}
         ]}}]);
       case '/v1/user':
-        return authenticateAPI(request.query.access_token, function(session, namespace) {
+        return authenticateAPI(request.query.access_token, function(namespace) {
           db.get(namespace, false, function(path) {
             return !path.length && function(key) {
               if (key != 'name' && key != 'email') return 'skip';
@@ -205,7 +205,7 @@ function(modules) {
           });
         });
       case '/v1/workspace':
-        return authenticateAPI(request.query.access_token, function(session, namespace) {
+        return authenticateAPI(request.query.access_token, function(namespace) {
           db.get(namespace+'/workspace', false, function(path) {
             // apps,modules/<name>/versions/<#>/code,config,dependencies,published/<#>
             return [
@@ -237,7 +237,7 @@ function(modules) {
       if (parts.length < 5 && method == 'POST') {
         var upgrade = parts.length == 3;
         if (upgrade && !request.query.version) return response.error();
-        return authenticateAPI(request.query.access_token, function(session, namespace) {
+        return authenticateAPI(request.query.access_token, function(namespace) {
           db.get(namespace+'/workspace/'+path+(upgrade ? '/'+request.query.version : ''), true).then(function(version) {
             if (!version) return response.error();
             var published = version.published.pop();
@@ -267,7 +267,7 @@ function(modules) {
         });
       } else if (parts.length == 4) {
         if (method == 'GET')
-          return authenticateAPI(request.query.access_token, function(session, namespace) {
+          return authenticateAPI(request.query.access_token, function(namespace) {
             db.get(namespace+'/workspace/'+path).then(function(data) {
               if (!data) return response.generic(404);
               response.end(JSON.stringify(data), 'json');
@@ -275,7 +275,7 @@ function(modules) {
           });
         if (method == 'PUT')
           return request.slurp(function(code) {
-            authenticateAPI(request.query.access_token, function(session, namespace) {
+            authenticateAPI(request.query.access_token, function(namespace) {
               db.put(namespace+'/workspace/'+path+'/code', code).then(function(error) { // TODO: check If-Match header
                 if (!error) return response.ok();
                 if (parts[3] != '0') return response.error();
@@ -290,19 +290,19 @@ function(modules) {
             });
           }, 'utf8', 65536);
         if (method == 'DELETE')
-          return authenticateAPI(request.query.access_token, function(session, namespace) {
+          return authenticateAPI(request.query.access_token, function(namespace) {
             db.delete(namespace+'/workspace/'+path).then(response.ok);
           });
       } else if (parts.length == 5 && parts[4] == 'config') {
         if (method == 'PUT')
           return request.slurp(function(body) {
             if (body === undefined) return response.generic(415);
-            authenticateAPI(request.query.access_token, function(session, namespace) {
+            authenticateAPI(request.query.access_token, function(namespace) {
               db.put(namespace+'/workspace/'+path, body).then(response.ok); // TODO: create app/module record if not exists
             });
           }, 'json');
         if (method == 'DELETE')
-          return authenticateAPI(request.query.access_token, function(session, namespace) {
+          return authenticateAPI(request.query.access_token, function(namespace) {
             db.delete(namespace+'/workspace/'+path).then(response.ok);
           });
       } else if (parts[4] == 'dependencies') {
@@ -310,12 +310,12 @@ function(modules) {
           return request.slurp(function(body) {
             if (body === undefined) return response.generic(415);
             if (body.name == null || typeof body.version != 'number') return response.error();
-            authenticateAPI(request.query.access_token, function(session, namespace) {
+            authenticateAPI(request.query.access_token, function(namespace) {
               db.put(namespace+'/workspace/'+path+'/'+encodeURIComponent(body.name), body.version).then(response.ok);
             });
           }, 'json');
         if (method == 'DELETE' && parts.length == 6)
-          return authenticateAPI(request.query.access_token, function(session, namespace) {
+          return authenticateAPI(request.query.access_token, function(namespace) {
             db.delete(namespace+'/workspace/'+path).then(response.ok);
           });
       }
