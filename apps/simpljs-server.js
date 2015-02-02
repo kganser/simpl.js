@@ -19,6 +19,16 @@ function(modules) {
     var value = modules.crypto.misc.cachedPbkdf2(password, salt && {salt: toBits(salt, true)});
     return {key: fromBits(value.key, true, true), salt: fromBits(value.salt, true, true)};
   };
+  var gcSessions = function(db) {
+    if (Math.random() > .1) return;
+    db.get('sessions').then(function(sessions) {
+      var now = Date.now();
+      Object.keys(sessions).forEach(function(sid) {
+        if (sessions[sid].expires <= now)
+          db.delete('sessions/'+sid);
+      });
+    });
+  };
   
   modules.http.serve({port: config.port}, function(request, response) {
     var render = function(body, status) {
@@ -40,11 +50,11 @@ function(modules) {
       else response.generic(303, {'Set-Cookie': 'sid=; Expires='+new Date().toUTCString(), Location: '/'});
     };
     var authenticate = function(sid, callback, token) {
-      return verify(sid) && !db.get('sessions/'+sid).then(function(username) {
-        if (!username) return logout();
-        this.get('accounts/'+encodeURIComponent(username)).then(function(account) {
+      return verify(sid) && !db.get('sessions/'+sid).then(function(session) {
+        if (!session || !session.user) return logout();
+        this.get('accounts/'+encodeURIComponent(session.user)).then(function(account) {
           if (!account) return logout(sid);
-          account.username = username;
+          account.username = session.user;
           callback(account);
         });
       });
@@ -75,8 +85,9 @@ function(modules) {
             if (!authenticate(request.cookie.sid, function(account) {
               var username = account.username,
                   client = body.client_id;
+              gcSessions(db);
               db.put('accounts/'+encodeURIComponent(username)+'/clients/'+encodeURIComponent(client), true)
-                .put('sessions/'+(sid = token()), {client: client, owner: username})
+                .put('sessions/'+(sid = token()), {client: client, owner: username, expires: Date.now()+86400000})
                 .then(function() { response.generic(303, {Location: body.redirect_uri+'?authorization_code='+sid+'&state='+encodeURIComponent(body.state)}); });
             })) response.error();
           }, 'url');
@@ -85,9 +96,11 @@ function(modules) {
               redirect = request.query.redirect_uri,
               scope = request.query.scope,
               state = request.query.state;
-          if (client in account.clients)
-            return db.put('sessions/'+(sid = token()), {client: client, owner: account.username})
+          if (client in account.clients) {
+            gcSessions(db);
+            return db.put('sessions/'+(sid = token()), {client: client, owner: account.username, expires: Date.now()+86400000})
               .then(function() { response.generic(303, {Location: redirect+'?authorization_code='+sid+'&state='+encodeURIComponent(state)}); });
+          }
           render([
             {p: client+' would like access to your account information.'},
             {form: {method: 'post', action: '/authorize', children: [
@@ -114,9 +127,8 @@ function(modules) {
             db.get('accounts/'+encodeURIComponent(body.username), true).then(function(account) {
               if (!account || account.password !== pbkdf2(body.password, account.salt).key)
                 return render(['Invalid login. ', {a: {href: '/login', children: 'Try again'}}], 401);
-              // TODO: reuse unexpired session id for user account
-              // TODO: garbage collect expired sessions
-              this.put('sessions/'+(sid = token()), body.username).then(function() {
+              gcSessions(this);
+              this.put('sessions/'+(sid = token()), {user: body.username, expires: Date.now()+86400000}).then(function() {
                 var redirect = body.redirect || '/';
                 response.generic(303, {'Set-Cookie': 'sid='+sid, Location: redirect[0] == '/' ? redirect : '/'});
               });
