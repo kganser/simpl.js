@@ -63,7 +63,8 @@ function(modules) {
       if (!verify(token)) return response.generic(401);
       db.get('sessions/'+token).then(function(session) {
         if (!session || !session.owner || !session.accessToken == !authCode) return response.generic(401);
-        callback(authCode ? session : 'accounts/'+encodeURIComponent(session.owner));
+        if (authCode) return callback(session);
+        callback('accounts/'+encodeURIComponent(session.owner), session);
       });
     };
     var sid;
@@ -77,7 +78,6 @@ function(modules) {
         // TODO: CSRF token
         // TODO: client registration
         // TODO: implement scopes
-        // TODO: session timestamp/expiration
         // TODO: default to client's default redirect_uri
         // TODO: redirect on deny
         if (request.method == 'POST' && (request.headers['Content-Type'] || '').split(';')[0] == 'application/x-www-form-urlencoded')
@@ -202,17 +202,18 @@ function(modules) {
         return render([{form: {method: 'post', action: '/register', children: [
           {label: 'Name: '}, {input: {type: 'text', name: 'name'}}, {br: null},
           {label: 'Email: '}, {input: {type: 'text', name: 'email'}}, {br: null},
-          {label: 'Username: '}, {input: {type: 'text', name: 'username'}}, {br: null},
-          {label: 'Password: '}, {input: {type: 'password', name: 'password'}}, {br: null},
+          {label: 'Username: '}, {input: {type: 'text', name: 'username'}}, {br: null}, // javascript identifier token
+          {label: 'Password: '}, {input: {type: 'password', name: 'password'}}, {br: null}, // uppercase, lowercase, digit, special char, min 10 chars
           {input: {type: 'submit', value: 'Register'}}
         ]}}]);
       case '/v1/user':
-        return authenticateAPI(request.query.access_token, function(namespace) {
+        return authenticateAPI(request.query.access_token, function(namespace, session) {
           db.get(namespace, false, function(path) {
             return !path.length && function(key) {
               if (key != 'name' && key != 'email') return 'skip';
             };
           }).then(function(data) {
+            data.username = session.owner;
             response.end(JSON.stringify(data), 'json');
           });
         });

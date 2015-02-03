@@ -16,6 +16,10 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
       return fromBits(new o.crypto.misc.hmac(key).mac(toBits(parts[0], true)), true, true) == parts[1] && signed;
     } catch (e) {}
   };
+  var authenticate = function(sid, callback) {
+    if (!verify(sid)) return callback(null, true);
+    db.get('sessions/'+sid).then(callback);
+  };
   
   db.get('apps').then(function(data) {
     if (data) return;
@@ -100,24 +104,23 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
         
         var match, sid;
         var logout = function(sid) {
-          if (sid) db.delete('sessions/'+sid).then(function() { logout(); });
-          else response.generic(303, {'Set-Cookie': 'sid=; Expires='+new Date().toUTCString(), Location: '/'});
+          if (sid) return db.delete('sessions/'+sid).then(function() { logout(); });
+          response.generic(303, {'Set-Cookie': 'sid=; Expires='+new Date().toUTCString(), Location: '/'});
         };
-        var forward = function(sid, path, fallback, callback, method, body, text) {
-          if (sid = verify(request.cookie.sid))
-            return db.get('sessions/'+sid).then(function(session) {
-              if (!session) return logout(sid);
-              o.xhr('http://127.0.0.1:8005/v1/'+path+(~path.indexOf('?') ? '&' : '?')+'access_token='+session.accessToken, {
-                method: method,
-                responseType: 'json',
-                json: text ? undefined : body,
-                data: text ? body : undefined
-              }, function(e) {
-                if (e.target.status != 200) return logout(sid);
-                callback(e.target.response, {email: session.email, name: session.name});
-              });
+        var forward = function(path, fallback, callback, method, body, text) {
+          authenticate(request.cookie.sid, function(session, inactive) {
+            if (inactive) return fallback(callback);
+            if (!session) return logout(sid);
+            o.xhr('http://127.0.0.1:8005/v1/'+path+(~path.indexOf('?') ? '&' : '?')+'access_token='+session.accessToken, {
+              method: method,
+              responseType: 'json',
+              json: text ? undefined : body,
+              data: text ? body : undefined
+            }, function(e) {
+              if (e.target.status != 200) return logout(sid); // TODO: handle certain error statuses
+              callback(e.target.response, {email: session.email, name: session.name});
             });
-          fallback(callback);
+          });
         };
         
         if (match = request.path.match(/^\/([^.\/]*)\.(\d+)\.js$/))
@@ -136,7 +139,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
           if (parts.length < 5 && method == 'POST') {
             var upgrade = parts.length == 3;
             if (upgrade && !request.query.version) return response.error();
-            return forward(request.cookie.sid, request.uri.substr(1), function(callback) {
+            return forward(request.uri.substr(1), function(callback) {
               db.get(upgrade ? path+'/'+request.query.version : path, true).then(function(version) {
                 if (!version) return response.error();
                 var published = version.published.pop();
@@ -166,7 +169,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
             }, response.ok, method);
           } else if (parts.length == 4) {
             if (method == 'GET')
-              return forward(request.cookie.sid, uri, function(callback) {
+              return forward(uri, function(callback) {
                 db.get(path).then(callback);
               }, function(data) {
                 if (!data) return response.generic(404);
@@ -174,7 +177,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
               });
             if (method == 'PUT')
               return request.slurp(function(code) {
-                forward(request.cookie.sid, uri, function(callback) {
+                forward(uri, function(callback) {
                   db.put(path+'/code', code).then(function(error) { // TODO: check If-Match header
                     if (!error) return callback();
                     if (parts[3] != '0') return response.error();
@@ -189,19 +192,19 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
                 }, response.ok, method, code, true);
               }, 'utf8', 65536);
             if (method == 'DELETE')
-              return forward(request.cookie.sid, uri, function(callback) {
+              return forward(uri, function(callback) {
                 db.delete(path).then(callback);
               }, response.ok, method);
           } else if (parts.length == 5 && parts[4] == 'config') {
             if (method == 'PUT')
               return request.slurp(function(body) {
                 if (body === undefined) return response.generic(415);
-                forward(request.cookie.sid, uri, function(callback) {
+                forward(uri, function(callback) {
                   db.put(path, body).then(callback); // TODO: create app/module record if not exists
                 }, response.ok, method, body);
               }, 'json');
             if (method == 'DELETE')
-              return forward(request.cookie.sid, uri, function(callback) {
+              return forward(uri, function(callback) {
                 db.delete(path).then(callback);
               }, response.ok, method);
           } else if (parts[4] == 'dependencies') {
@@ -209,12 +212,12 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
               return request.slurp(function(body) {
                 if (body === undefined) return response.generic(415);
                 if (body.name == null || typeof body.version != 'number') return response.error();
-                forward(request.cookie.sid, uri, function(callback) {
+                forward(uri, function(callback) {
                   db.put(path+'/'+encodeURIComponent(body.name), body.version).then(callback);
                 }, response.ok, method, body);
               }, 'json');
             if (method == 'DELETE' && parts.length == 6)
-              return forward(request.cookie.sid, uri, function(callback) {
+              return forward(uri, function(callback) {
                 db.delete(path).then(callback);
               }, response.ok, method);
           }
@@ -236,7 +239,12 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
             code = e.target.responseText;
             o.xhr('http://127.0.0.1:8005/v1/user?access_token='+code, {responseType: 'json'}, function(e) {
               if (e.target.status != 200) return response.error();
-              db.put('sessions/'+(sid = token()), {accessToken: code, name: e.target.response.name, email: e.target.response.email}).then(function() {
+              db.put('sessions/'+(sid = token()), {
+                accessToken: code,
+                username: e.target.response.username,
+                name: e.target.response.name,
+                email: e.target.response.email
+              }).then(function() {
                 response.generic(303, {'Set-Cookie': 'sid='+sid, Location: '/'});
               });
             });
@@ -249,35 +257,49 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
             return request.slurp(function(body) {
               if (body === undefined) return response.generic(415);
               if (body.app == null || typeof body.version != 'number') return response.error();
-              var name = body.app,
-                  version = body.version,
-                  id = name+version,
-                  action = body.action;
-              if ((action == 'stop' || action == 'restart') && apps[id]) {
-                apps[id].terminate();
-                broadcast('stop', {app: name, version: version});
-                delete apps[id];
-                if (action == 'stop') return response.ok();
-              }
-              if ((action == 'run' || action == 'restart') && !apps[id])
-                return db.get('apps/'+encodeURIComponent(name)+'/versions/'+version).then(function(app) {
-                  if (!app) return response.error();
-                  apps[id] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\nsimpl.use('+JSON.stringify(app.dependencies)+','+app.code+');', function(module, callback) {
-                    db.get('modules/'+encodeURIComponent(module.name)+'/versions/'+module.version).then(function(record) {
-                      callback(wrap(module.name, record.code, module.version, record.dependencies));
+              authenticate(request.cookie.sid, function(session, inactive) {
+                if (!inactive && !session) return response.error();
+                var name = body.app,
+                    version = body.version,
+                    id = (session ? session.username+'/' : '')+name+version,
+                    action = body.action;
+                if ((action == 'stop' || action == 'restart') && apps[id]) {
+                  apps[id].terminate();
+                  broadcast('stop', {app: name, version: version});
+                  delete apps[id];
+                  if (action == 'stop') return response.ok();
+                }
+                if ((action == 'run' || action == 'restart') && !apps[id])
+                  return function(callback) {
+                    if (inactive) return db.get('apps/'+encodeURIComponent(name)+'/versions/'+version).then(callback);
+                    o.xhr('http://127.0.0.1:8005/v1/apps/'+encodeURIComponent(name)+'/'+version+'?access_token='+session.accessToken, {responseType: 'json'}, function(e) {
+                      if (e.target.status != 200) return response.error();
+                      callback(e.target.response);
                     });
-                  }, function(level, args, module, line, column) {
-                    broadcast('log', {app: name, version: version, level: level, message: args, module: module, line: line, column: column});
-                  }, function(message, module, line) {
-                    broadcast('error', {app: name, version: version, message: message, module: module, line: line});
-                    delete apps[id];
+                  }(function(app) {
+                    if (!app) return response.error();
+                    apps[id] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\nsimpl.use('+JSON.stringify(app.dependencies)+','+app.code+');', function(module, callback) {
+                      (function(callback) {
+                        if (inactive) return db.get('modules/'+encodeURIComponent(module.name)+'/versions/'+module.version).then(callback);
+                        o.xhr('http://127.0.0.1:8005/v1/modules/'+encodeURIComponent(module.name)+'/'+module.version+'?access_token='+session.accessToken, {responseType: 'json'}, function(e) {
+                          callback(e.target.response);
+                        });
+                      }(function(record) {
+                        callback(wrap(module.name, record.code, module.version, record.dependencies));
+                      }));
+                    }, function(level, args, module, line, column) {
+                      broadcast('log', {app: name, version: version, level: level, message: args, module: module, line: line, column: column});
+                    }, function(message, module, line) {
+                      broadcast('error', {app: name, version: version, message: message, module: module, line: line});
+                      delete apps[id];
+                    });
+                    broadcast('run', {app: name, version: version});
+                    response.ok();
                   });
-                  broadcast('run', {app: name, version: version});
-                  response.ok();
-                });
-              response.error();
+                response.error();
+              });
             }, 'json');
-          return forward(request.cookie.sid, 'workspace', function(callback) {
+          return forward('workspace', function(callback) {
             db.get('', false, function(path) {
               // apps,modules,sessions/<name>/versions/<#>/code,config,dependencies,published/<#>
               return [
