@@ -115,7 +115,7 @@ simpl.add('app', function(o) {
           selected = line = null;
           code.setOption('readOnly', false);
           code.setValue(entry.code); // TODO: use codemirror documents
-          config.update(entry.config);
+          config.update(entry.config || null);
           dependencies(entry.dependencies);
           search.value = '';
           suggest();
