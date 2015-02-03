@@ -118,7 +118,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
               data: text ? body : undefined
             }, function(e) {
               if (e.target.status != 200) return logout(sid); // TODO: handle certain error statuses
-              callback(e.target.response, {email: session.email, name: session.name});
+              callback(e.target.response, {username: session.username, name: session.name, email: session.email});
             });
           });
         };
@@ -323,7 +323,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
             Object.keys(data).forEach(function(group) {
               Object.keys(data[group]).forEach(function(name) {
                 data[group][name] = data[group][name].versions.map(function(version) {
-                  return group == 'apps' ? [version, !!apps[name+version]] : version;
+                  return group == 'apps' ? [version, !!apps[(session ? session.username+'/' : '')+name+version]] : version;
                 });
               });
             });
