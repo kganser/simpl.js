@@ -141,9 +141,9 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
           
           if (parts.length < 5 && method == 'POST') {
             var upgrade = parts.length == 3;
-            if (upgrade && !request.query.version) return response.error();
+            if (upgrade && !/\d+/.test(request.query.source)) return response.error();
             return forward(request.uri.substr(1), function(callback) {
-              db.get(upgrade ? path+'/'+request.query.version : path, true).then(function(version) {
+              db.get(upgrade ? path+'/'+request.query.source : path, true).then(function(version) {
                 if (!version) return response.error();
                 var published = version.published.pop();
                 if (published && version.code == published.code &&

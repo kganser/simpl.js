@@ -251,9 +251,9 @@ function(modules) {
       
       if (parts.length < 5 && method == 'POST') {
         var upgrade = parts.length == 3;
-        if (upgrade && !request.query.version) return response.error();
+        if (upgrade && !/\d+/.test(request.query.source)) return response.error();
         return authenticateAPI(request.query.access_token, function(namespace) {
-          db.get(namespace+'/workspace/'+path+(upgrade ? '/'+request.query.version : ''), true).then(function(version) {
+          db.get(namespace+'/workspace/'+path+(upgrade ? '/'+request.query.source : ''), true).then(function(version) {
             if (!version) return response.error();
             var published = version.published.pop();
             if (published && version.code == published.code &&
