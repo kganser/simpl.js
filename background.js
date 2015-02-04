@@ -403,7 +403,9 @@ chrome.app.runtime.onLaunched.addListener(function() {
     resizable: false,
     innerBounds: {width: 300, height: 100}
   }, function(window) {
-    launcher = window;
+    (launcher = window).onClosed.addListener(function() {
+      launcher = false;
+    });
   });
   launcher = true;
 });
