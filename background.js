@@ -90,9 +90,11 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
       var wrap = function(name, code, version, dependencies) {
         return 'simpl.add('+[JSON.stringify(name), code, version, JSON.stringify(dependencies)]+');';
       };
-      var broadcast = function(event, data) {
+      var broadcast = function(event, data, user) {
         Object.keys(clients).forEach(function(socketId) {
-          clients[socketId].send(o.string.toUTF8Buffer((event ? 'data: '+JSON.stringify({event: event, data: data}) : ':ping')+'\n\n').buffer, function(info) {
+          var client = clients[socketId];
+          if (client.user != user && client != null) return;
+          client.socket.send(o.string.toUTF8Buffer((event ? 'data: '+JSON.stringify({event: event, data: data}) : ':ping')+'\n\n').buffer, function(info) {
             if (info.resultCode) delete clients[socketId];
           });
         });
@@ -223,11 +225,13 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
           }
         }
         if (request.path == '/activity') {
-          clients[socket.socketId] = socket;
           socket.setNoDelay(true);
-          return response.end('', {
-            'Content-Type': 'text/event-stream',
-            'Content-Length': null
+          return authenticate(request.cookie.sid, function(session) {
+            clients[socket.socketId] = {user: session && session.username, socket: socket};
+            response.end('', {
+              'Content-Type': 'text/event-stream',
+              'Content-Length': null
+            });
           });
         }
         if (request.path == '/auth') {
@@ -262,10 +266,11 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
                 var name = body.app,
                     version = body.version,
                     id = (session ? session.username+'/' : '')+name+version,
-                    action = body.action;
+                    action = body.action,
+                    user = session && session.username;
                 if ((action == 'stop' || action == 'restart') && apps[id]) {
                   apps[id].terminate();
-                  broadcast('stop', {app: name, version: version});
+                  broadcast('stop', {app: name, version: version}, user);
                   delete apps[id];
                   if (action == 'stop') return response.ok();
                 }
@@ -288,12 +293,12 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
                         callback(wrap(module.name, record.code, module.version, record.dependencies));
                       }));
                     }, function(level, args, module, line, column) {
-                      broadcast('log', {app: name, version: version, level: level, message: args, module: module, line: line, column: column});
+                      broadcast('log', {app: name, version: version, level: level, message: args, module: module, line: line, column: column}, user);
                     }, function(message, module, line) {
-                      broadcast('error', {app: name, version: version, message: message, module: module, line: line});
+                      broadcast('error', {app: name, version: version, message: message, module: module, line: line}, user);
                       delete apps[id];
                     });
-                    broadcast('run', {app: name, version: version});
+                    broadcast('run', {app: name, version: version}, user);
                     response.ok();
                   });
                 response.error();
