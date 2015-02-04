@@ -71,8 +71,10 @@ function(modules) {
     switch (request.path) {
       case '/':
         return authenticate(request.cookie.sid, function(account) {
-          render(['Welcome, '+account.name+'! ', {a: {href: '/logout', children: 'Log out'}}]);
+          render(['Welcome, '+account.name+'! ', {a: {href: '/launch', children: 'Launch Console'}}, ' ', {a: {href: '/logout', children: 'Log out'}}]);
         }) || render(['Please ', {a: {href: '/register', children: 'Register'}}, ' or ', {a: {href: '/login', children: 'Log in'}}, '.']);
+      case '/launch':
+        return render('Launching...');
       case '/authorize':
         // prompt owner for access; redirect to client with authorization_code if granted
         // TODO: CSRF token

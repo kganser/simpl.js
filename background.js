@@ -1,7 +1,8 @@
 simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0}, function(o, proxy) {
 
-  var server, port, ping, loader, lines,
+  var server, ping, loader, lines,
       db = o.database.open('simpl', {sessions: {}}),
+      api = 'http://127.0.0.1:8005/',
       key = o.crypto.codec.utf8String.toBits(o.crypto.random.randomWords(6, 0)),
       fromBits = o.crypto.codec.base64.fromBits,
       toBits = o.crypto.codec.base64.toBits;
@@ -81,7 +82,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
         if (server) {
           clearInterval(ping);
           server.disconnect();
-          server = null;
+          server = port = null;
         }
         return launcher.postMessage({action: 'stop'});
       }
@@ -113,7 +114,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
           authenticate(request.cookie.sid, function(session, inactive) {
             if (inactive) return fallback(callback);
             if (!session) return logout(sid);
-            o.xhr('http://127.0.0.1:8005/v1/'+path+(~path.indexOf('?') ? '&' : '?')+'access_token='+session.accessToken, {
+            o.xhr(api+'v1/'+path+(~path.indexOf('?') ? '&' : '?')+'access_token='+session.accessToken, {
               method: method,
               responseType: 'json',
               json: text ? undefined : body,
@@ -238,10 +239,10 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
           var code = request.query.authorization_code;
           // TODO: check request.query.state
           if (!code) return response.error();
-          return o.xhr('http://127.0.0.1:8005/token?authorization_code='+code, function(e) {
+          return o.xhr(api+'token?authorization_code='+code, function(e) {
             if (e.target.status != 200) return response.error();
             code = e.target.responseText;
-            o.xhr('http://127.0.0.1:8005/v1/user?access_token='+code, {responseType: 'json'}, function(e) {
+            o.xhr(api+'v1/user?access_token='+code, {responseType: 'json'}, function(e) {
               if (e.target.status != 200) return response.error();
               db.put('sessions/'+(sid = token()), {
                 accessToken: code,
@@ -277,7 +278,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
                 if ((action == 'run' || action == 'restart') && !apps[id])
                   return function(callback) {
                     if (inactive) return db.get('apps/'+encodeURIComponent(name)+'/versions/'+version).then(callback);
-                    o.xhr('http://127.0.0.1:8005/v1/apps/'+encodeURIComponent(name)+'/'+version+'?access_token='+session.accessToken, {responseType: 'json'}, function(e) {
+                    o.xhr(api+'v1/apps/'+encodeURIComponent(name)+'/'+version+'?access_token='+session.accessToken, {responseType: 'json'}, function(e) {
                       if (e.target.status != 200) return response.error();
                       callback(e.target.response);
                     });
@@ -286,7 +287,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
                     apps[id] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\nsimpl.use('+JSON.stringify(app.dependencies)+','+app.code+');', function(module, callback) {
                       (function(callback) {
                         if (inactive) return db.get('modules/'+encodeURIComponent(module.name)+'/versions/'+module.version).then(callback);
-                        o.xhr('http://127.0.0.1:8005/v1/modules/'+encodeURIComponent(module.name)+'/'+module.version+'?access_token='+session.accessToken, {responseType: 'json'}, function(e) {
+                        o.xhr(api+'v1/modules/'+encodeURIComponent(module.name)+'/'+module.version+'?access_token='+session.accessToken, {responseType: 'json'}, function(e) {
                           callback(e.target.response);
                         });
                       }(function(record) {
@@ -371,8 +372,10 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
           response.end(e.target.response, (request.path.match(/\.([^.]*)$/) || [])[1]);
         });
       }, function(error, s) {
-        server = s;
-        port = command.port;
+        if (!error) {
+          server = s;
+          port = command.port;
+        }
         launcher.postMessage({error: error, action: 'start', port: port});
       });
     });
@@ -388,10 +391,19 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
   });
 });
 
+var port, launcher = false;
+
 chrome.app.runtime.onLaunched.addListener(function() {
+  if (launcher.focus) {
+    if (port) return window.open('http://localhost:'+port);
+    return launcher.focus();
+  }
   chrome.app.window.create('simpl.html', {
     id: 'simpl',
     resizable: false,
     innerBounds: {width: 300, height: 100}
+  }, function(window) {
+    launcher = window;
   });
+  launcher = true;
 });
