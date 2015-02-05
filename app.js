@@ -236,11 +236,7 @@ simpl.add('app', function(o) {
             {a: {className: 'logout', href: '/logout', title: 'Log Out'}},
             user.name
           ]}}
-        : {a: {
-            className: 'user unknown',
-            children: 'Log In or Register',
-            href: 'http://127.0.0.1:8005/authorize?client_id=simpljs-chrome&redirect_uri='+encodeURIComponent(location.href+'auth')
-          }},
+        : {a: {className: 'user unknown', href: '/login', children: 'Log In or Register'}},
         {h2: 'Apps'},
         {div: {className: 'form', children: [
           {input: {type: 'text', placeholder: 'New App', onkeyup: function(e) {

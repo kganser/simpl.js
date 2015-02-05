@@ -34,9 +34,7 @@
   },
   "url_handlers": {
     "launch": {
-      "matches": [
-        "http://127.0.0.1:8005/launch"
-      ],
+      "matches": ["http://simpljs.com/launch/*"],
       "title": "Launch Simpl.js Console"
     }
   }

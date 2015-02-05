@@ -5,14 +5,18 @@ function(modules) {
       fromBits = modules.crypto.codec.base64.fromBits,
       toBits = modules.crypto.codec.base64.toBits;
   
+  var signature = function(value) {
+    if (!Array.isArray(value)) value = toBits(value, true);
+    return fromBits(new modules.crypto.misc.hmac(key).mac(value), true, true);
+  };
   var token = function() {
     var rand = modules.crypto.random.randomWords(6, 0);
-    return fromBits(rand, true, true)+'.'+fromBits(new modules.crypto.misc.hmac(key).mac(rand), true, true);
+    return fromBits(rand, true, true)+'.'+signature(rand);
   };
   var verify = function(signed) {
     try {
       var parts = signed.split('.');
-      return fromBits(new modules.crypto.misc.hmac(key).mac(toBits(parts[0], true)), true, true) == parts[1] && signed;
+      return signature(parts[0]) == parts[1] && signed;
     } catch (e) {}
   };
   var pbkdf2 = function(password, salt) {
@@ -30,7 +34,7 @@ function(modules) {
     });
   };
   
-  modules.http.serve({port: config.port}, function(request, response) {
+  modules.http.serve({port: 80}, function(request, response) {
     var render = function(body, status) {
       response.end(modules.html.markup([
         {'!doctype': {html: null}},
@@ -341,7 +345,7 @@ function(modules) {
       response.end(e.target.response, (request.path.match(/\.([^.]*)$/) || [])[1]);
     });
   }, function(error) {
-    if (error) console.error('Error listening on 0.0.0.0:'+config.port+'\n'+error);
-    else console.log('Listening at http://localhost:'+config.port);
+    if (error) console.error(error);
+    else console.log('Listening at http://simpljs.com');
   });
 }

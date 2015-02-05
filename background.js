@@ -2,19 +2,22 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
 
   var server, ping, loader, lines,
       db = o.database.open('simpl', {sessions: {}}),
-      api = 'http://127.0.0.1:8005/',
-      key = o.crypto.codec.utf8String.toBits(o.crypto.random.randomWords(6, 0)),
-      fromBits = o.crypto.codec.base64.fromBits,
-      toBits = o.crypto.codec.base64.toBits;
+      api = 'http://simpljs.com/',
+      key = o.crypto.random.randomWords(6, 0), // TODO: store in database
+      fromBits = o.crypto.codec.base64.fromBits;
   
+  var signature = function(value) {
+    if (!Array.isArray(value)) value = o.crypto.codec.base64.toBits(value, true);
+    return fromBits(new o.crypto.misc.hmac(key).mac(value), true, true);
+  };
   var token = function() {
     var rand = o.crypto.random.randomWords(6, 0);
-    return fromBits(rand, true, true)+'.'+fromBits(new o.crypto.misc.hmac(key).mac(rand), true, true);
+    return fromBits(rand, true, true)+'.'+signature(rand);
   };
   var verify = function(signed) {
     try {
       var parts = signed.split('.');
-      return fromBits(new o.crypto.misc.hmac(key).mac(toBits(parts[0], true)), true, true) == parts[1] && signed;
+      return signature(parts[0]) == parts[1] && signed;
     } catch (e) {}
   };
   var authenticate = function(sid, callback) {
@@ -31,7 +34,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
       {name: '4 Simple Login', file: 'simple-login', config: {port: 8003, sessionKey: 'yabadabadoo'}, dependencies: {crypto: 0, database: 0, html: 0, http: 0}},
       {name: '5 Unit Tests', file: 'unit-tests', dependencies: {async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 0, xhr: 0}},
       {name: 'Time Tracker', file: 'time-tracker', config: {port: 8004, redmineHost: 'redmine.slytrunk.com'}, dependencies: {http: 0, database: 0, html: 0, xhr: 0}},
-      {name: 'Simpl.js Server', file: 'simpljs-server', config: {port: 8005, sessionKey: 'abracadabra'}, dependencies: {crypto: 0, database: 0, html: 0, http: 0, xhr: 0}}
+      {name: 'Simpl.js Server', file: 'simpljs-server', config: {sessionKey: 'abracadabra'}, dependencies: {crypto: 0, database: 0, html: 0, http: 0, xhr: 0}}
     ].forEach(function(app, i, apps) {
       o.xhr('/apps/'+app.file+'.js', function(e) {
         data[app.name] = {versions: [{
@@ -235,26 +238,34 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
             });
           });
         }
-        if (request.path == '/auth') {
-          var code = request.query.authorization_code;
-          // TODO: check request.query.state
-          if (!code) return response.error();
-          return o.xhr(api+'token?authorization_code='+code, function(e) {
-            if (e.target.status != 200) return response.error();
-            code = e.target.responseText;
-            o.xhr(api+'v1/user?access_token='+code, {responseType: 'json'}, function(e) {
+        if (request.path == '/auth')
+          return authenticate(sid = request.cookie.sid, function(session) {
+            var code = request.query.authorization_code;
+            if (!session || !code || signature(sid.split('.')[0]) != request.query.state) return response.error();
+            o.xhr(api+'token?authorization_code='+code, function(e) {
               if (e.target.status != 200) return response.error();
-              db.put('sessions/'+(sid = token()), {
-                accessToken: code,
-                username: e.target.response.username,
-                name: e.target.response.name,
-                email: e.target.response.email
-              }).then(function() {
-                response.generic(303, {'Set-Cookie': 'sid='+sid, Location: '/'});
+              code = e.target.responseText;
+              o.xhr(api+'v1/user?access_token='+code, {responseType: 'json'}, function(e) {
+                if (e.target.status != 200) return response.error();
+                db.put('sessions/'+sid, {
+                  accessToken: code,
+                  username: e.target.response.username,
+                  name: e.target.response.name,
+                  email: e.target.response.email
+                }).then(function() {
+                  response.generic(303, {Location: '/'});
+                });
               });
             });
           });
-        }
+        if (request.path == '/login')
+          return authenticate(sid = request.cookie.sid, function(session) {
+            var uri = api+'authorize?client_id=simpljs&redirect_uri='+encodeURIComponent('http://localhost:'+port+'/auth')+'&state=';
+            if (session) return response.generic(303, {Location: uri+signature(sid.split('.')[0])});
+            db.put('sessions/'+(sid = token()), true).then(function() {
+              response.generic(303, {'Set-Cookie': 'sid='+sid, Location: uri+signature(sid.split('.')[0])});
+            });
+          });
         if (request.path == '/logout')
           return logout(verify(request.cookie.sid));
         if (request.path == '/') {
