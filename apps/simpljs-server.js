@@ -6,7 +6,7 @@ function(modules) {
       toBits = modules.crypto.codec.base64.toBits;
   
   var signature = function(value) {
-    if (!Array.isArray(value)) value = toBits(value, true);
+    if (!Array.isArray(value)) value = toBits(value.split('.')[0], true);
     return fromBits(new modules.crypto.misc.hmac(key).mac(value), true, true);
   };
   var token = function() {
@@ -14,24 +14,25 @@ function(modules) {
     return fromBits(rand, true, true)+'.'+signature(rand);
   };
   var verify = function(signed) {
-    try {
-      var parts = signed.split('.');
-      return signature(parts[0]) == parts[1] && signed;
-    } catch (e) {}
+    if (typeof signed != 'string') return;
+    var parts = signed.split('.');
+    return signature(parts[0]) == parts[1] && signed;
   };
   var pbkdf2 = function(password, salt) {
     var value = modules.crypto.misc.cachedPbkdf2(password, salt && {salt: toBits(salt, true)});
     return {key: fromBits(value.key, true, true), salt: fromBits(value.salt, true, true)};
   };
   var gcSessions = function(db) {
-    if (Math.random() > .1) return;
-    db.get('sessions').then(function(sessions) {
-      var now = Date.now();
-      Object.keys(sessions).forEach(function(sid) {
-        if (sessions[sid].expires <= now)
-          db.delete('sessions/'+sid);
+    if (Math.random() < .1) {
+      db.get('sessions').then(function(sessions) {
+        var now = Date.now();
+        Object.keys(sessions).forEach(function(sid) {
+          if (sessions[sid].expires <= now)
+            db.delete('sessions/'+sid);
+        });
       });
-    });
+    }
+    return db;
   };
   
   modules.http.serve({port: 80}, function(request, response) {
@@ -43,7 +44,8 @@ function(modules) {
             {title: 'Simpl.js'},
             {meta: {charset: 'utf-8'}},
             {meta: {name: 'viewport', content: 'width=device-width, initial-scale=1.0, user-scalable=no'}},
-            {link: {rel: 'stylesheet', href: '/apps/assets/simpljs-server.css'}}
+            {link: {rel: 'stylesheet', href: '/apps/assets/simpljs-server.css'}},
+            {link: {rel: 'chrome-webstore-item', href: 'https://chrome.google.com/webstore/detail/'+config.appId}}
           ]},
           {body: body}
         ]}
@@ -75,54 +77,75 @@ function(modules) {
     switch (request.path) {
       case '/':
         return authenticate(request.cookie.sid, function(account) {
-          render(['Welcome, '+account.name+'! ', {a: {href: '/launch', children: 'Launch Console'}}, ' ', {a: {href: '/logout', children: 'Log out'}}]);
+          render(['Welcome, '+account.name+'! ', {a: {href: '/launch', children: 'Launch'}}, ' ', {a: {href: '/logout', children: 'Log out'}}]);
         }) || render(['Please ', {a: {href: '/register', children: 'Register'}}, ' or ', {a: {href: '/login', children: 'Log in'}}, '.']);
       case '/launch':
-        return render('Launching...');
+        return authenticate(sid = request.cookie.sid, function(account) {
+          render([
+            {p: {id: 'message', children: ['Please install ', {a: {id: 'link', href: 'https://chrome.google.com/webstore/detail/simpljs/'+config.appId, children: 'Simpl.js for Chrome'}}, '.']}},
+            {script: function(token) {
+              if (!token) return signature(sid);
+              var message = document.getElementById('message'),
+                  launch = function() { location.href = '/launch-'+token; };
+              if (!window.chrome || !chrome.app)
+                return message.innerHTML = 'You must be running Google Chrome to launch your Simpl.js Console. If you already have Chrome, open it and navigate to <code>http://simpljs.com/launch</code>. Otherwise, <a href="http://www.google.com/chrome/">download Chrome</a>.';
+              if (chrome.app.isInstalled) return launch();
+              document.getElementById('link').onclick = function(e) {
+                e.preventDefault();
+                chrome.webstore.install(undefined, launch);
+              };
+            }}
+          ]);
+        }) || response.generic(303, {Location: '/login?redirect=%2Flaunch'});
       case '/authorize':
         // prompt owner for access; redirect to client with authorization_code if granted
-        // TODO: CSRF token
         // TODO: client registration
-        // TODO: implement scopes
         // TODO: default to client's default redirect_uri
-        // TODO: redirect on deny
+        // TODO: implement scopes
         if (request.method == 'POST' && (request.headers['Content-Type'] || '').split(';')[0] == 'application/x-www-form-urlencoded')
           return request.slurp(function(body) {
-            if (!authenticate(request.cookie.sid, function(account) {
-              var username = account.username,
+            if (!authenticate(sid = request.cookie.sid, function(account) {
+              var state = '&state='+encodeURIComponent(body.state),
+                  owner = account.username,
                   client = body.client_id;
-              gcSessions(db);
-              db.put('accounts/'+encodeURIComponent(username)+'/clients/'+encodeURIComponent(client), true)
-                .put('sessions/'+(sid = token()), {client: client, owner: username, expires: Date.now()+86400000})
-                .then(function() { response.generic(303, {Location: body.redirect_uri+'?authorization_code='+sid+'&state='+encodeURIComponent(body.state)}); });
+              if (body.token != signature(sid)) return response.error();
+              if (body.action != 'Authorize') return response.generic(303, {Location: body.redirect_uri+'?error=access_denied'+state});
+              gcSessions(db).put('accounts/'+encodeURIComponent(owner)+'/clients/'+encodeURIComponent(client), true)
+                .put('sessions/'+(sid = token()), {client: client, owner: owner, expires: Date.now()+86400000})
+                .then(function() { response.generic(303, {Location: body.redirect_uri+'?authorization_code='+sid+state}); });
             })) response.error();
           }, 'url');
-        return authenticate(request.cookie.sid, function(account) {
+        return authenticate(sid = request.cookie.sid, function(account) {
           var client = request.query.client_id,
               redirect = request.query.redirect_uri,
-              scope = request.query.scope,
               state = request.query.state;
-          if (client in account.clients) {
-            gcSessions(db);
-            return db.put('sessions/'+(sid = token()), {client: client, owner: account.username, expires: Date.now()+86400000})
-              .then(function() { response.generic(303, {Location: redirect+'?authorization_code='+sid+'&state='+encodeURIComponent(state)}); });
+          if (client in account.clients || client == 'simpljs') {
+            var session = {client: client, owner: account.username, expires: Date.now()+86400000};
+            if (client == 'simpljs') session.secret = signature(sid);
+            return gcSessions(db).put('sessions/'+(sid = token()), session).then(function() {
+              response.generic(303, {Location: redirect+'?authorization_code='+sid+'&state='+encodeURIComponent(state)});
+            });
           }
+          // TODO: look up client name, redirect_uri from client_id
           render([
             {p: client+' would like access to your account information.'},
             {form: {method: 'post', action: '/authorize', children: [
               {input: {type: 'hidden', name: 'client_id', value: client}},
               {input: {type: 'hidden', name: 'redirect_uri', value: redirect}},
-              {input: {type: 'hidden', name: 'scope', value: scope}},
               {input: {type: 'hidden', name: 'state', value: state}},
-              {input: {type: 'submit', value: 'Authorize'}} // TODO: deny button
+              {input: {type: 'hidden', name: 'token', value: signature(sid)}},
+              {input: {type: 'submit', name: 'action', value: 'Authorize'}},
+              {input: {type: 'submit', name: 'action', value: 'Deny'}}
             ]}}
           ]);
         }) || response.generic(302, {Location: '/login?redirect='+encodeURIComponent(request.uri)});
       case '/token':
         // exchange authorization_code for access_token
-        // TODO: require client secret
         return authenticateAPI(sid = request.query.authorization_code, function(session) {
+          // TODO: check client secret for registered clients
+          if (session.secret != request.query.client_secret) return response.error();
           session.accessToken = true;
+          delete session.secret;
           db.delete('sessions/'+sid).put('sessions/'+(sid = token()), session).then(function() {
             response.end(sid);
           });
@@ -133,8 +156,7 @@ function(modules) {
             db.get('accounts/'+encodeURIComponent(body.username), true).then(function(account) {
               if (!account || account.password !== pbkdf2(body.password, account.salt).key)
                 return render(['Invalid login. ', {a: {href: '/login', children: 'Try again'}}], 401);
-              gcSessions(this);
-              this.put('sessions/'+(sid = token()), {user: body.username, expires: Date.now()+86400000}).then(function() {
+              gcSessions(this).put('sessions/'+(sid = token()), {user: body.username, expires: Date.now()+86400000}).then(function() {
                 var redirect = body.redirect || '/';
                 response.generic(303, {'Set-Cookie': 'sid='+sid, Location: redirect[0] == '/' ? redirect : '/'});
               });
@@ -144,7 +166,7 @@ function(modules) {
         return render([{form: {method: 'post', action: '/login', children: [
           {label: 'Username: '}, {input: {type: 'text', name: 'username'}}, {br: null},
           {label: 'Password: '}, {input: {type: 'password', name: 'password'}}, {br: null},
-          {input: {type: 'hidden', name: 'redirect', value: request.query.redirect || '/'}},
+          {input: {type: 'hidden', name: 'redirect', value: request.query.redirect || ''}},
           {input: {type: 'submit', value: 'Log In'}}
         ]}}]);
       case '/logout':
