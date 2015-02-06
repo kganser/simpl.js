@@ -23,6 +23,18 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
     if (!verify(sid)) return callback(null, true);
     db.get('sessions/'+sid).then(callback);
   };
+  var gcSessions = function(db) {
+    if (Math.random() < .1) {
+      db.get('sessions').then(function(sessions) {
+        var now = Date.now();
+        Object.keys(sessions).forEach(function(sid) {
+          if (sessions[sid].expires <= now)
+            db.delete('sessions/'+sid);
+        });
+      });
+    }
+    return db;
+  };
   
   db.get('apps').then(function(data) {
     if (data) return;
@@ -240,7 +252,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
         if (request.path == '/auth')
           return authenticate(sid = request.cookie.sid, function(session) {
             var code = request.query.authorization_code;
-            if (!session || !code || signature(sid.split('.')[0]) != request.query.state) return response.error();
+            if (!session || !code || signature(sid) != request.query.state) return response.error();
             o.xhr(api+'token?authorization_code='+code+'&client_secret='+session.secret, function(e) {
               if (e.target.status != 200) return response.error();
               code = e.target.responseText;
@@ -250,7 +262,8 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
                   accessToken: code,
                   username: e.target.response.username,
                   name: e.target.response.name,
-                  email: e.target.response.email
+                  email: e.target.response.email,
+                  expires: Date.now()+86400000
                 }).then(function() {
                   response.generic(303, {Location: '/'});
                 });
@@ -263,7 +276,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
           return authenticate(sid = request.cookie.sid, function(session) {
             var uri = api+'authorize?client_id=simpljs&redirect_uri=http%3A%2F%2Flocalhost%3A'+port+'%2Fauth&state=';
             if (!session) sid = token();
-            db.put('sessions/'+sid, {secret: secret}).then(function() {
+            gcSessions(db).put('sessions/'+sid, {secret: secret, expires: Date.now()+86400000}).then(function() {
               response.generic(303, {'Set-Cookie': 'sid='+sid, Location: uri+signature(sid)});
             });
           });

@@ -117,8 +117,8 @@ function(modules) {
           }, 'url');
         return authenticate(sid = request.cookie.sid, function(account) {
           var client = request.query.client_id,
-              redirect = request.query.redirect_uri,
-              state = request.query.state;
+              redirect = request.query.redirect_uri || '',
+              state = request.query.state || '';
           if (client in account.clients || client == 'simpljs') {
             var session = {client: client, owner: account.username, expires: Date.now()+86400000};
             if (client == 'simpljs') session.secret = signature(sid);
@@ -157,7 +157,7 @@ function(modules) {
               if (!account || account.password !== pbkdf2(body.password, account.salt).key)
                 return render(['Invalid login. ', {a: {href: '/login', children: 'Try again'}}], 401);
               gcSessions(this).put('sessions/'+(sid = token()), {user: body.username, expires: Date.now()+86400000}).then(function() {
-                var redirect = body.redirect || '/';
+                var redirect = body.redirect || '/'; // TODO: better redirect validation
                 response.generic(303, {'Set-Cookie': 'sid='+sid, Location: redirect[0] == '/' ? redirect : '/'});
               });
             });
