@@ -151,7 +151,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
               method = request.method;
           
           parts.splice(2, 0, 'versions');
-          path = parts.join('/');
+          var path = parts.join('/');
           
           if (parts.length < 5 && method == 'POST') {
             var upgrade = parts.length == 3;
@@ -402,11 +402,11 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
           server = s;
           port = command.port;
         }
-        launcher.postMessage({error: error, action: 'start', port: port});
+        launcher.postMessage({error: error, action: 'start', port: port, path: path});
       });
     });
     
-    if (server) launcher.postMessage({action: 'start', port: port});
+    if (server) launcher.postMessage({action: 'start', port: port, path: path});
   });
   
   chrome.runtime.onSuspend.addListener(function() {
@@ -417,14 +417,17 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
   });
 });
 
-var port, launcher = false;
+var port, path = '', launcher = false;
 
 chrome.app.runtime.onLaunched.addListener(function(source) {
+  path = source && source.url ? '/login?token='+source.url.substr(26) : '';
   if (launcher.focus) {
-    source = source && source.url;
     // TODO: use chrome.browser.openTab() to navigate in existing tab
-    // TODO: store token if server is not running; open tab when launched
-    if (port) return window.open('http://localhost:'+port+(source ? '/login?token='+source.substr(26) : ''));
+    if (port) {
+      var link = launcher.contentWindow.document.getElementById('link');
+      link.setAttribute('href', 'http://localhost:'+port+path);
+      return link.click();
+    }
     return launcher.focus();
   }
   launcher = true;

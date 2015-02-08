@@ -9,8 +9,15 @@ bg.onMessage.addListener(function(message) {
   if (!message.error) {
     action.value = started ? 'Stop' : 'Launch';
     if (message.port) port.value = message.port;
-    if (started) link.setAttribute('href', 'http://localhost:'+message.port);
-    else link.removeAttribute('href');
+    if (started) {
+      link.setAttribute('href', 'http://localhost:'+message.port+message.path);
+      if (message.path) {
+        link.click();
+        link.setAttribute('href', 'http://localhost:'+message.port);
+      }
+    } else {
+      link.removeAttribute('href');
+    }
   }
   error.textContent = message.error || '';
   action.disabled = false;
