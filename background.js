@@ -45,7 +45,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
       {name: '4 Simple Login', file: 'simple-login', config: {port: 8003, sessionKey: 'yabadabadoo'}, dependencies: {crypto: 0, database: 0, html: 0, http: 0}},
       {name: '5 Unit Tests', file: 'unit-tests', dependencies: {async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 0, xhr: 0}},
       {name: 'Time Tracker', file: 'time-tracker', config: {port: 8004, redmineHost: 'redmine.slytrunk.com'}, dependencies: {http: 0, database: 0, html: 0, xhr: 0}},
-      {name: 'Simpl.js Server', file: 'simpljs-server', config: {sessionKey: 'abracadabra', appId: 'ppkbmgeiifejebmkmnlnbfjgemabpldk'}, dependencies: {crypto: 0, database: 0, html: 0, http: 0, xhr: 0}}
+      {name: 'Simpl.js Server', file: 'simpljs-server', config: {sessionKey: 'abracadabra', appId: 'kdkheiopehanfbajkkopimfppjmclgbp'}, dependencies: {crypto: 0, database: 0, html: 0, http: 0, xhr: 0}}
     ].forEach(function(app, i, apps) {
       o.xhr('/apps/'+app.file+'.js', function(e) {
         data[app.name] = {versions: [{
@@ -422,6 +422,8 @@ var port, launcher = false;
 chrome.app.runtime.onLaunched.addListener(function(source) {
   if (launcher.focus) {
     source = source && source.url;
+    // TODO: use chrome.browser.openTab() to navigate in existing tab
+    // TODO: store token if server is not running; open tab when launched
     if (port) return window.open('http://localhost:'+port+(source ? '/login?token='+source.substr(26) : ''));
     return launcher.focus();
   }

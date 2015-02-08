@@ -81,21 +81,8 @@ function(modules) {
         }) || render(['Please ', {a: {href: '/register', children: 'Register'}}, ' or ', {a: {href: '/login', children: 'Log in'}}, '.']);
       case '/launch':
         return authenticate(sid = request.cookie.sid, function(account) {
-          render([
-            {p: {id: 'message', children: ['Please install ', {a: {id: 'link', href: 'https://chrome.google.com/webstore/detail/simpljs/'+config.appId, children: 'Simpl.js for Chrome'}}, '.']}},
-            {script: function(token) {
-              if (!token) return signature(sid);
-              var message = document.getElementById('message'),
-                  launch = function() { location.href = '/launch-'+token; };
-              if (!window.chrome || !chrome.app)
-                return message.innerHTML = 'You must be running Google Chrome to launch your Simpl.js Console. If you already have Chrome, open it and navigate to <code>http://simpljs.com/launch</code>. Otherwise, <a href="http://www.google.com/chrome/">download Chrome</a>.';
-              if (chrome.app.isInstalled) return launch();
-              document.getElementById('link').onclick = function(e) {
-                e.preventDefault();
-                chrome.webstore.install(undefined, launch);
-              };
-            }}
-          ]);
+          // TODO: change this to HTTP 303 when possible: https://code.google.com/p/chromium/issues/detail?id=316951
+          response.end('<script>location.href = "/launch-'+signature(sid)+'";</script>', 'html');
         }) || response.generic(303, {Location: '/login?redirect=%2Flaunch'});
       case '/authorize':
         // prompt owner for access; redirect to client with authorization_code if granted
@@ -266,6 +253,18 @@ function(modules) {
           });
         });
     }
+    if (/^\/launch-[^\/]*$/.test(request.path))
+      return render([
+        {p: {id: 'message', children: ['Please install ', {a: {id: 'link', href: 'https://chrome.google.com/webstore/detail/simpljs/'+config.appId, children: 'Simpl.js for Chrome'}}, '.']}},
+        {script: function() {
+          if (!window.chrome || !chrome.app)
+            return document.getElementById('message').innerHTML = 'You must be running Google Chrome to launch your Simpl.js Console. If you already have Chrome, open it and navigate to <code>http://simpljs.com/launch</code>. Otherwise, <a href="http://www.google.com/chrome/">download Chrome</a>.';
+          document.getElementById('link').onclick = function(e) {
+            e.preventDefault();
+            chrome.webstore.install(undefined, function() { location.href = '/launch'; });
+          };
+        }}
+      ]);
     if (/^\/v1\/(apps|modules)\/[^\/]*(\/\d+(\/|$)|$)/.test(request.path)) {
       var path = request.path.substr(4),
           parts = path.split('/'),
