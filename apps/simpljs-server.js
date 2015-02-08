@@ -200,7 +200,7 @@ function(modules) {
                   }
                   if (++count < items.length) return;
                   var hash = pbkdf2(body.password);
-                  db.put('sessions/'+(sid = token()), body.username).put(path, {
+                  db.put('sessions/'+(sid = token()), {user: body.username, expires: Date.now()+86400000}).put(path, {
                     name: body.name,
                     email: body.email,
                     password: hash.key,
