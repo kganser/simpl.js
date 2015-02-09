@@ -4,7 +4,7 @@
   "description": "Simpl.js isomorphic platform for javascript",
   "offline_enabled": true,
   "icons": {"128": "icon.png"},
-  "version": "0.1",
+  "version": "0.2",
   "minimum_chrome_version": "33",
   "permissions": [
     "unlimitedStorage",
