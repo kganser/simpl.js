@@ -90,12 +90,13 @@ simpl.add('app', function(o) {
       var entry = (app ? apps : modules)[name][version];
       return function(e) {
         e.stopPropagation();
-        this.disabled = true;
+        var button = this;
+        button.disabled = true;
         o.xhr('/', {
           method: 'POST',
           json: {action: action, app: name, version: version}
         }, function() {
-          e.target.disabled = false;
+          button.disabled = false;
           entry.running = action != 'stop';
           entry.tab.classList[entry.running ? 'add' : 'remove']('running');
           if (entry.running) {
