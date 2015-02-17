@@ -1,9 +1,3 @@
-@font-face {
-  font-family: entypo;
-  src: url(/entypo.woff);
-  font-weight: normal;
-  font-style: normal;
-}
 @keyframes yellow-fade {
   5% { background-color: #ff6; }
 }
@@ -13,6 +7,18 @@
 body {
   margin: 0;
   font: 13px sans-serif;
+}
+#icons {
+  display: none;
+}
+svg {
+  width: 15px;
+  height: 15px;
+  vertical-align: bottom;
+  fill: currentColor;
+}
+nav svg {
+  height: 100%;
 }
 pre, code, kbd, samp, tt, .CodeMirror {
   font-family: Consolas, monospace;
@@ -55,31 +61,23 @@ h2 {
   color: black;
   text-decoration: none;
 }
-.user img {
+.user img, .user span {
+  background: #f7f7f7;
   float: left;
   width: 30px;
   height: 25px;
   margin: -5px 10px 0 0;
+}
+.user span {
+  color: #666;
+  text-align: center;
 }
 .logout {
   float: right;
   position: relative;
   color: white;
   margin: -5px 0 0 1px;
-}
-.logout:before {
-  content: "";
-}
-.user.unknown:before {
-  content: "👤";
-  font: 26px/13px entypo;
-  color: #666;
   text-align: center;
-  background: #f7f7f7;
-  float: left;
-  width: 30px;
-  height: 25px;
-  margin: -5px 10px 0 0;
 }
 .form {
   position: relative;
@@ -91,9 +89,6 @@ h2 {
   position: absolute;
   top: 0;
   right: 0;
-}
-.form button:before {
-  content: "➕";
 }
 input {
   box-sizing: border-box;
@@ -127,23 +122,18 @@ nav .name span {
   color: #999;
   margin-left: 5px;
 }
-nav .name:after {
-  font: 26px entypo;
+nav .icon-loading, nav .icon-error {
+  display: none;
+  float: right;
+  margin: 0 7px;
+  height: 15px;
   color: #666;
-  position: absolute;
-  top: 0;
-  right: 5px;
-  height: 100%;
-  width: 20px;
-  text-align: center;
-  margin-top: -.28em;
 }
-nav .error .name:after {
-  content: "⚠";
+nav .icon-error {
   color: #c33;
 }
-nav .loading .name:after {
-  content: "⏳";
+nav .error .icon-error, nav .loading .icon-loading {
+  display: inline-block;
 }
 nav .changed .name:before {
   content: "*";
@@ -153,7 +143,6 @@ nav .changed .name:before {
 }
 button, .logout {
   background: #f7f7f7;
-  text-align: left;
   padding: 0;
   border: none;
   outline: none;
@@ -170,15 +159,6 @@ nav button, #actions button {
   vertical-align: top;
   margin: 0 0 1px 1px;
 }
-nav button:before, .logout:before, #actions button:before {
-  font: 26px entypo;
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  line-height: 13px;
-  text-align: center;
-}
 nav button:hover, #actions button:hover {
   color: white;
 }
@@ -188,7 +168,7 @@ button:active {
 .run:hover, .restart:hover, #status.success {
   background: #3c3;
 }
-.logout, nav .delete:hover, #actions .delete:hover, #dependencies .delete:hover, .stop:hover, #status.failure {
+.logout, #actions .delete:hover, #dependencies .delete:hover, .stop:hover, #status.failure {
   background: #c33;
 }
 .code:hover, .settings:hover, .log:hover, .docs:hover, #status.info {
@@ -200,41 +180,11 @@ button:active {
 .toggle:hover, .show-code .toggle:hover {
   background: #666;
 }
-.publish:before {
-  content: "";
-}
-.code:before {
-  content: "";
-}
-.settings:before {
-  content: "⚙";
-}
-.log:before {
-  content: "☰";
-}
-.docs:before {
-  content: "ℹ";
-}
-.run:before {
-  content: "▶";
-}
-.restart:before {
-  content: "⟳";
-}
-.stop:before {
-  content: "■";
-}
-nav .delete:before, #actions .delete:before {
-  content: "";
-}
-.toggle:before {
-  content: "◂";
-}
-.collapsed .toggle:before {
-  content: "▸";
-}
-.view, .selected.loading .view, .restart, .stop, .running .run, .running .delete, .collapsed nav .delete {
+.view, .view svg, .selected.loading .view, .restart, .stop, .running .run, .toggle .icon-right, .collapsed .toggle .icon-left {
   display: none;
+}
+.code .icon-code, .settings .icon-settings, .log .icon-log, .docs .icon-info, .toggle .icon-left, .collapsed .toggle .icon-right {
+  display: inline-block;
 }
 .selected .view, .running .restart, .running .stop {
   display: inline;
@@ -374,11 +324,11 @@ nav .selected button {
   width: 50%;
 }
 #actions button {
-  padding: 5px 10px 5px 30px;
+  padding: 5px 10px;
   margin-bottom: 3px;
 }
-#actions button:before {
-  width: 30px;
+#actions button svg {
+  margin-right: 8px;
 }
 .search {
   position: relative;
@@ -387,14 +337,11 @@ nav .selected button {
 .search input {
   padding: 0 10px 0 28px;
 }
-.search:before {
-  content: "🔍";
-  font: 26px entypo;
-  color: #aaa;
+.search .icon-search {
   position: absolute;
-  margin: -.26em 0 0 10px;
-  height: 0;
-  text-align: center;
+  top: 5px;
+  left: 8px;
+  fill: #aaa;
 }
 #dependencies .module {
   padding: 0 0 5px 10px;
@@ -430,6 +377,7 @@ nav .selected button {
   box-sizing: border-box;
   width: 100%;
   padding: 3px 0 3px 25px;
+  text-align: left;
 }
 .suggest button:hover {
   background: #def;

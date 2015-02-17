@@ -11,7 +11,7 @@ simpl.add('app', function(o) {
       });
     });
     var appList, moduleList, selected, code, config, major, minor, del, dependencies, search, suggest, timeline, history, log, docs, line, status,
-        dom = o.html.dom;
+        icons = {}, dom = o.html.dom;
     if (window.EventSource) new EventSource('/activity').onmessage = function(e) {
       try { var message = JSON.parse(e.data); } catch (e) { return; }
       var data = message.data || {},
@@ -28,7 +28,7 @@ simpl.add('app', function(o) {
             message: data.message,
             module: data.module ? data.module.name : '',
             version: data.module ? data.module.version : '',
-            line: data.line > offset ? data.module ? data.line : data.line-offset : null
+            line: data.module ? data.line : data.line > offset ? data.line-offset : null
           }) > 1000) entry.log.shift();
           if (selected && selected.entry == entry) {
             var scroll = body.classList.contains('show-log') && body.scrollHeight - body.scrollTop == document.documentElement.clientHeight;
@@ -49,6 +49,16 @@ simpl.add('app', function(o) {
           break;
       }
     };
+    Array.prototype.slice.call(document.getElementById('icons').childNodes).forEach(function(icon) {
+      icons[icon.id.substr(5)] = function(el) {
+        var ns = 'http://www.w3.org/2000/svg',
+            svg = document.createElementNS(ns, 'svg');
+        svg.setAttribute('class', icon.id);
+        el.appendChild(svg)
+          .appendChild(document.createElementNS(ns, 'use'))
+          .setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#'+icon.id);
+      };
+    });
     var url = function(app, name, version) {
       if (!arguments.length && selected) {
         app = selected.app;
@@ -120,7 +130,7 @@ simpl.add('app', function(o) {
           search.value = '';
           suggest();
           del.style.display = entry.minor ? 'none' : 'inline-block';
-          major.style.display = entry.minor ? 'inline-block' : 'none';
+          major.parentNode.style.display = entry.minor ? 'inline-block' : 'none';
           major.textContent = 'Publish '+(versions.length+1)+'.0';
           minor.textContent = 'Publish '+(version+1)+'.'+entry.minor;
           timeline(name, version, app);
@@ -185,9 +195,7 @@ simpl.add('app', function(o) {
           (current.app ? appList : moduleList).insertBefore(
             dom(li(current.name, version-1, 1, current.app)),
             versions[version-2].tab.nextSibling);
-          major.style.display = 'inline-block';
           major.textContent = 'Publish '+(version+1)+'.0';
-          del.style.display = 'none';
         } else {
           entry.published.push(current.app
             ? {code: entry.code, config: entry.config, dependencies: entry.dependencies}
@@ -195,11 +203,12 @@ simpl.add('app', function(o) {
           entry.tab.lastChild.title = current.name+' '+version;
           entry.tab.lastChild.lastChild.textContent = version;
           timeline(version);
-          major.style.display = 'inline-block';
+          major.parentNode.style.display = 'inline-block';
           major.textContent = 'Publish '+(versions.length+1)+'.0';
           minor.textContent = 'Publish '+(current.version+1)+'.'+entry.minor;
-          del.style.display = 'none';
         }
+        major.parentNode.style.display = 'inline-block';
+        del.style.display = 'none';
       });
     };
     var li = function(name, major, minor, app) {
@@ -208,23 +217,25 @@ simpl.add('app', function(o) {
       return {li: function(elem) {
         entry.tab = elem;
         elem.onclick = function(e) {
-          var selected = this.classList.contains('selected');
-          if (!selected || e.target == entry.view)
-            toggle(name, major, app, selected && e.target.className.replace(/\s*view\s*/, ''));
+          if (!this.classList.contains('selected'))
+            toggle(name, major, app);
         };
         if (entry.running)
           elem.classList.add('running');
         return [
           {div: {className: 'controls', children: [
-            {button: {className: 'view', children: function(e) { entry.view = e; }}},
-            app && {button: {className: 'run', title: 'Run', onclick: handler('run', name, major, app)}},
-            app && {button: {className: 'restart', title: 'Restart', onclick: handler('restart', name, major, app)}},
-            app && {button: {className: 'stop', title: 'Stop', onclick: handler('stop', name, major, app)}}
+            {button: {className: 'view', onclick: function() { toggle(name, major, app, this.className.replace(/\s*view\s*/, '')); }, children: function(e) {
+              entry.view = e;
+              return [app || icons.info, icons.code, icons.settings, app && icons.log];
+            }}},
+            app && {button: {className: 'run', title: 'Run', onclick: handler('run', name, major, app), children: icons.run}},
+            app && {button: {className: 'restart', title: 'Restart', onclick: handler('restart', name, major, app), children: icons.restart}},
+            app && {button: {className: 'stop', title: 'Stop', onclick: handler('stop', name, major, app), children: icons.stop}}
           ]}},
           {span: {
             className: 'name',
             title: version ? name+' '+version : name,
-            children: [name, {span: version}]
+            children: [icons.loading, icons.error, name, {span: version}]
           }}
         ];
       }};
@@ -233,16 +244,19 @@ simpl.add('app', function(o) {
       {nav: [user
         ? {div: {className: 'user', children: [
             {img: {src: 'http://www.gravatar.com/avatar/'+md5(user.email.toLowerCase())}},
-            {a: {className: 'logout', href: '/logout', title: 'Log Out'}},
+            {a: {className: 'logout', href: '/logout', title: 'Log Out', children: icons.logout}},
             user.name
           ]}}
-        : {a: {className: 'user unknown', href: '/login', children: 'Log In or Register'}},
+        : {a: {className: 'user', href: '/login', children: [
+            {span: icons.user},
+            'Log In or Register'
+          ]}},
         {h2: 'Apps'},
         {div: {className: 'form', children: [
           {input: {type: 'text', placeholder: 'New App', onkeyup: function(e) {
             if (e.keyCode == 13) this.nextSibling.click();
           }}},
-          {button: {title: 'Add', onclick: function() {
+          {button: {title: 'Add', children: icons.add, onclick: function() {
             var field = this.previousSibling,
                 name = field.value;
             field.value = '';
@@ -269,7 +283,7 @@ simpl.add('app', function(o) {
           {input: {type: 'text', placeholder: 'New Module', onkeyup: function(e) {
             if (e.keyCode == 13) this.nextSibling.click();
           }}},
-          {button: {title: 'Add', onclick: function() {
+          {button: {title: 'Add', children: icons.add, onclick: function() {
             var field = this.previousSibling,
                 name = field.value;
             field.value = '';
@@ -291,7 +305,7 @@ simpl.add('app', function(o) {
             });
           });
         }},
-        {button: {className: 'toggle', onclick: function() {
+        {button: {className: 'toggle', children: [icons.left, icons.right], onclick: function() {
           body.classList.toggle('collapsed');
           code.refresh();
         }}}
@@ -328,9 +342,9 @@ simpl.add('app', function(o) {
         }}},
         {div: {id: 'settings', children: [
           {section: {id: 'actions', children: [
-            {button: {className: 'publish', children: function(e) { major = e; }, onclick: function() { publish(true); }}}, {br: null},
-            {button: {className: 'publish', children: function(e) { minor = e; }, onclick: function() { publish(); }}}, {br: null},
-            {button: {className: 'delete', children: function(e) { del = e; return 'Delete'; }, onclick: function() {
+            {button: {className: 'publish', children: [icons.publish, {span: function(e) { major = e; }}], onclick: function() { publish(true); }}}, {br: null},
+            {button: {className: 'publish', children: [icons.publish, {span: function(e) { minor = e; }}], onclick: function() { publish(); }}}, {br: null},
+            {button: {className: 'delete', children: function(e) { del = e; return [icons.delete, 'Delete']; }, onclick: function() {
               var button = this,
                   current = selected,
                   type = selected.app ? 'app' : 'module';
@@ -357,6 +371,7 @@ simpl.add('app', function(o) {
           {section: {id: 'dependencies', children: [
             {h2: 'Dependencies'},
             {div: {className: 'search', children: [
+              icons.search,
               {input: {type: 'text', placeholder: 'Search Modules', children: function(e) { search = e; }, onkeyup: function(e) {
                 if (e.keyCode != 13) {
                   var results = [], value = this.value;
