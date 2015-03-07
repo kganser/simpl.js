@@ -1,10 +1,10 @@
 simpl.add('docs', function(modules) {
 
   var tokens = {
-    id: /[a-zA-Z_$][a-zA-Z0-9_$]*/,
-    number: /[0-9]+/,
-    string: /'[^']*'|"[^"]*"/,
-    code: /`[^`]+`/,
+    id: /[a-z_$][a-z0-9_$]*/i,
+    number: /(0|[1-9][0-9]*)?(\.[0-9]*)?/,
+    string: /'[^\\'\r\n]*(\\.[^\\'\r\n]*)*'|"[^\\"\r\n]*(\\.[^\\"\r\n]*)*"/,
+    code: /`[^\\`\r\n]*(\\.[^\\`\r\n]*)*`/,
     '': /\s+/
   };
   var self, parse = modules.parser.generate({
