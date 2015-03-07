@@ -63,10 +63,10 @@ simpl.add('http', function(modules) {
       `query` is the result of `parseQuery` run on `uri`'s query string, if any. `headers` and `cookie` store only the
       last string value for a given key.
       
-      `slurp` buffers the request body (up to `maxSize` bytes) and issues `callback` when complete. If format is
-      `'utf8'`, `'url'`, or `'json'`, the body is converted to a string, `parseQuery` object, or json structure,
-      respectively. Otherwise, `body` is an `ArrayBuffer`. If the max size is exceeded, `callback` is not issued and
-      the server responds with a generic `413 Request Entity Too Large`. */
+      `slurp` buffers the request body (up to `maxSize` bytes) and issues `callback` when complete. It must be called
+      synchronously inside `RequestCallback`. If `format` is `'utf8'`, `'url'`, or `'json'`, the body is converted to a
+      string, `parseQuery` object, or json structure, respectively. Otherwise, `body` is an `ArrayBuffer`. If the max
+      size is exceeded, `callback` is not issued and the server responds with a generic `413 Request Entity Too Large`. */
       
   /** Response: {
         send: function(body='':ArrayBuffer|string, headers=`{}`:object|string, status=200:number, callback:function(error:string|undefined)),

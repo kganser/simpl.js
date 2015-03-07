@@ -181,7 +181,7 @@ function(modules) {
           }, 'json');
         }
       }, function(error, server) {
-        assert(!error, 'http listen from port 9123');
+        assert(!error, 'http listen on port 9123');
         if (error) return next();
         var host = 'http://127.0.0.1:9123';
         modules.xhr(host, function(e) {
@@ -301,17 +301,18 @@ function(modules) {
         assert(!e.indexOf('Reduce-reduce conflict'), 'parser reduce-reduce error detection');
       }
       
-      var i = 1;
+      var i = 1, server;
       modules.socket.listen({port: 9123}, function(socket) {
         socket.send(modules.string.toUTF8Buffer('ping').buffer);
         return function(data) {
           assert(i++ == 2 && modules.string.fromUTF8Buffer(data) == 'pong', 'socket receive from client');
+          if (server) server.disconnect();
           next();
         };
       }, function(error) {
-        assert(!error, 'socket listen from port 9123');
+        assert(!error, 'socket listen on port 9123');
         modules.socket.connect({port: 9123}, function(error, socket) {
-          assert(!error, 'socket connect');
+          assert(!error && (server = socket), 'socket connect');
           return function(data) {
             assert(i++ == 1 && modules.string.fromUTF8Buffer(data) == 'ping', 'socket receive from server');
             socket.send(modules.string.toUTF8Buffer('pong').buffer);
