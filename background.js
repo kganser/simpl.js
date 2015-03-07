@@ -43,7 +43,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
       {name: '2 Web Server', file: 'web-server', config: {port: 8001}, dependencies: {http: 0}},
       {name: '3 Database Editor', file: 'database-editor', config: {port: 8002, database: 'simpl'}, dependencies: {database: 0, html: 0, http: 0, xhr: 0}},
       {name: '4 Simple Login', file: 'simple-login', config: {port: 8003, sessionKey: 'yabadabadoo'}, dependencies: {crypto: 0, database: 0, html: 0, http: 0}},
-      {name: '5 Unit Tests', file: 'unit-tests', dependencies: {async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 0, xhr: 0}}
+      {name: '5 Unit Tests', file: 'unit-tests', dependencies: {async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 0, socket: 0, xhr: 0}}
     ].forEach(function(app, i, apps) {
       o.xhr('/apps/'+app.file+'.js', function(e) {
         data[app.name] = {versions: [{

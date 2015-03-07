@@ -30,7 +30,8 @@
     }
   },
   "sockets": {
-    "tcpServer": {"listen": "*"}
+    "tcpServer": {"listen": "*"},
+    "tcp": {"connect": "*"}
   },
   "url_handlers": {
     "launch": {

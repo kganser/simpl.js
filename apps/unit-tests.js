@@ -301,12 +301,31 @@ function(modules) {
         assert(!e.indexOf('Reduce-reduce conflict'), 'parser reduce-reduce error detection');
       }
       
+      var i = 1;
+      modules.socket.listen({port: 9123}, function(socket) {
+        socket.send(modules.string.toUTF8Buffer('ping').buffer);
+        return function(data) {
+          assert(i++ == 2 && modules.string.fromUTF8Buffer(data) == 'pong', 'socket receive from client');
+          next();
+        };
+      }, function(error) {
+        assert(!error, 'socket listen from port 9123');
+        modules.socket.connect({port: 9123}, function(error, socket) {
+          assert(!error, 'socket connect');
+          return function(data) {
+            assert(i++ == 1 && modules.string.fromUTF8Buffer(data) == 'ping', 'socket receive from server');
+            socket.send(modules.string.toUTF8Buffer('pong').buffer);
+          };
+        });
+      });
+    },
+    function(next) {
       var uint8 = [116,101,115,116,32,49,50,51,32,195,161,195,169,195,173,195,179,195,186],
           str = 'test 123 áéíóú',
           buf = modules.string.toUTF8Buffer(str);
       assert(buf.length == uint8.length && !uint8.some(function(n, i) { return n != buf[i]; }), 'string to buffer');
       assert(modules.string.fromUTF8Buffer(new Uint8Array(uint8).buffer) === str, 'string from buffer');
-      assert(passed == 60, 'tests complete ('+passed+'/60 in '+(Date.now()-start)+'ms)');
+      assert(passed == 64, 'tests complete ('+passed+'/64 in '+(Date.now()-start)+'ms)');
     }
   );
 }
