@@ -85,10 +85,10 @@ simpl.add('socket', function(modules, proxy) {
   });
   
   if (simpl.worker) return {
-    listen: function(options, onConnect, callback) {
+    listen: function(options, accept, callback) {
       proxy('listen', [options], function(error, socketId) {
         if (error) return callback && callback(error);
-        servers[socketId] = onConnect;
+        servers[socketId] = accept;
         if (callback) callback(false, {
           disconnect: function() {
             proxy('disconnectServer', [socketId]);
@@ -159,13 +159,13 @@ simpl.add('socket', function(modules, proxy) {
     disconnect(info.socketId);
   });
   
-  var listen = function(options, onConnect, callback) {
+  var listen = function(options, accept, callback) {
     sockets.tcpServer.create({name: options.name}, function(info) {
       var socketId = info.socketId;
       try {
         sockets.tcpServer.listen(socketId, options.address || '0.0.0.0', options.port, options.backlog, function(resultCode) {
           if (resultCode) sockets.tcpServer.close(socketId);
-          else servers[socketId] = {clients: {}, callback: onConnect};
+          else servers[socketId] = {clients: {}, callback: accept};
           callback(resultCode && chrome.runtime.lastError.message, socketId);
         });
       } catch (e) {
@@ -225,12 +225,12 @@ simpl.add('socket', function(modules, proxy) {
   
   /** socket: {
         connect: function(options:ConnectOptions, callback:function(error:string|null, socket:ClientSocket|false) -> function(data:ArrayBuffer)),
-        listen: function(options:ListenOptions, onConnect:function(ClientSocket) -> function(data:ArrayBuffer), callback:function(error:string|null, socket:ServerSocket|false))
+        listen: function(options:ListenOptions, accept:function(ClientSocket) -> function(data:ArrayBuffer), callback:function(error:string|null, socket:ServerSocket|false))
       }
       
-      TCP client/server. `callback` receives either an `error` string or `socket` instance. `onConnect` is executed with
-      every accepted connection. A reader function should be returned by `connect`'s `callback` and `listen`'s
-      `onConnect` functions. */
+      TCP client/server. `callback` receives either an `error` string or `socket` instance. `accept` is executed with
+      every accepted connection. A reader function should be returned by `connect`'s `callback` and `listen`'s `accept`
+      functions. */
   
   /** ConnectOptions: {
         address='127.0.0.1': string,
@@ -270,8 +270,8 @@ simpl.add('socket', function(modules, proxy) {
         peerPort: number
       } */
   return {
-    listen: function(options, onConnect, callback) {
-      listen(options, onConnect, function(error, socketId) {
+    listen: function(options, accept, callback) {
+      listen(options, accept, function(error, socketId) {
         if (callback) callback(error, !error && {
           disconnect: function() {
             disconnectServer(socketId);
