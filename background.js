@@ -437,7 +437,9 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
 var port, path = '', launcher = false;
 
 chrome.app.runtime.onLaunched.addListener(function(source) {
-  path = source && source.url ? '/login?token='+source.url.substr(26) : '';
+  var token = source && source.url && source.url.substr(26),
+      headless = token == 'headless';
+  path = token && !headless ? '/login?token='+token : '';
   if (launcher.focus) {
     // TODO: use chrome.browser.openTab() to navigate in existing tab
     if (port) {
@@ -456,5 +458,8 @@ chrome.app.runtime.onLaunched.addListener(function(source) {
     (launcher = window).onClosed.addListener(function() {
       launcher = false;
     });
+    if (headless) launcher.contentWindow.onload = function(e) {
+      e.target.getElementById('action').click();
+    };
   });
 });
