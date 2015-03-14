@@ -28,7 +28,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
       data: text ? data : undefined
     }, function(e) {
       var t = e.target;
-      callback(t.status, t.response, t.responseText);
+      callback(t.status, t.response);
     });
   };
   var authenticate = function(sid, callback, token) {
@@ -267,9 +267,9 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
           return authenticate(sid = request.cookie.sid, function(session) {
             var code = request.query.authorization_code;
             if (!session || !code || signature(sid) != request.query.state) return response.error();
-            api('token?authorization_code='+code+'&client_secret='+session.secret, null, function(status, data, text) {
+            api('token?authorization_code='+code+'&client_secret='+session.secret, null, function(status, data) {
               if (status != 200) return response.error();
-              api('v1/user', code = text, function(status, data) {
+              api('v1/user', code = data.accessToken, function(status, data) {
                 if (status != 200) return response.error();
                 db.put('sessions/'+sid, {
                   accessToken: code,
