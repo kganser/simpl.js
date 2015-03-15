@@ -12,43 +12,6 @@ simpl.add('app', function(o) {
     });
     var appList, moduleList, selected, code, config, major, minor, del, dependencies, search, suggest, timeline, history, log, docs, line, status,
         icons = {}, dom = o.html.dom;
-    if (window.EventSource) new EventSource('/activity').onmessage = function(e) {
-      try { var message = JSON.parse(e.data); } catch (e) { return; }
-      var data = message.data || {},
-          entry = (apps[data.app] || {})[data.version];
-      if (!entry) return;
-      switch (message.event) {
-        case 'error':
-          entry.running = false;
-          entry.tab.classList.add(data.level = 'error');
-          data.message = [data.message];
-        case 'log':
-          if (entry.log.push(message = {
-            level: data.level == 'log' ? 'debug' : data.level,
-            message: data.message,
-            module: data.module ? data.module.name : '',
-            version: data.module ? data.module.version : '',
-            line: data.module ? data.line : data.line > offset ? data.line-offset : null
-          }) > 1000) entry.log.shift();
-          if (selected && selected.entry == entry) {
-            var scroll = body.classList.contains('show-log') && body.scrollHeight - body.scrollTop == document.documentElement.clientHeight;
-            dom(logLine(message), log);
-            if (scroll) body.scrollTop = body.scrollHeight;
-          }
-          break;
-        case 'run':
-        case 'stop':
-          entry.running = message.event == 'run';
-          entry.tab.classList[entry.running ? 'add' : 'remove']('running');
-          entry.tab.classList.remove('error');
-          if (entry.running) {
-            entry.log = [];
-            if (selected && selected.entry == entry)
-              log.textContent = '';
-          }
-          break;
-      }
-    };
     Array.prototype.slice.call(document.getElementById('icons').childNodes).forEach(function(icon) {
       icons[icon.id.substr(5)] = function(el) {
         var ns = 'http://www.w3.org/2000/svg',
@@ -596,15 +559,63 @@ simpl.add('app', function(o) {
           var i = 0; clear = function() {
             if (!--i) e.style.display = 'none';
           };
-          status = function(type, text) {
+          status = function(type, text, persist) {
             e.style.display = 'block';
             e.className = type;
             e.textContent = text;
-            setTimeout(clear, 2000);
-            i++;
+            if (!persist) {
+              setTimeout(clear, 2000);
+              i++;
+            }
           };
         }}}
       ]}}
     ], body);
+    
+    if (window.EventSource) {
+      var activity = new EventSource('/activity');
+      activity.onmessage = function(e) {
+        try { var message = JSON.parse(e.data); } catch (e) { return; }
+        var data = message.data || {},
+            entry = (apps[data.app] || {})[data.version];
+        if (!entry) return;
+        switch (message.event) {
+          case 'error':
+            entry.running = false;
+            entry.tab.classList.add(data.level = 'error');
+            data.message = [data.message];
+          case 'log':
+            if (entry.log.push(message = {
+              level: data.level == 'log' ? 'debug' : data.level,
+              message: data.message,
+              module: data.module ? data.module.name : '',
+              version: data.module ? data.module.version : '',
+              line: data.module ? data.line : data.line > offset ? data.line-offset : null
+            }) > 1000) entry.log.shift();
+            if (selected && selected.entry == entry) {
+              var scroll = body.classList.contains('show-log') && body.scrollHeight - body.scrollTop == document.documentElement.clientHeight;
+              dom(logLine(message), log);
+              if (scroll) body.scrollTop = body.scrollHeight;
+            }
+            break;
+          case 'run':
+          case 'stop':
+            entry.running = message.event == 'run';
+            entry.tab.classList[entry.running ? 'add' : 'remove']('running');
+            entry.tab.classList.remove('error');
+            if (entry.running) {
+              entry.log = [];
+              if (selected && selected.entry == entry)
+                log.textContent = '';
+            }
+            break;
+        }
+      };
+      activity.onerror = function() {
+        status('failure', 'Connection lost', true);
+      };
+    } else {
+      status('failure', 'Disconnected from log stream', true);
+    }
   };
 }, 0, {html: 0, xhr: 0, jsonv: 0, docs: 0});
