@@ -1,7 +1,6 @@
 simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0}, function(o, proxy) {
 
   var server, ping, loader, lines, icons,
-      host = 'http://simpljs.com/',
       db = o.database.open('simpl', {sessions: {}}),
       key = o.crypto.random.randomWords(6, 0), // TODO: store in database
       fromBits = o.crypto.codec.base64.fromBits;
@@ -20,7 +19,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
     return signature(parts[0]) == parts[1] && signed;
   };
   var api = function(path, token, callback, method, data, text) {
-    o.xhr(host+path, {
+    o.xhr('http://api.simpljs.com/'+path, {
       method: method,
       responseType: 'json',
       headers: {Authorization: token ? 'Bearer '+token : null},
@@ -32,7 +31,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
     });
   };
   var authenticate = function(sid, callback, token) {
-    if (token) return api('v1/user', token, function(status, data) {
+    if (token) return api('user', token, function(status, data) {
       callback(status == 200 && {username: data.username, accessToken: token});
     });
     if (!verify(sid)) return callback(null, true);
@@ -147,7 +146,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
           authenticate(request.cookie.sid, function(session, local) {
             if (local) return fallback(callback);
             if (!session) return logout(sid);
-            api('v1/'+path, session.accessToken, function(status, data) {
+            api(path, session.accessToken, function(status, data) {
               if (status != 200) return logout(sid); // TODO: handle certain error statuses
               callback(data, {username: session.username, name: session.name, email: session.email});
             }, method, data, text);
@@ -269,7 +268,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
             if (!session || !code || signature(sid) != request.query.state) return response.error();
             api('token?authorization_code='+code+'&client_secret='+session.secret, null, function(status, data) {
               if (status != 200) return response.error();
-              api('v1/user', code = data.accessToken, function(status, data) {
+              api('user', code = data.accessToken, function(status, data) {
                 if (status != 200) return response.error();
                 db.put('sessions/'+sid, {
                   accessToken: code,
@@ -285,13 +284,13 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
           });
         if (request.path == '/login') {
           var secret = request.query.token;
-          if (!secret) return response.generic(303, {Location: host+'launch'});
+          if (!secret) return response.generic(303, {Location: 'http://simpljs.com/launch'});
           return authenticate(sid = request.cookie.sid, function(session) {
             if (!session) sid = token();
             gcSessions(db).put('sessions/'+sid, {secret: secret, expires: Date.now()+86400000}).then(function() {
               response.generic(303, {
                 'Set-Cookie': 'sid='+sid,
-                Location: host+'authorize?client_id=simpljs&redirect_uri=http%3A%2F%2Flocalhost%3A'+port+'%2Fauth&state='+signature(sid)
+                Location: 'http://simpljs.com/authorize?client_id=simpljs&redirect_uri=http%3A%2F%2Flocalhost%3A'+port+'%2Fauth&state='+signature(sid)
               });
             });
           });
@@ -308,7 +307,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
                 var name = body.app,
                     version = body.version,
                     action = body.action;
-                if (session && body.server) return api('v1/servers/'+encodeURIComponent(body.server), session.accessToken, function(status) {
+                if (session && body.server) return api('servers/'+encodeURIComponent(body.server), session.accessToken, function(status) {
                   response.generic(status);
                 }, 'POST', {app: name, version: version, action: action});
                 var id = (session ? session.username+'/' : '')+name+version,
@@ -322,7 +321,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
                 if ((action == 'run' || action == 'restart') && !apps[id])
                   return function(callback) {
                     if (local) return db.get('apps/'+encodeURIComponent(name)+'/versions/'+version).then(callback);
-                    api('v1/apps/'+encodeURIComponent(name)+'/'+version, session.accessToken, function(status, data) {
+                    api('apps/'+encodeURIComponent(name)+'/'+version, session.accessToken, function(status, data) {
                       if (status != 200) return response.error();
                       callback(data);
                     });
@@ -331,7 +330,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
                     apps[id] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\nsimpl.use('+JSON.stringify(app.dependencies)+','+app.code+');', function(module, callback) {
                       (function(callback) {
                         if (local) return db.get('modules/'+encodeURIComponent(module.name)+'/versions/'+module.version).then(callback);
-                        api('v1/modules/'+encodeURIComponent(module.name)+'/'+module.version, session.accessToken, function(status, data) {
+                        api('modules/'+encodeURIComponent(module.name)+'/'+module.version, session.accessToken, function(status, data) {
                           callback(data);
                         });
                       }(function(record) {
