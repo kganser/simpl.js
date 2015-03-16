@@ -106,18 +106,28 @@ simpl.add('app', function(o) {
           code.setValue('');
           entry.tab.classList.add('loading');
           o.xhr(url(app, name, version), {responseType: 'json'}, function(e) {
-            if (e.target.status != 200) {
+            try {
+              if (e.target.status != 200) throw 'error';
+              var response = e.target.response;
+              if (typeof response != 'object')
+                response = JSON.parse(response);
+              entry.code = response.code;
+              entry.config = response.config;
+              entry.dependencies = response.dependencies;
+              entry.published = response.published;
+              entry.tab.classList.remove('error');
+              if (entry == selected.entry)
+                toggle(name, version, app, panel, ln, ch);
+            } catch (e) {
               entry.tab.classList.remove('loading');
-              // TODO: add failed class
+              entry.tab.classList.add('error');
+              if (entry == selected.entry) {
+                entry.tab.classList.remove('selected');
+                body.classList.remove('show-'+panel);
+                selected = null;
+              }
               return status('failure', 'Error retrieving '+(app ? 'app' : 'module'));
             }
-            var response = e.target.response;
-            if (typeof response != 'object') try { response = JSON.parse(response); } catch(e) {}
-            entry.code = response.code;
-            entry.config = response.config;
-            entry.dependencies = response.dependencies;
-            entry.published = response.published;
-            if (entry == selected.entry) toggle(name, version, app, panel, ln, ch);
           });
         }
         entry.tab.classList.add('selected');
