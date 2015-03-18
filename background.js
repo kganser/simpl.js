@@ -220,7 +220,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
                     });
                   });
                 }, response.ok, method, code, true);
-              }, 'utf8', 65536);
+              }, 'utf8', 131072);
             if (method == 'DELETE')
               return forward(uri, function(callback) {
                 db.delete(path).then(callback);
@@ -252,16 +252,38 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
               }, response.ok, method);
           }
         }
-        if (request.path == '/activity') {
-          socket.setNoDelay(true);
+        if (match = request.path.match(/^(\/servers\/([^\/]+))?\/activity$/)) {
           return authenticate(request.cookie.sid, function(session) {
-            clients[socket.socketId] = {user: session && session.username, socket: socket};
+            if (match = match[2]) {
+              if (!session) return response.error();
+              var feed = new EventSource('http://api.simpljs.com/servers/'+match+'/activity?access_token='+session.accessToken);
+              feed.onmessage = function(e) {
+                socket.send(o.string.toUTF8Buffer('data: '+e.data+'\n\n').buffer, function(info) {
+                  if (info.resultCode) feed.close();
+                });
+              };
+              feed.onerror = function() {
+                feed.close();
+                socket.disconnect();
+              };
+            } else {
+              clients[socket.socketId] = {user: session && session.username, socket: socket};
+            }
+            socket.setNoDelay(true);
             response.end('', {
               'Content-Type': 'text/event-stream',
               'Content-Length': null
             });
           }, request.query.accessToken);
         }
+        if (request.path == '/servers')
+          return authenticate(request.cookie.sid, function(session) {
+            if (!session) return response.generic(404);
+            api('servers', session.accessToken, function(status, data) {
+              if (!Array.isArray(data)) return response.generic(500);
+              response.end(JSON.stringify(data), 'json');
+            });
+          });
         if (request.path == '/auth')
           return authenticate(sid = request.cookie.sid, function(session) {
             var code = request.query.authorization_code;
@@ -346,7 +368,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
                     response.ok();
                   });
                 response.error();
-              }, request.query.accessToken);
+              }, request.query.access_token);
             }, 'json');
           return forward('workspace', function(callback) {
             db.get('', false, function(path) {
@@ -372,6 +394,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
             Object.keys(data).forEach(function(group) {
               Object.keys(data[group]).forEach(function(name) {
                 data[group][name] = data[group][name].versions.map(function(version) {
+                  // TODO: remove 'running' boolean
                   return group == 'apps' ? [version, !!apps[(session ? session.username+'/' : '')+name+version]] : version;
                 });
               });
