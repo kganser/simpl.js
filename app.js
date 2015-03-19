@@ -2,7 +2,7 @@ simpl.add('app', function(o) {
   return function(apps, modules, offset, user, body) {
     Object.keys(apps).forEach(function(name) {
       apps[name].forEach(function(version, i, app) {
-        app[i] = {minor: version[0], running: version[1], log: []};
+        app[i] = {minor: version, log: []};
       });
     });
     Object.keys(modules).forEach(function(name) {
@@ -27,8 +27,30 @@ simpl.add('app', function(o) {
       if (feed) feed.close();
       server = id || undefined;
       feed = new EventSource(id ? '/servers/'+encodeURIComponent(id)+'/activity' : '/activity');
+      appList.classList.add('disabled');
+      Object.keys(apps).forEach(function(app) {
+        apps[app].forEach(function(entry) {
+          entry.tab.classList.remove('running');
+          entry.running = false;
+          entry.log = [];
+        });
+      });
+      if (selected && selected.app)
+        log.innerHTML = '';
       feed.onmessage = function(e) {
         try { var message = JSON.parse(e.data); } catch (e) { return; }
+        if (message.state) {
+          appList.classList.remove('disabled');
+          return Object.keys(message.state).forEach(function(app) {
+            if (!apps[app]) return;
+            message.state[app].forEach(function(version) {
+              if (app = apps[app][version]) {
+                app.tab.classList.add('running');
+                app.running = true;
+              }
+            });
+          });
+        }
         var data = message.data || {},
             entry = (apps[data.app] || {})[data.version];
         if (!entry) return;
@@ -97,8 +119,8 @@ simpl.add('app', function(o) {
         {div: {className: 'message', children: message}}
       ]}};
     };
-    var handler = function(action, name, version, app) {
-      var entry = (app ? apps : modules)[name][version];
+    var handler = function(action, name, version) {
+      var entry = apps[name][version];
       return function(e) {
         e.stopPropagation();
         var button = this;
@@ -242,17 +264,15 @@ simpl.add('app', function(o) {
           if (!this.classList.contains('selected'))
             toggle(name, major, app);
         };
-        if (entry.running)
-          elem.classList.add('running');
         return [
           {div: {className: 'controls', children: [
             {button: {className: 'view', onclick: function() { toggle(name, major, app, this.className.replace(/\s*view\s*/, '')); }, children: function(e) {
               entry.view = e;
               return [app || icons.info, icons.code, icons.settings, app && icons.log];
             }}},
-            app && {button: {className: 'run', title: 'Run', onclick: handler('run', name, major, app), children: icons.run}},
-            app && {button: {className: 'restart', title: 'Restart', onclick: handler('restart', name, major, app), children: icons.restart}},
-            app && {button: {className: 'stop', title: 'Stop', onclick: handler('stop', name, major, app), children: icons.stop}}
+            app && {button: {className: 'run', title: 'Run', onclick: handler('run', name, major), children: icons.run}},
+            app && {button: {className: 'restart', title: 'Restart', onclick: handler('restart', name, major), children: icons.restart}},
+            app && {button: {className: 'stop', title: 'Stop', onclick: handler('stop', name, major), children: icons.stop}}
           ]}},
           {span: {
             className: 'name',
@@ -285,7 +305,10 @@ simpl.add('app', function(o) {
                     return {option: {value: server.id, children: server.id+'@'+server.ip}};
                   }), elem);
                 });
-                return {option: {value: '', children: 'Localhost'}};
+                return [
+                  {option: {value: '', children: 'Localhost'}},
+                  //{option: {value: 'test', children: 'Test Server'}}
+                ];
               }}
             ]}}]
         : {a: {className: 'user', href: '/login', children: [

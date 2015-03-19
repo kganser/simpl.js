@@ -137,6 +137,9 @@ nav .name span {
   color: #999;
   margin-left: 5px;
 }
+nav .disabled .controls {
+  display: none;
+}
 nav .icon-loading, nav .icon-error {
   display: none;
   float: right;
@@ -147,7 +150,7 @@ nav .icon-loading, nav .icon-error {
 nav .icon-error {
   color: #c33;
 }
-nav .error .icon-error, nav .loading .icon-loading {
+nav .disabled .icon-loading, nav .error .icon-error, nav .loading .icon-loading {
   display: inline-block;
 }
 nav .changed .name:before {
@@ -234,7 +237,7 @@ nav .selected button {
   background: white;
   box-shadow: 0 0 3px rgba(0, 0, 0, .3);
 }
-.collapsed .user, .collapsed nav h2, .collapsed .form, .collapsed nav li, .collapsed nav .selected:after {
+.collapsed .user, .collapsed .servers, .collapsed nav h2, .collapsed .form, .collapsed nav li, .collapsed nav .selected:after {
   display: none;
 }
 .collapsed nav {

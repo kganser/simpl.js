@@ -269,8 +269,17 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
             } else {
               clients[socket.socketId] = {user: session && session.username, socket: socket};
             }
+            var state = {};
+            Object.keys(apps).forEach(function(id) {
+              id = id.split('/').map(decodeURIComponent);
+              if (session ? session.username == id[0] : !id[0]) {
+                var version = parseInt(id[2], 10);
+                if (!state[id[1]]) state[id[1]] = [version];
+                else state[id[1]].push(version);
+              }
+            });
             socket.setNoDelay(true);
-            response.end('', {
+            response.end('data: '+JSON.stringify({state: state})+'\n\n', {
               'Content-Type': 'text/event-stream',
               'Content-Length': null
             });
@@ -332,7 +341,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
                 if (session && body.server) return api('servers/'+encodeURIComponent(body.server), session.accessToken, function(status) {
                   response.generic(status);
                 }, 'POST', {app: name, version: version, action: action});
-                var id = (session ? session.username+'/' : '')+name+version,
+                var id = [session ? session.username : '', name, version].map(encodeURIComponent).join('/'),
                     user = session && session.username;
                 if ((action == 'stop' || action == 'restart') && apps[id]) {
                   apps[id].terminate();
@@ -391,14 +400,8 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
             });
           }, function(data, session) {
             if (!data) return response.generic(500);
-            Object.keys(data).forEach(function(group) {
-              Object.keys(data[group]).forEach(function(name) {
-                data[group][name] = data[group][name].versions.map(function(version) {
-                  // TODO: remove 'running' boolean
-                  return group == 'apps' ? [version, !!apps[(session ? session.username+'/' : '')+name+version]] : version;
-                });
-              });
-            });
+            Object.keys(data.apps).forEach(function(name) { data.apps[name] = data.apps[name].versions; });
+            Object.keys(data.modules).forEach(function(name) { data.modules[name] = data.modules[name].versions; });
             response.end(o.html.markup([
               {'!doctype': {html: null}},
               {html: [
