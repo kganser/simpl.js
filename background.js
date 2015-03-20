@@ -119,14 +119,14 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
         return launcher.postMessage({action: 'stop'});
       }
       
-      var apps = {}, clients = {};
+      var apps = {}, logs = {}, clients = {};
       var wrap = function(name, code, version, dependencies) {
         return 'simpl.add('+[JSON.stringify(name), code, version, JSON.stringify(dependencies)]+');';
       };
       var broadcast = function(event, data, user) {
         Object.keys(clients).forEach(function(socketId) {
           var client = clients[socketId];
-          if (client.user != user && client != null) return;
+          if (data && client.user != user) return;
           client.socket.send(o.string.toUTF8Buffer((event ? 'data: '+JSON.stringify({event: event, data: data}) : ':ping')+'\n\n').buffer, function(info) {
             if (info.resultCode) delete clients[socketId];
           });
@@ -266,20 +266,26 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
                 feed.close();
                 socket.disconnect();
               };
+              var data = '';
             } else {
+              var user = session ? session.username : '',
+                  state = {}, log = [];
+              Object.keys(apps).forEach(function(id) {
+                var parts = id.split('/').map(decodeURIComponent);
+                if (parts[0] == user) {
+                  var version = parseInt(parts[2], 10);
+                  if (!state[parts[1]]) state[parts[1]] = [version];
+                  else state[parts[1]].push(version);
+                  log = log.concat(logs[id]);
+                }
+              });
+              var data = 'data: '+JSON.stringify({state: state})+'\n\n'+log.map(function(message) {
+                return 'data: '+JSON.stringify({event: 'log', data: message})+'\n\n';
+              }).join('');
               clients[socket.socketId] = {user: session && session.username, socket: socket};
             }
-            var state = {};
-            Object.keys(apps).forEach(function(id) {
-              id = id.split('/').map(decodeURIComponent);
-              if (session ? session.username == id[0] : !id[0]) {
-                var version = parseInt(id[2], 10);
-                if (!state[id[1]]) state[id[1]] = [version];
-                else state[id[1]].push(version);
-              }
-            });
             socket.setNoDelay(true);
-            response.end('data: '+JSON.stringify({state: state})+'\n\n', {
+            response.end(data, {
               'Content-Type': 'text/event-stream',
               'Content-Length': null
             });
@@ -341,8 +347,8 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
                 if (session && body.server) return api('servers/'+encodeURIComponent(body.server), session.accessToken, function(status) {
                   response.generic(status);
                 }, 'POST', {app: name, version: version, action: action});
-                var id = [session ? session.username : '', name, version].map(encodeURIComponent).join('/'),
-                    user = session && session.username;
+                var user = session && session.username,
+                    id = [user || '', name, version].map(encodeURIComponent).join('/');
                 if ((action == 'stop' || action == 'restart') && apps[id]) {
                   apps[id].terminate();
                   broadcast('stop', {app: name, version: version}, user);
@@ -358,6 +364,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
                     });
                   }(function(app) {
                     if (!app) return response.error();
+                    logs[id] = [];
                     apps[id] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\nsimpl.use('+JSON.stringify(app.dependencies)+','+app.code+');', function(module, callback) {
                       (function(callback) {
                         if (local) return db.get('modules/'+encodeURIComponent(module.name)+'/versions/'+module.version).then(callback);
@@ -368,9 +375,12 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
                         callback(wrap(module.name, record.code, module.version, record.dependencies));
                       }));
                     }, function(level, args, module, line, column) {
-                      broadcast('log', {app: name, version: version, level: level, message: args, module: module, line: line, column: column}, user);
+                      var data = {app: name, version: version, level: level, message: args, module: module, line: line, column: column};
+                      if (logs[id].push(data) > 100) logs[id].unshift();
+                      broadcast('log', data, user);
                     }, function(message, module, line) {
                       broadcast('error', {app: name, version: version, message: message, module: module, line: line}, user);
+                      delete logs[id];
                       delete apps[id];
                     });
                     broadcast('run', {app: name, version: version}, user);
