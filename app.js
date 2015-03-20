@@ -40,8 +40,7 @@ simpl.add('app', function(o) {
       feed.onmessage = function(e) {
         try { var message = JSON.parse(e.data); } catch (e) { return; }
         if (message.state) {
-          appList.classList.remove('disabled');
-          return Object.keys(message.state).forEach(function(app) {
+          Object.keys(message.state).forEach(function(app) {
             if (!apps[app]) return;
             message.state[app].forEach(function(version) {
               if (app = apps[app][version]) {
@@ -50,6 +49,9 @@ simpl.add('app', function(o) {
               }
             });
           });
+          if (selected && selected.app)
+            toggle(selected.name, selected.version, true, selected.panel == 'log' && !selected.entry.running ? 'code' : selected.panel);
+          return appList.classList.remove('disabled');
         }
         var data = message.data || {},
             entry = (apps[data.app] || {})[data.version];

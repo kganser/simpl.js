@@ -289,7 +289,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
               'Content-Type': 'text/event-stream',
               'Content-Length': null
             });
-          }, request.query.accessToken);
+          }, request.query.access_token);
         }
         if (request.path == '/servers')
           return authenticate(request.cookie.sid, function(session) {
