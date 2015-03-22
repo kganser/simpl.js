@@ -23,8 +23,9 @@ simpl.add('app', function(o) {
       };
     });
     var connect = function(id) {
-      if (!window.EventSource) return status('failure', 'Disconnected from log stream', true);
+      if (!window.EventSource) return status('failure', 'EventSource is not supported in this browser', true);
       if (feed) feed.close();
+      status();
       server = id || undefined;
       feed = new EventSource(id ? '/servers/'+encodeURIComponent(id)+'/activity' : '/activity');
       appList.classList.add('disabled');
@@ -89,7 +90,7 @@ simpl.add('app', function(o) {
         }
       };
       feed.onerror = function() {
-        status('failure', 'Connection lost', true);
+        status('failure', 'Connection lost; please refresh', true);
         feed.close();
         feed = null;
       };
@@ -684,6 +685,7 @@ simpl.add('app', function(o) {
             if (!--i) e.style.display = 'none';
           };
           status = function(type, text, persist) {
+            if (!type) return e.style.display = 'none';
             e.style.display = 'block';
             e.className = type;
             e.textContent = text;
