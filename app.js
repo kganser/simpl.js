@@ -225,12 +225,14 @@ simpl.add('app', function(o) {
       var current = selected,
           entry = selected.entry,
           published = entry.published.slice(-1).pop();
+      if (Object.keys(entry.dependencies).some(function(name) { return !entry.dependencies[name]; }))
+        return alert('All dependencies must be published module versions');
       if (published && entry.code == published.code &&
           JSON.stringify(entry.config) == JSON.stringify(published.config) &&
           JSON.stringify(entry.dependencies) == JSON.stringify(published.dependencies))
         return alert('No changes to publish');
       status('info', 'Publishing...');
-      o.xhr(upgrade ? (current.app ? '/apps/' : '/modules/')+encodeURIComponent(current.name)+'?version='+current.version : url(), {method: 'POST'}, function(e) {
+      o.xhr(upgrade ? (current.app ? '/apps/' : '/modules/')+encodeURIComponent(current.name)+'?source='+current.version : url(), {method: 'POST'}, function(e) {
         if (e.target.status != 200)
           return status('failure', 'Error');
         status('success', 'Published');
@@ -461,9 +463,12 @@ simpl.add('app', function(o) {
                 if (e.keyCode != 13) {
                   var results = [], value = this.value;
                   if (value) Object.keys(modules).forEach(function(name) {
-                    if (~name.indexOf(value)) results.push.apply(results, modules[name].map(function(module, version) {
-                      return {name: name, version: module.minor ? version : version-1};
-                    }).reverse());
+                    if (~name.indexOf(value)) {
+                      var versions = modules[name];
+                      results.push({name: name, version: 0});
+                      for (var i = versions[0].minor ? versions.length : 0; i > 0; i--)
+                        results.push({name: name, version: i});
+                    }
                   });
                   suggest(results);
                 } else if (this.nextSibling.firstChild) {
@@ -473,7 +478,7 @@ simpl.add('app', function(o) {
               {ul: {className: 'suggest', children: function(e) {
                 suggest = function(modules) {
                   dom(modules && modules.map(function(module, i) {
-                    return {li: [{button: {className: 'name', children: [module.name, {span: ++module.version || null}], onclick: function() {
+                    return {li: [{button: {className: 'name', children: [module.name, {span: module.version || 'current'}], onclick: function() {
                       var entry = selected.entry;
                       search.value = '';
                       suggest();
@@ -507,7 +512,7 @@ simpl.add('app', function(o) {
                           button.parentNode.parentNode.removeChild(button.parentNode);
                       });
                     }}},
-                    {span: {className: 'name', children: [module, {span: !version || version}]}}
+                    {span: {className: 'name', children: [module, {span: version || 'current'}]}}
                   ]}};
                 }), e, true);
               };

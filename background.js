@@ -185,11 +185,13 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
             return forward(request.uri.substr(1), function(callback) {
               db.get(upgrade ? path+'/'+request.query.source : path, true).then(function(version) {
                 if (!version) return response.error();
+                if (Object.keys(version.dependencies).some(function(name) { return !version.dependencies[name]; }))
+                  return response.error();
                 var published = version.published.pop();
                 if (published && version.code == published.code &&
                     JSON.stringify(version.config) == JSON.stringify(published.config) &&
                     JSON.stringify(version.dependencies) == JSON.stringify(published.dependencies))
-                  return response.generic(412);
+                  return response.error();
                 var record = {
                   code: version.code,
                   config: version.config,

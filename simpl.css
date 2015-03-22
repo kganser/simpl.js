@@ -168,10 +168,10 @@ nav .name {
   text-overflow: ellipsis;
   overflow: hidden;
 }
-nav .name span {
+nav .name span, #dependencies .name span {
   font-size: 90%;
   color: #999;
-  margin-left: 5px;
+  margin-left: 10px;
 }
 nav .disabled .controls {
   display: none;
@@ -412,11 +412,6 @@ nav .selected button {
   text-overflow: ellipsis;
   overflow: hidden;
 }
-#dependencies .name span {
-  font-size: 90%;
-  color: #999;
-  margin-left: 5px;
-}
 #dependencies .delete {
   margin-right: 5px;
   line-height: .8em;
@@ -451,6 +446,9 @@ nav .selected button {
   color: white;
   background: #36c;
   outline: none;
+}
+#dependencies button:focus span, #dependencies input:focus + ul li:first-child button span {
+  color: #def;
 }
 .jsonv {
   padding: 4px 10px;
