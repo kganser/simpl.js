@@ -87,9 +87,6 @@ function(modules) {
             });
           });
         });
-        db.get().then(function(result) {
-          assert(compare(data, result), 'database read transaction during write transaction');
-        });
         db.get('', true).then(function(result) {
           assert(compare({array: ['elem', 1, 2, 3, 4], string: 'value'}, result),
             'database write transaction after write transaction');
@@ -326,7 +323,7 @@ function(modules) {
           buf = modules.string.toUTF8Buffer(str);
       assert(buf.length == uint8.length && !uint8.some(function(n, i) { return n != buf[i]; }), 'string to buffer');
       assert(modules.string.fromUTF8Buffer(new Uint8Array(uint8).buffer) === str, 'string from buffer');
-      assert(passed == 64, 'tests complete ('+passed+'/64 in '+(Date.now()-start)+'ms)');
+      assert(passed == 63, 'tests complete ('+passed+'/63 in '+(Date.now()-start)+'ms)');
     }
   );
 }
