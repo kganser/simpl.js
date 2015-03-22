@@ -286,7 +286,7 @@ simpl.add('app', function(o) {
       }};
     };
     dom([
-      {nav: [false ? user
+      {nav: [user
         ? [ {div: {className: 'user', children: [
               {img: {src: 'http://www.gravatar.com/avatar/'+md5(user.email.toLowerCase())}},
               {a: {className: 'logout', href: '/logout', title: 'Log Out', children: icons.logout}},
@@ -314,10 +314,6 @@ simpl.add('app', function(o) {
                 ];
               }}
             ]}}]
-        : {a: {className: 'user', href: '/login', children: [
-            {span: icons.user},
-            'Log In or Register'
-          ]}}
         : {div: {className: 'home', onclick: function() {
             if (!selected) return;
             selected.entry.tab.classList.remove('selected');
@@ -388,7 +384,7 @@ simpl.add('app', function(o) {
       {div: {id: 'main', children: [
         {div: {id: 'home', children: [
           {h1: 'Simpl.js'},
-          {p: ['Simpl.js makes it easy to develop apps that run in your browser with access to low-level system APIs. ', {strong: 'Apps'}, ' run in separate WebWorker threads with ', {code: 'modules'}, ' and ', {code: 'config'}, ' objects as specified in the app\'s ', icons.settings,'settings panel, and ', {code: 'console'}, ' output is streamed to the app\'s ', icons.log,'log panel. ', {strong: 'Modules'}, ' are libraries imported as dependencies by apps and other modules, and feature auto-generated documentation using the ', {code: 'docs'}, ' module syntax.']},
+          {p: ['Simpl.js makes it easy to develop software that runs in your browser with access to low-level system APIs. ', {strong: 'Apps'}, ' run in separate WebWorker threads with ', {code: 'modules'}, ' and ', {code: 'config'}, ' objects as specified in the app\'s ', icons.settings,'settings panel, and ', {code: 'console'}, ' output is streamed to the app\'s ', icons.log,'log panel. ', {strong: 'Modules'}, ' are libraries imported as dependencies by apps and other modules, and feature auto-generated documentation using the ', {code: 'docs'}, ' module syntax.']},
           {form: {method: 'post', action: '/restore', children: [
             {button: {className: 'revert', type: 'submit', name: 'scope', value: 'modules', children: [icons.revert, 'Restore Modules'], onclick: function(e) {
               if (!confirm('This will delete and restore all preinstalled modules in your workspace. Are you sure?'))
@@ -431,8 +427,8 @@ simpl.add('app', function(o) {
         }}},
         {div: {id: 'settings', children: [
           {section: {id: 'actions', children: [
-            {button: {className: 'publish', children: [icons.publish, {span: function(e) { major = e; }}], onclick: function() { publish(true); }}}, {br: null},
-            {button: {className: 'publish', children: [icons.publish, {span: function(e) { minor = e; }}], onclick: function() { publish(); }}}, {br: null},
+            {button: {className: 'publish', children: [user ? icons.publish : icons.upgrade, {span: function(e) { major = e; }}], onclick: function() { publish(true); }}}, {br: null},
+            {button: {className: 'publish', children: [user ? icons.publish : icons.upgrade, {span: function(e) { minor = e; }}], onclick: function() { publish(); }}}, {br: null},
             {button: {className: 'delete', children: function(e) { del = e; return [icons.delete, 'Delete']; }, onclick: function() {
               var button = this,
                   current = selected,

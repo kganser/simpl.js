@@ -94,17 +94,14 @@ nav h2, #settings h2 {
   display: none;
 }
 .user {
-  display: block;
   padding: 5px 0 0 40px;
   height: 20px;
-  color: black;
-  text-decoration: none;
 }
 .user, .servers {
   margin-bottom: 1px;
   position: relative;
 }
-.user img, .user span, .servers span {
+.user img, .servers span {
   background: #f7f7f7;
   width: 30px;
   height: 25px;
@@ -118,7 +115,6 @@ nav h2, #settings h2 {
 .logout {
   float: right;
   position: relative;
-  color: white;
   margin: -5px 0 0 1px;
   text-align: center;
 }
@@ -208,7 +204,7 @@ button, .logout {
   overflow: hidden;
   cursor: pointer;
 }
-button:hover, .home button {
+button:hover, .home button, .logout {
   color: white;
 }
 button:active {
