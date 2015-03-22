@@ -387,9 +387,7 @@ simpl.add('app', function(o) {
       {div: {id: 'main', children: [
         {div: {id: 'home', children: [
           {h1: 'Simpl.js'},
-          {h2: 'Getting Started'},
-          {p: ['Simpl.js makes it easy to develop apps and modules that run in your browser with access to low-level system APIs. An app instance runs in a separate WebWorker thread with access to its dependency ', {code: 'modules'}, ' and ', {code: 'config'}, ' objects as specified in the app\'s ', icons.settings,'settings panel, and ', {code: 'console'}, ' output is streamed to the app\'s ', icons.log,'log panel. Modules can depend on other modules as well, and feature auto-generated documentation using the ', {code: 'docs'}, ' module syntax.']},
-          {h2: 'Restore'},
+          {p: ['Simpl.js makes it easy to develop apps that run in your browser with access to low-level system APIs. ', {strong: 'Apps'}, ' run in separate WebWorker threads with ', {code: 'modules'}, ' and ', {code: 'config'}, ' objects as specified in the app\'s ', icons.settings,'settings panel, and ', {code: 'console'}, ' output is streamed to the app\'s ', icons.log,'log panel. ', {strong: 'Modules'}, ' are libraries imported as dependencies by apps and other modules, and feature auto-generated documentation using the ', {code: 'docs'}, ' module syntax.']},
           {form: {method: 'post', action: '/restore', children: [
             {button: {className: 'revert', type: 'submit', name: 'scope', value: 'modules', children: [icons.revert, 'Restore Modules'], onclick: function(e) {
               if (!confirm('This will delete and restore all preinstalled modules in your workspace. Are you sure?'))
