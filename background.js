@@ -302,6 +302,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
             socket.setNoDelay(true);
             response.end(data, {
               'Content-Type': 'text/event-stream',
+              'Cache-Control': 'no-cache',
               'Content-Length': null
             });
           }, request.query.access_token);

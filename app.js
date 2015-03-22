@@ -22,12 +22,11 @@ simpl.add('app', function(o) {
           .setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#'+icon.id);
       };
     });
-    var connect = function(id) {
+    var connect = function(host) {
       if (!window.EventSource) return status('failure', 'EventSource is not supported in this browser', true);
       if (feed) feed.close();
       status();
-      server = id || undefined;
-      feed = new EventSource(id ? '/servers/'+encodeURIComponent(id)+'/activity' : '/activity');
+      server = host || undefined;
       appList.classList.add('disabled');
       Object.keys(apps).forEach(function(app) {
         apps[app].forEach(function(entry) {
@@ -38,6 +37,7 @@ simpl.add('app', function(o) {
       });
       if (selected && selected.app)
         log.innerHTML = '';
+      feed = new EventSource(host ? '/servers/'+encodeURIComponent(host)+'/activity' : '/activity');
       feed.onmessage = function(e) {
         try { var message = JSON.parse(e.data); } catch (e) { return; }
         if (message.state) {
@@ -128,11 +128,15 @@ simpl.add('app', function(o) {
         e.stopPropagation();
         var button = this;
         button.disabled = true;
+        if (feed && feed.readyState == 2)
+          connect(server);
         o.xhr('/', {
           method: 'POST',
           json: {action: action, app: name, version: version, server: server}
-        }, function() {
+        }, function(e) {
           button.disabled = false;
+          if (e.target.status != 200)
+            return status('failure', 'Command failed');
           entry.running = action != 'stop';
           entry.tab.classList[entry.running ? 'add' : 'remove']('running');
           if (entry.running) {
