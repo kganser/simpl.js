@@ -285,7 +285,7 @@ simpl.add('app', function(o) {
       }};
     };
     dom([
-      {nav: [user
+      {nav: [false ? user
         ? [ {div: {className: 'user', children: [
               {img: {src: 'http://www.gravatar.com/avatar/'+md5(user.email.toLowerCase())}},
               {a: {className: 'logout', href: '/logout', title: 'Log Out', children: icons.logout}},
@@ -309,13 +309,21 @@ simpl.add('app', function(o) {
                 });
                 return [
                   {option: {value: '', children: 'Localhost'}},
-                  //{option: {value: 'test', children: 'Test Server'}}
+                  {option: {value: 'test', children: 'Test Server'}}
                 ];
               }}
             ]}}]
         : {a: {className: 'user', href: '/login', children: [
             {span: icons.user},
             'Log In or Register'
+          ]}}
+        : {div: {className: 'home', onclick: function() {
+            if (!selected) return;
+            selected.entry.tab.classList.remove('selected');
+            selected = body.className = null;
+          }, children: [
+            {div: {className: 'controls', children: {button: {className: 'settings', title: 'Settings', children: icons.settings}}}},
+            'Simpl.js'
           ]}},
         {h2: 'Apps'},
         {div: {className: 'form', children: [
@@ -377,6 +385,22 @@ simpl.add('app', function(o) {
         }}}
       ]},
       {div: {id: 'main', children: [
+        {div: {id: 'home', children: [
+          {h1: 'Simpl.js'},
+          {h2: 'Getting Started'},
+          {p: ['Simpl.js makes it easy to develop apps and modules that run in your browser with access to low-level system APIs. An app instance runs in a separate WebWorker thread with access to its dependency ', {code: 'modules'}, ' and ', {code: 'config'}, ' objects as specified in the app\'s ', icons.settings,'settings panel, and ', {code: 'console'}, ' output is streamed to the app\'s ', icons.log,'log panel. Modules can depend on other modules as well, and feature auto-generated documentation using the ', {code: 'docs'}, ' module syntax.']},
+          {h2: 'Restore'},
+          {form: {method: 'post', action: '/restore', children: [
+            {button: {className: 'revert', type: 'submit', name: 'scope', value: 'modules', children: [icons.revert, 'Restore Modules'], onclick: function(e) {
+              if (!confirm('This will delete and restore all preinstalled modules in your workspace. Are you sure?'))
+                e.preventDefault();
+            }}}, ' ',
+            {button: {className: 'revert', type: 'submit', name: 'scope', value: 'full', children: [icons.revert, 'Reset Workspace'], onclick: function(e) {
+              if (!confirm('This will delete your entire workspace and restore default apps and modules. Are you sure?'))
+                e.preventDefault();
+            }}}
+          ]}}
+        ]}},
         {div: {id: 'code', children: function(e) {
           code = CodeMirror(e, {
             value: selected ? selected.entry.code : '',

@@ -20,14 +20,26 @@ svg {
 nav svg {
   height: 100%;
 }
+p svg {
+  color: #666;
+  height: 1.5em;
+  margin: 0 2px;
+}
 pre, code, kbd, samp, tt, .CodeMirror {
   font-family: Consolas, monospace;
 }
 html, body, #code, .CodeMirror {
   height: 100%;
 }
+p {
+  line-height: 1.5;
+}
 pre {
   margin: 0;
+}
+code {
+  padding: 0 2px;
+  border: solid 1px #e0e0e0;
 }
 nav {
   position: fixed;
@@ -38,11 +50,20 @@ nav {
   overflow-y: auto;
   overflow-x: hidden;
 }
+nav:after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: -15px;
+  height: 100%;
+  width: 15px;
+  box-shadow: 0 0 3px rgba(0, 0, 0, .3);
+}
 h1 {
-  font-family: "Segoe UI";
+  font: 500 2em "Segoe UI", "Lucida Grande", AvenirNext-Medium, sans-serif;
   margin: 0 0 .5em 0;
 }
-h2 {
+nav h2, #settings h2 {
   margin: 0 0 1px 0;
   padding: 2px 0 2px 10px;
   font-size: 11px;
@@ -52,6 +73,20 @@ h2 {
   letter-spacing: 1px;
   background: #333;
   color: #ddd;
+}
+.home {
+  font: 500 15px "Segoe UI", "Lucida Grande", AvenirNext-Medium, sans-serif;
+  background: url(/icon.png) 10px/16px no-repeat;
+  padding: 2px 0 0 30px;
+  height: 23px;
+  margin-bottom: 1px;
+  position: relative;
+}
+.home .controls {
+  margin-top: -2px;
+}
+.show-app .home:after, .show-module .home:after {
+  display: none;
 }
 .user {
   display: block;
@@ -161,11 +196,18 @@ nav .changed .name:before {
 }
 button, .logout {
   background: #f7f7f7;
+  color: #666;
   padding: 0;
   border: none;
   outline: none;
   overflow: hidden;
   cursor: pointer;
+}
+button:hover, .home button {
+  color: white;
+}
+button:active {
+  opacity: .7;
 }
 nav button, .logout {
   height: 25px;
@@ -173,23 +215,16 @@ nav button, .logout {
 }
 nav button, #actions button {
   position: relative;
-  color: #666;
   vertical-align: top;
   margin: 0 0 1px 1px;
-}
-nav button:hover, #actions button:hover {
-  color: white;
-}
-button:active {
-  opacity: .7;
 }
 .run:hover, .restart:hover, #status.success {
   background: #3c3;
 }
-.logout, #actions .delete:hover, #dependencies .delete:hover, .stop:hover, #status.failure {
+.logout, #actions .delete:hover, #dependencies .delete:hover, .stop:hover, .revert:hover, #status.failure {
   background: #c33;
 }
-.code:hover, .settings:hover, .log:hover, .docs:hover, #status.info {
+.code:hover, .settings:hover, .log:hover, .docs:hover, .home .settings, #status.info {
   background: #36c;
 }
 .publish:hover {
@@ -198,7 +233,7 @@ button:active {
 .toggle:hover, .show-code .toggle:hover {
   background: #666;
 }
-.view, .view svg, .selected.loading .view, .restart, .stop, .running .run, .toggle .icon-right, .collapsed .toggle .icon-left {
+.view, .view svg, .selected.loading .view, .restart, .stop, .running .run, .toggle .icon-right, .collapsed .toggle .icon-left, .show-app #home, .show-module #home {
   display: none;
 }
 .code .icon-code, .settings .icon-settings, .log .icon-log, .docs .icon-info, .toggle .icon-left, .collapsed .toggle .icon-right {
@@ -211,7 +246,7 @@ nav .selected {
   background: #f7f7f7;
   position: relative;
 }
-nav .selected:after {
+nav .selected:after, .home:after {
   content: "";
   position: absolute;
   top: 0;
@@ -222,6 +257,7 @@ nav .selected:after {
   transform: translate(6px, 6px) rotate(45deg) skew(22.5deg, 22.5deg);
   -webkit-transform: translate(6px, 6px) rotate(45deg) skew(22.5deg, 22.5deg);
   box-shadow: 0 0 3px rgba(0, 0, 0, .3);
+  z-index: 1;
 }
 .show-code nav .selected:after, .show-code .toggle {
   background: #f7f7f7;
@@ -236,8 +272,9 @@ nav .selected button {
   right: 0px;
   background: white;
   box-shadow: 0 0 3px rgba(0, 0, 0, .3);
+  z-index: 1;
 }
-.collapsed .user, .collapsed .servers, .collapsed nav h2, .collapsed .form, .collapsed nav li, .collapsed nav .selected:after {
+.collapsed .home, .collapsed .user, .collapsed .servers, .collapsed nav h2, .collapsed .form, .collapsed nav li, .collapsed nav .selected:after {
   display: none;
 }
 .collapsed nav {
@@ -268,7 +305,6 @@ nav .selected button {
 #main {
   margin-left: 250px;
   height: 100%;
-  background: url(/simpl.png) no-repeat center center;
 }
 #status {
   position: fixed;
@@ -289,8 +325,12 @@ nav .selected button {
 .show-settings #main, .show-log #main, .show-docs #main {
   background: transparent;
 }
-#log, #docs {
-  padding: 4px 8px;
+#home, #log, #docs {
+  padding: 5px 15px;
+}
+#home h2 {
+  font: normal 22px/1 "Segoe UI", "Lucida Grande", AvenirNext-Medium, sans-serif;
+  color: #999;
 }
 #log .entry {
   border-bottom: solid 1px #ececec;
@@ -313,10 +353,10 @@ nav .selected button {
 #log .error, #log .warn, #docs .error {
   color: red;
 }
-#code, #settings, .show-module #configuration, #log, #docs, #loading {
+#code, #settings, .show-module #configuration, #log, #docs {
   display: none;
 }
-.show-code #code, .show-settings #settings, .show-log #log, .show-docs #docs, .show-loading #loading {
+.show-code #code, .show-settings #settings, .show-log #log, .show-docs #docs {
   display: block;
 }
 #settings section {
@@ -341,11 +381,11 @@ nav .selected button {
 .show-module #settings section {
   width: 50%;
 }
-#actions button {
+#home button, #actions button {
   padding: 5px 10px;
   margin-bottom: 3px;
 }
-#actions button svg {
+#home button svg, #actions button svg {
   margin-right: 8px;
 }
 .search {
@@ -359,7 +399,7 @@ nav .selected button {
   position: absolute;
   top: 5px;
   left: 8px;
-  fill: #aaa;
+  color: #aaa;
 }
 #dependencies .module {
   padding: 0 0 5px 10px;
@@ -390,6 +430,7 @@ nav .selected button {
   box-shadow: 0 3px 3px #999;
 }
 .suggest button {
+  color: black;
   background: white;
   display: block;
   box-sizing: border-box;
@@ -398,6 +439,7 @@ nav .selected button {
   text-align: left;
 }
 .suggest button:hover {
+  color: black;
   background: #def;
 }
 .suggest button:focus, .search input:focus + ul li:first-child button {

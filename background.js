@@ -49,32 +49,21 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
     }
     return db;
   };
-  
-  db.get('apps').then(function(data) {
-    if (data) return;
-    data = {};
+  var restore = function(callback, scope, sparse) {
+    if (!scope) {
+      var immediate = function(path) { return !path.length; };
+      return db.get('apps', false, immediate).get('modules', immediate).then(function(apps, mods) {
+        if (apps && mods) return callback();
+        restore(callback, apps ? 'modules' : mods ? 'apps' : 'both');
+      });
+    }
+    var apps = {}, mods = {}, pending = 0;
     [ {name: '1 Hello World', file: 'hello-world'},
       {name: '2 Web Server', file: 'web-server', config: {port: 8001}, dependencies: {http: 0}},
       {name: '3 Database Editor', file: 'database-editor', config: {port: 8002, database: 'simpl'}, dependencies: {database: 0, html: 0, http: 0, xhr: 0}},
       {name: '4 Simple Login', file: 'simple-login', config: {port: 8003, sessionKey: 'yabadabadoo'}, dependencies: {crypto: 0, database: 0, html: 0, http: 0}},
-      {name: '5 Unit Tests', file: 'unit-tests', dependencies: {async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 0, socket: 0, xhr: 0}}
-    ].forEach(function(app, i, apps) {
-      o.xhr('/apps/'+app.file+'.js', function(e) {
-        data[app.name] = {versions: [{
-          code: e.target.responseText,
-          config: app.config || {},
-          dependencies: app.dependencies || {},
-          published: []
-        }]};
-        if (Object.keys(data).length == apps.length)
-          db.put('apps', data);
-      });
-    });
-  });
-  db.get('modules').then(function(data) {
-    if (data) return;
-    data = {};
-    [ {name: 'async'},
+      {name: '5 Unit Tests', file: 'unit-tests', dependencies: {async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, string: 0, xhr: 0}},
+      {name: 'async'},
       {name: 'crypto'},
       {name: 'database'},
       {name: 'docs', dependencies: {parser: 0}},
@@ -85,18 +74,42 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
       {name: 'socket', proxy: true},
       {name: 'string'},
       {name: 'xhr'}
-    ].forEach(function(module, i, modules) {
-      o.xhr('/modules/'+module.name+'.js', function(e) {
-        data[module.name] = {versions: [{
-          code: 'function(modules'+(module.proxy ? ', proxy' : '')+') {\n'+e.target.responseText.split(/\n/).slice(1, -1).join('\n')+'\n}',
-          dependencies: module.dependencies || {},
-          published: []
-        }]};
-        if (Object.keys(data).length == modules.length)
-          db.put('modules', data);
+    ].forEach(function(item) {
+      if (scope != 'both' && scope == 'apps' == !item.file) return;
+      pending++;
+      o.xhr(location.origin+(item.file ? '/apps/'+item.file : '/modules/'+item.name)+'.js', function(e) {
+        var code = e.target.responseText;
+        if (item.file) {
+          apps[item.name] = {versions: [{
+            code: code,
+            config: item.config || {},
+            dependencies: item.dependencies || {},
+            published: []
+          }]};
+        } else {
+          mods[item.name] = {versions: [{
+            code: 'function(modules'+(item.proxy ? ', proxy' : '')+') {\n'+code.split(/\n/).slice(1, -1).join('\n')+'\n}',
+            dependencies: item.dependencies || {},
+            published: []
+          }]};
+        }
+        if (!--pending) {
+          var trans = db;
+          if (scope != 'modules')
+            trans = sparse
+              ? Object.keys(apps).reduce(function(t, name) { return t.put('apps/'+encodeURIComponent(name), apps[name]); }, trans)
+              : trans.put('apps', apps);
+          if (scope != 'apps')
+            trans = sparse
+              ? Object.keys(mods).reduce(function(t, name) { return t.put('modules/'+encodeURIComponent(name), mods[name]); }, trans)
+              : trans.put('modules', mods);
+          trans.then(callback);
+        }
       });
     });
-  });
+  };
+  
+  restore(function() {});
   o.xhr('/simpl.js', function(e) {
     loader = e.target.responseText;
     lines = loader.match(/\n/g).length+1;
@@ -334,6 +347,13 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
         }
         if (request.path == '/logout')
           return logout(verify(request.cookie.sid));
+        if (request.path == '/restore' && request.method == 'POST')
+          return request.slurp(function(body) {
+            var full = body.scope == 'full';
+            restore(function() {
+              return response.generic(303, {Location: '/'});
+            }, full ? 'both' : 'modules', !full);
+          }, 'url');
         if (request.path == '/') {
           if (request.method == 'POST')
             return request.slurp(function(body) {
