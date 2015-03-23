@@ -7,6 +7,7 @@
 body {
   margin: 0;
   font: 13px sans-serif;
+  -webkit-text-size-adjust: none;
 }
 #icons {
   display: none;
@@ -326,9 +327,12 @@ nav .selected button {
 .show-settings #main, .show-log #main, .show-docs #main {
   background: transparent;
 }
+#home, #code, #settings, #log, #docs {
+  min-width: 259px;
+}
 #home {
   margin: 0 auto;
-  padding: 100px 15px 0;
+  padding: 8% 15px 15px;
   max-width: 600px;
 }
 #log, #docs {

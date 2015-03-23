@@ -391,7 +391,9 @@ simpl.add('app', function(o) {
       {div: {id: 'main', children: [
         {div: {id: 'home', children: [
           {h1: 'Simpl.js'},
-          {p: ['Simpl.js makes it easy to develop software that runs in your browser with access to low-level system APIs. ', {strong: 'Apps'}, ' run in separate WebWorker threads with ', {code: 'modules'}, ' and ', {code: 'config'}, ' objects as specified in the app\'s ', icons.settings,'settings panel. Any ', {code: 'console'}, ' output is streamed to the app\'s ', icons.log,'log panel. ', {strong: 'Modules'}, ' are libraries imported as dependencies by apps and other modules. Module documentation is auto-generated using the ', {code: 'docs'}, ' module syntax.']},
+          {p: ['Simpl.js makes it easy to develop software that runs in your browser with access to low-level system APIs. ', {strong: 'Apps'}, ' run in separate WebWorker threads with ', {code: 'modules'}, ' and ', {code: 'config'}, ' objects as specified in the app\'s ', icons.settings,'settings panel. Any ', {code: 'console'}, ' output is streamed to the app\'s ', icons.log,'log panel. ', {strong: 'Modules'}, ' are libraries imported as dependencies by apps and other modules. Module documentation is generated using the ', {code: 'docs'}, ' module syntax.']},
+          {p: 'Apps and modules can be published with a major-minor versioning scheme. Major versions can be developed in parallel, while minor versions comprise backward-compatible incremental changes.'},
+          {p: 'Browse the core modules and run the included demo apps to get started.'},
           {form: {method: 'post', action: '/restore', children: [
             {button: {className: 'revert', type: 'submit', name: 'scope', value: 'modules', children: [icons.revert, 'Restore Modules'], onclick: function(e) {
               if (!confirm('This will delete and restore all preinstalled modules in your workspace. Are you sure?'))
