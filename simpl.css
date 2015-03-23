@@ -80,7 +80,7 @@ nav h2, #settings h2 {
 }
 .home {
   font: 500 15px "Segoe UI", "Lucida Grande", AvenirNext-Medium, sans-serif;
-  background: url(/icon.png) 10px/16px no-repeat;
+  background: url(/favicon.ico) 10px no-repeat;
   padding: 2px 0 0 30px;
   height: 23px;
   margin-bottom: 1px;
