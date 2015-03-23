@@ -10,7 +10,7 @@ simpl.add('app', function(o) {
         module[i] = {minor: version};
       });
     });
-    var appList, moduleList, selected, code, config, major, minor, del, dependencies, search, suggest, timeline, history, log, docs, line, status, feed, server, unload,
+    var appList, moduleList, selected, code, config, major, minor, del, dependencies, search, suggest, timeline, history, log, docs, status, feed, server, unload,
         icons = {}, dom = o.html.dom;
     Array.prototype.slice.call(document.getElementById('icons').childNodes).forEach(function(icon) {
       icons[icon.id.substr(5)] = function(el) {
@@ -159,14 +159,11 @@ simpl.add('app', function(o) {
         if (selected) {
           selected.entry.tab.classList.remove('selected');
           body.classList.remove(selected.app ? 'show-app' : 'show-module');
-          if ('code' in selected.entry && !refresh)
-            selected.entry.code = code.getValue();
         }
         body.classList.add(app ? 'show-app' : 'show-module');
         if ('code' in entry) {
-          selected = line = null;
           code.setOption('readOnly', false);
-          code.setValue(entry.code); // TODO: use codemirror documents
+          code.swapDoc(entry.doc);
           config.update(entry.config || null);
           dependencies(entry.dependencies);
           search.value = '';
@@ -181,7 +178,6 @@ simpl.add('app', function(o) {
           entry.tab.classList.remove('loading');
         } else if (!refresh) {
           code.setOption('readOnly', 'nocursor');
-          code.setValue('');
           entry.tab.classList.add('loading');
           o.xhr(url(app, name, version), {responseType: 'json'}, function(e) {
             try {
@@ -189,6 +185,7 @@ simpl.add('app', function(o) {
               var response = e.target.response;
               if (typeof response != 'object')
                 response = JSON.parse(response);
+              entry.doc = CodeMirror.Doc(response.code, {name: 'javascript'});
               entry.code = response.code;
               entry.config = response.config;
               entry.dependencies = response.dependencies;
@@ -219,10 +216,12 @@ simpl.add('app', function(o) {
       entry.view.title = 'Show '+next[0].toUpperCase()+next.slice(1);
       if (panel == 'code') {
         code.refresh();
-        if (line) code.removeLineClass(line, 'background', 'current');
         if (ln != null) {
-          line = code.addLineClass(ln-1, 'background', 'current');
-          code.scrollIntoView({line: ln, ch: ch});
+          code.scrollIntoView({line: ln-1, ch: ch});
+          var line = code.addLineClass(ln-1, 'background', 'current');
+          setTimeout(function() {
+            entry.doc.removeLineClass(line, 'background', 'current');
+          }, 2000);
         }
       }
     };
@@ -392,7 +391,7 @@ simpl.add('app', function(o) {
         {div: {id: 'home', children: [
           {h1: 'Simpl.js'},
           {p: ['Simpl.js makes it easy to develop software that runs in your browser with access to low-level system APIs. ', {strong: 'Apps'}, ' run in separate WebWorker threads with ', {code: 'modules'}, ' and ', {code: 'config'}, ' objects as specified in the app\'s ', icons.settings,'settings panel. Any ', {code: 'console'}, ' output is streamed to the app\'s ', icons.log,'log panel. ', {strong: 'Modules'}, ' are libraries imported as dependencies by apps and other modules. Module documentation is generated using the ', {code: 'docs'}, ' module syntax.']},
-          {p: 'Apps and modules can be published with a major-minor versioning scheme. Major versions can be developed in parallel, while minor versions comprise backward-compatible incremental changes.'},
+          {p: 'Apps and modules can be published with a major-minor versioning scheme. Major versions can be developed in parallel, while minor versions represent backward-compatible incremental changes.'},
           {p: 'Browse the core modules and run the included demo apps to get started.'},
           {form: {method: 'post', action: '/restore', children: [
             {button: {className: 'revert', type: 'submit', name: 'scope', value: 'modules', children: [icons.revert, 'Restore Modules'], onclick: function(e) {
@@ -407,28 +406,25 @@ simpl.add('app', function(o) {
         ]}},
         {div: {id: 'code', children: function(e) {
           code = CodeMirror(e, {
-            value: selected ? selected.entry.code : '',
+            value: selected && selected.entry.doc || '',
             lineNumbers: true,
             matchBrackets: true,
             highlightSelectionMatches: true
           });
           code.on('changes', function(e) {
-            if (!selected || e.options.readOnly) return;
             selected.entry.dirty = true;
             selected.entry.tab.classList.add('changed');
           });
           CodeMirror.commands.save = function() {
-            if (!selected || !selected.entry.dirty) return;
-            var entry = selected.entry;
+            var entry = selected.entry,
+                code = entry.doc.getValue();
             status('info', 'Saving...');
-            o.xhr(url(), {
-              method: 'PUT',
-              data: entry.code = code.getValue()
-            }, function(e) {
+            o.xhr(url(), {method: 'PUT', data: code}, function(e) {
               if (e.target.status != 200)
-                return status('failure', 'Error');
+                return status('failure', 'Error saving document');
               status('success', 'Saved');
               entry.tab.classList.remove('changed');
+              entry.code = code;
               if (selected && !selected.app && selected.entry == entry)
                 docs(selected.name, entry.code);
             });
