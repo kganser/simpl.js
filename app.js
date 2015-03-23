@@ -172,8 +172,8 @@ simpl.add('app', function(o) {
           suggest();
           del.style.display = entry.minor ? 'none' : 'inline-block';
           major.parentNode.style.display = entry.minor ? 'inline-block' : 'none';
-          major.textContent = 'Publish '+(versions.length+1)+'.0';
-          minor.textContent = 'Publish '+(version+1)+'.'+entry.minor;
+          major.textContent = 'Publish v'+(versions.length+1)+'.0';
+          minor.textContent = 'Publish v'+(version+1)+'.'+entry.minor;
           timeline(name, version, app);
           if (app) dom(entry.log.map(logLine), log, true);
           else docs(name, entry.code);
@@ -229,7 +229,7 @@ simpl.add('app', function(o) {
       var current = selected,
           entry = selected.entry,
           published = entry.published.slice(-1).pop();
-      if (Object.keys(entry.dependencies).some(function(name) { return !entry.dependencies[name]; }))
+      if (Object.keys(entry.dependencies).some(function(name) { return entry.dependencies[name] < 1; }))
         return alert('All dependencies must be published module versions');
       if (published && entry.code == published.code &&
           JSON.stringify(entry.config) == JSON.stringify(published.config) &&
@@ -238,17 +238,17 @@ simpl.add('app', function(o) {
       status('info', 'Publishing...');
       o.xhr(upgrade ? (current.app ? '/apps/' : '/modules/')+encodeURIComponent(current.name)+'?source='+current.version : url(), {method: 'POST'}, function(e) {
         if (e.target.status != 200)
-          return status('failure', 'Error');
+          return status('failure', 'Error publishing new version');
         status('success', 'Published');
         var versions = (current.app ? apps : modules)[current.name],
             version = upgrade
               ? versions.push(current.app ? {minor: 1, log: []} : {minor: 1})
-              : (current.version+1)+'.'+(entry.minor++);
+              : 'v'+(current.version+1)+'.'+(entry.minor++);
         if (upgrade) {
           (current.app ? appList : moduleList).insertBefore(
             dom(li(current.name, version-1, 1, current.app)),
             versions[version-2].tab.nextSibling);
-          major.textContent = 'Publish '+(version+1)+'.0';
+          major.textContent = 'Publish v'+(version+1)+'.0';
         } else {
           entry.published.push(current.app
             ? {code: entry.code, config: entry.config, dependencies: entry.dependencies}
@@ -257,8 +257,8 @@ simpl.add('app', function(o) {
           entry.tab.lastChild.lastChild.textContent = version;
           timeline(version);
           major.parentNode.style.display = 'inline-block';
-          major.textContent = 'Publish '+(versions.length+1)+'.0';
-          minor.textContent = 'Publish '+(current.version+1)+'.'+entry.minor;
+          major.textContent = 'Publish v'+(versions.length+1)+'.0';
+          minor.textContent = 'Publish v'+(current.version+1)+'.'+entry.minor;
         }
         major.parentNode.style.display = 'inline-block';
         del.style.display = 'none';
@@ -266,7 +266,7 @@ simpl.add('app', function(o) {
     };
     var li = function(name, major, minor, app) {
       var entry = (app ? apps : modules)[name][major],
-          version = minor ? (major+1)+'.'+(minor-1) : '';
+          version = minor ? 'v'+(major+1)+'.'+(minor-1) : '';
       return {li: function(elem) {
         entry.tab = elem;
         elem.onclick = function(e) {
@@ -390,7 +390,7 @@ simpl.add('app', function(o) {
       {div: {id: 'main', children: [
         {div: {id: 'home', children: [
           {h1: 'Simpl.js'},
-          {p: ['Simpl.js makes it easy to develop software that runs in your browser with access to low-level system APIs. ', {strong: 'Apps'}, ' run in separate WebWorker threads with ', {code: 'modules'}, ' and ', {code: 'config'}, ' objects as specified in the app\'s ', icons.settings,'settings panel, and ', {code: 'console'}, ' output is streamed to the app\'s ', icons.log,'log panel. ', {strong: 'Modules'}, ' are libraries imported as dependencies by apps and other modules, and feature auto-generated documentation using the ', {code: 'docs'}, ' module syntax.']},
+          {p: ['Simpl.js makes it easy to develop software that runs in your browser with access to low-level system APIs. ', {strong: 'Apps'}, ' run in separate WebWorker threads with ', {code: 'modules'}, ' and ', {code: 'config'}, ' objects as specified in the app\'s ', icons.settings,'settings panel. Any ', {code: 'console'}, ' output is streamed to the app\'s ', icons.log,'log panel. ', {strong: 'Modules'}, ' are libraries imported as dependencies by apps and other modules. Module documentation is auto-generated using the ', {code: 'docs'}, ' module syntax.']},
           {form: {method: 'post', action: '/restore', children: [
             {button: {className: 'revert', type: 'submit', name: 'scope', value: 'modules', children: [icons.revert, 'Restore Modules'], onclick: function(e) {
               if (!confirm('This will delete and restore all preinstalled modules in your workspace. Are you sure?'))
@@ -463,16 +463,22 @@ simpl.add('app', function(o) {
             {h2: 'Dependencies'},
             {div: {className: 'search', children: [
               icons.search,
-              {input: {type: 'text', placeholder: 'Search Modules', children: function(e) { search = e; }, onkeyup: function(e) {
+              {input: {type: 'text', placeholder: 'Search Modules', children: function(e) { search = e; }, onkeydown: function(e) {
+                if (e.keyCode != 9 || e.shiftKey) return;
+                var second = this.nextSibling.firstChild;
+                if (second = second && second.nextSibling.firstChild) {
+                  e.preventDefault()
+                  second.focus();
+                }
+              }, onkeyup: function(e) {
                 if (e.keyCode != 13) {
                   var results = [], value = this.value;
                   if (value) Object.keys(modules).forEach(function(name) {
-                    if (~name.indexOf(value)) {
-                      var versions = modules[name];
-                      results.push({name: name, version: 0});
-                      for (var i = versions[0].minor ? versions.length : 0; i > 0; i--)
-                        results.push({name: name, version: i});
-                    }
+                    if (~name.indexOf(value) && (selected.app || name != selected.name))
+                      modules[name].forEach(function(version, i) {
+                        results.push({name: name, version: version.minor ? -++i : 0}); // current
+                        if (version.minor) results.push({name: name, version: i}); // published
+                      });
                   });
                   suggest(results);
                 } else if (this.nextSibling.firstChild) {
@@ -481,8 +487,9 @@ simpl.add('app', function(o) {
               }}},
               {ul: {className: 'suggest', children: function(e) {
                 suggest = function(modules) {
-                  dom(modules && modules.map(function(module, i) {
-                    return {li: [{button: {className: 'name', children: [module.name, {span: module.version || 'current'}], onclick: function() {
+                  dom(modules && modules.map(function(module) {
+                    var v = module.version;
+                    return {li: [{button: {className: 'name', children: [module.name, {span: v ? v > 0 ? 'v'+v : 'v'+-v+' current' : ''}], onclick: function() {
                       var entry = selected.entry;
                       search.value = '';
                       suggest();
@@ -501,7 +508,7 @@ simpl.add('app', function(o) {
             {ul: function(e) {
               dependencies = function(modules) {
                 dom(Object.keys(modules).map(function(module) {
-                  var version = modules[module];
+                  var v = modules[module];
                   return {li: {className: 'module', children: [
                     {button: {className: 'delete', title: 'Remove', children: '×', onclick: function() {
                       var button = this,
@@ -516,7 +523,7 @@ simpl.add('app', function(o) {
                           button.parentNode.parentNode.removeChild(button.parentNode);
                       });
                     }}},
-                    {span: {className: 'name', children: [module, {span: version || 'current'}]}}
+                    {span: {className: 'name', children: [module, {span: v ? v > 0 ? 'v'+v : 'v'+-v+' current' : ''}]}}
                   ]}};
                 }), e, true);
               };
@@ -658,7 +665,7 @@ simpl.add('app', function(o) {
                 history();
                 var minor = (app ? apps : modules)[name][version].minor;
                 dom(new Array(minor+1).join().split(',').map(function(x, i) {
-                  return {li: [{span: null}, i ? (version+1)+'.'+(minor-i) : 'Current']};
+                  return {li: [{span: null}, i ? 'v'+(version+1)+'.'+(minor-i) : 'Current']};
                 }), elem, true);
               };
             }}},

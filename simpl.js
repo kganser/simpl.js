@@ -6,7 +6,7 @@ var simpl = function(modules, clients) {
       var needed = Object.keys(client.dependencies),
           available = {};
       needed.forEach(function(name) {
-        var version = parseInt(needed[name], 10) || 0;
+        var version = parseInt(client.dependencies[name], 10) || 0;
         if (!modules[name]) modules[name] = {};
         if (!(version in modules[name])) {
           requested.push({name: name, version: version});

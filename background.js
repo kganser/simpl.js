@@ -166,7 +166,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
           });
         };
         
-        if (match = request.path.match(/^\/([^.\/]*)\.(\d+)\.js$/))
+        if (match = request.path.match(/^\/([^\/]*)\.(\d+)\.js$/))
           return db.get('modules/'+match[1]+'/versions/'+match[2]).then(function(module) {
             response.end(wrap(decodeURIComponent(match[1]), module.code, match[2], module.dependencies), 'js');
           });
@@ -185,7 +185,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
             return forward(request.uri.substr(1), function(callback) {
               db.get(upgrade ? path+'/'+request.query.source : path, true).then(function(version) {
                 if (!version) return response.error();
-                if (Object.keys(version.dependencies).some(function(name) { return !version.dependencies[name]; }))
+                if (Object.keys(version.dependencies).some(function(name) { return version.dependencies[name] < 1; }))
                   return response.error();
                 var published = version.published.pop();
                 if (published && version.code == published.code &&
@@ -389,22 +389,30 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
                     if (!app) return response.error();
                     logs[id] = [];
                     apps[id] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\nsimpl.use('+JSON.stringify(app.dependencies)+','+app.code+');', function(module, callback) {
+                      var i = module.version,
+                          current = i < 1;
+                      if (i) i = current ? -i-1 : i-1;
                       (function(callback) {
-                        if (local) return db.get('modules/'+encodeURIComponent(module.name)+'/versions/'+module.version).then(callback);
-                        api('modules/'+encodeURIComponent(module.name)+'/'+module.version, session.accessToken, function(status, data) {
+                        if (local) return db.get('modules/'+encodeURIComponent(module.name)+'/versions/'+i).then(callback);
+                        api('modules/'+encodeURIComponent(module.name)+'/'+i, session.accessToken, function(status, data) {
                           callback(data);
                         });
                       }(function(record) {
-                        callback(wrap(module.name, record.code, module.version, record.dependencies));
+                        if (record && !current) record = record.published.pop();
+                        if (record) return callback(wrap(module.name, record.code, module.version, record.dependencies));
+                        apps[id].terminate();
+                        delete logs[id];
+                        delete apps[id];
+                        broadcast('error', {app: name, version: version, message: 'Required module not found: '+module.name}, user);
                       }));
                     }, function(level, args, module, line, column) {
                       var data = {app: name, version: version, level: level, message: args, module: module, line: line, column: column};
                       if (logs[id].push(data) > 100) logs[id].unshift();
                       broadcast('log', data, user);
                     }, function(message, module, line) {
-                      broadcast('error', {app: name, version: version, message: message, module: module, line: line}, user);
                       delete logs[id];
                       delete apps[id];
+                      broadcast('error', {app: name, version: version, message: message, module: module, line: line}, user);
                     });
                     broadcast('run', {app: name, version: version}, user);
                     response.ok();
