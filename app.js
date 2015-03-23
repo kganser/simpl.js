@@ -61,6 +61,7 @@ simpl.add('app', function(o) {
           case 'error':
             entry.running = false;
             entry.tab.classList.add(data.level = 'error');
+            entry.tab.classList.remove('running');
             data.message = [data.message];
           case 'log':
             if (entry.log.push(message = {
