@@ -10,7 +10,7 @@ simpl.add('app', function(o) {
         module[i] = {minor: version};
       });
     });
-    var appList, moduleList, selected, code, config, major, minor, del, dependencies, search, suggest, timeline, history, log, docs, line, status, feed, server
+    var appList, moduleList, selected, code, config, major, minor, del, dependencies, search, suggest, timeline, history, log, docs, line, status, feed, server, unload,
         icons = {}, dom = o.html.dom;
     Array.prototype.slice.call(document.getElementById('icons').childNodes).forEach(function(icon) {
       icons[icon.id.substr(5)] = function(el) {
@@ -698,6 +698,7 @@ simpl.add('app', function(o) {
             if (!--i) e.style.display = 'none';
           };
           status = function(type, text, persist) {
+            if (unload) return;
             if (!type) return e.style.display = 'none';
             e.style.display = 'block';
             e.className = type;
@@ -711,5 +712,8 @@ simpl.add('app', function(o) {
       ]}}
     ], body);
     connect();
+    window.onbeforeunload = function() {
+      unload = true;
+    };
   };
 }, 0, {html: 0, xhr: 0, jsonv: 0, docs: 0});
