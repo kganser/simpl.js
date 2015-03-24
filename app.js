@@ -229,7 +229,7 @@ simpl.add('app', function(o) {
       var current = selected,
           entry = selected.entry,
           published = entry.published.slice(-1).pop();
-      if (Object.keys(entry.dependencies).some(function(name) { return entry.dependencies[name] < 1; }))
+      if (Object.keys(entry.dependencies).some(function(name) { return entry.dependencies[name] < 0; }))
         return alert('All dependencies must be published module versions');
       if (published && entry.code == published.code &&
           JSON.stringify(entry.config) == JSON.stringify(published.config) &&
@@ -475,7 +475,7 @@ simpl.add('app', function(o) {
                   if (value) Object.keys(modules).forEach(function(name) {
                     if (~name.indexOf(value) && (selected.app || name != selected.name))
                       modules[name].forEach(function(version, i) {
-                        results.push({name: name, version: version.minor ? -++i : 0}); // current
+                        results.push({name: name, version: version.minor ? -i-1 : -1}); // current
                         if (version.minor) results.push({name: name, version: i}); // published
                       });
                   });
@@ -485,17 +485,19 @@ simpl.add('app', function(o) {
                 }
               }}},
               {ul: {className: 'suggest', children: function(e) {
-                suggest = function(modules) {
-                  dom(modules && modules.map(function(module) {
-                    var v = module.version;
-                    return {li: [{button: {className: 'name', children: [module.name, {span: v ? v > 0 ? 'v'+v : 'v'+-v+' current' : ''}], onclick: function() {
+                suggest = function(matches) {
+                  dom(matches && matches.map(function(match) {
+                    var v = match.version+1,
+                        module = modules[match.name];
+                    if (v < 1 && module[0] && module[0].minor) v--;
+                    return {li: [{button: {className: 'name', children: [match.name, {span: v ? v > 0 ? 'v'+v : 'v'+-v+' current' : ''}], onclick: function() {
                       var entry = selected.entry;
                       search.value = '';
                       suggest();
-                      o.xhr(url()+'/dependencies', {method: 'POST', json: module}, function(e) {
+                      o.xhr(url()+'/dependencies', {method: 'POST', json: match}, function(e) {
                         if (e.target.status != 200)
                           return status('failure', 'Error updating dependencies');
-                        entry.dependencies[module.name] = module.version;
+                        entry.dependencies[match.name] = match.version;
                         if (selected && selected.entry == entry)
                           dependencies(entry.dependencies);
                       });
@@ -505,24 +507,26 @@ simpl.add('app', function(o) {
               }}}
             ]}},
             {ul: function(e) {
-              dependencies = function(modules) {
-                dom(Object.keys(modules).map(function(module) {
-                  var v = modules[module];
+              dependencies = function(values) {
+                dom(Object.keys(values).map(function(name) {
+                  var v = values[name]+1,
+                      module = modules[name];
+                  if (v < 1 && module[0] && module[0].minor) v--;
                   return {li: {className: 'module', children: [
                     {button: {className: 'delete', title: 'Remove', children: '×', onclick: function() {
                       var button = this,
                           entry = selected.entry;
                       button.disabled = true;
-                      o.xhr(url()+'/dependencies/'+encodeURIComponent(module), {method: 'DELETE'}, function(e) {
+                      o.xhr(url()+'/dependencies/'+encodeURIComponent(name), {method: 'DELETE'}, function(e) {
                         button.disabled = false;
                         if (e.target.status != 200)
                           return status('failure', 'Error updating dependencies');
-                        delete entry.dependencies[module];
+                        delete entry.dependencies[name];
                         if (selected && selected.entry == entry)
                           button.parentNode.parentNode.removeChild(button.parentNode);
                       });
                     }}},
-                    {span: {className: 'name', children: [module, {span: v ? v > 0 ? 'v'+v : 'v'+-v+' current' : ''}]}}
+                    {span: {className: 'name', children: [name, {span: v ? v > 0 ? 'v'+v : 'v'+-v+' current' : ''}]}}
                   ]}};
                 }), e, true);
               };
@@ -683,7 +687,8 @@ simpl.add('app', function(o) {
             var ref = e.target.dataset,
                 name = ref.module || selected.name,
                 version = ref.version ? parseInt(ref.version, 10) : selected.version;
-            toggle(name, version, !ref.module, 'code', ref.line, 0);
+            if (version < 0)
+              toggle(name, -version-1, !ref.module, 'code', ref.line, 0);
           }
         }}},
         {div: {id: 'docs', children: function(e) {

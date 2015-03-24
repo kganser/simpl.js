@@ -80,7 +80,7 @@ simpl = function(s) {
           blobs[url] = module;
         }
         if (!--remaining && urls.length)
-          importScripts.apply(null, urls); // TODO: catch compile-time errors
+          importScripts.apply(null, urls);
       });
     });
     return modules;
@@ -113,13 +113,15 @@ simpl = function(s) {
           worker.log(args.level, args.args, args.module, args.line, args.column);
         }
       } else {
-        var module = e.data.module,
-            listener = module == null ? worker ? worker.listeners[command] : globalListeners[command] : (moduleListeners[module] || {})[command];
-        if (!listener) return console.error('no listener for command '+command+(module ? ' (module '+module+')' : ''));
-        var destruct = listener(args, function() {
-          e.target.postMessage({id: id, result: Array.prototype.slice.call(arguments)});
-        }, function(command, args, callback, transferable) {
-          send(false, e.target, e.data.module, command, args, callback, transferable);
+        var destruct, module = e.data.module;
+        (module == null
+          ? [worker ? worker.listeners[command] : globalListeners[command]]
+          : (moduleListeners[module] || {})[command]).forEach(function(listener) {
+          destruct = listener(args, function() {
+            e.target.postMessage({id: id, result: Array.prototype.slice.call(arguments)});
+          }, function(command, args, callback, transferable) {
+            send(false, e.target, module, command, args, callback, transferable);
+          });
         });
         if (worker && typeof destruct == 'function')
           worker.destructors.push(destruct);
@@ -155,7 +157,12 @@ simpl = function(s) {
           destructors: []
         });
       } else if (module != null) {
-        moduleListeners[module] = listeners;
+        var ml = moduleListeners[module];
+        if (!ml) moduleListeners[module] = ml = {};
+        Object.keys(listeners).forEach(function(name) {
+          if (!ml[name]) ml[name] = [];
+          ml[name].push(listeners[name]);
+        })
       } else {
         globalListeners = listeners;
       }

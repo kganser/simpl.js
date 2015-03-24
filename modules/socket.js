@@ -41,8 +41,10 @@ simpl.add('socket', function(modules, proxy) {
       };
     },
     accept: function(args) {
-      var clientSocketId = args[1];
-      clients[clientSocketId] = servers[args[0]]({
+      var clientSocketId = args[1],
+          server = servers[args[0]];
+      if (!server) return;
+      clients[clientSocketId] = server({
         send: function(data, callback) {
           proxy('send', [clientSocketId, data], callback, [data]);
         },

@@ -59,16 +59,16 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
     }
     var apps = {}, mods = {}, pending = 0;
     [ {name: '1 Hello World', file: 'hello-world'},
-      {name: '2 Web Server', file: 'web-server', config: {port: 8001}, dependencies: {http: 0}},
-      {name: '3 Database Editor', file: 'database-editor', config: {port: 8002, database: 'simpl'}, dependencies: {database: 0, html: 0, http: 0, xhr: 0}},
-      {name: '4 Simple Login', file: 'simple-login', config: {port: 8003, sessionKey: 'yabadabadoo'}, dependencies: {crypto: 0, database: 0, html: 0, http: 0}},
-      {name: '5 Unit Tests', file: 'unit-tests', dependencies: {async: 0, database: 0, docs: 0, html: 0, http: 0, parser: 0, socket: 0, string: 0, xhr: 0}},
+      {name: '2 Web Server', file: 'web-server', config: {port: 8001}, dependencies: {http: -1}},
+      {name: '3 Database Editor', file: 'database-editor', config: {port: 8002, database: 'simpl'}, dependencies: {database: -1, html: -1, http: -1, xhr: -1}},
+      {name: '4 Simple Login', file: 'simple-login', config: {port: 8003, sessionKey: 'yabadabadoo'}, dependencies: {crypto: -1, database: -1, html: -1, http: -1}},
+      {name: '5 Unit Tests', file: 'unit-tests', dependencies: {async: -1, database: -1, docs: -1, html: -1, http: -1, parser: -1, socket: -1, string: -1, xhr: -1}},
       {name: 'async'},
       {name: 'crypto'},
       {name: 'database'},
-      {name: 'docs', dependencies: {parser: 0}},
+      {name: 'docs', dependencies: {parser: -1}},
       {name: 'html'},
-      {name: 'http', dependencies: {socket: 0, string: 0}},
+      {name: 'http', dependencies: {socket: -1, string: -1}},
       {name: 'net', proxy: true},
       {name: 'parser'},
       {name: 'socket', proxy: true},
@@ -185,7 +185,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
             return forward(request.uri.substr(1), function(callback) {
               db.get(upgrade ? path+'/'+request.query.source : path, true).then(function(version) {
                 if (!version) return response.error();
-                if (Object.keys(version.dependencies).some(function(name) { return version.dependencies[name] < 1; }))
+                if (Object.keys(version.dependencies).some(function(name) { return version.dependencies[name] < 0; }))
                   return response.error();
                 var published = version.published.pop();
                 if (published && version.code == published.code &&
