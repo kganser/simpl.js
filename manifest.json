@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Simpl.js",
-  "description": "Simpl.js isomorphic platform for javascript",
+  "description": "Simpl.js app platform",
   "offline_enabled": true,
   "icons": {"128": "icon.png"},
   "version": "0.2",

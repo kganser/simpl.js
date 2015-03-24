@@ -375,7 +375,6 @@ nav .selected button {
   width: 33.33%;
   min-height: 199px;
   border-left: 1px solid white;
-  overflow: auto;
 }
 #settings #history {
   display: block;
@@ -431,7 +430,7 @@ nav .selected button {
   position: absolute;
   left: 3px;
   right: 3px;
-  box-shadow: 0 3px 3px #999;
+  box-shadow: 0 3px 3px rgba(0, 0, 0, .3);
 }
 .suggest button {
   color: black;
@@ -603,7 +602,7 @@ nav .selected button {
 }
 .docjs-args > .docjs-value > .docjs-named-value:hover,
 .docjs-args > .docjs-values > .docjs-value > .docjs-named-value:hover {
-  cursor: pointer;
+  cursor: default;
   display: inline-block;
   position: relative;
   margin: -2px 0 -3px;
