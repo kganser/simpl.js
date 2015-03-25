@@ -1,0 +1,159 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Simpl.js</title>
+    <meta charset="utf-8">
+    <meta name="description" content="Simpl.js lets you write and run javascript apps from your browser.">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="og:title" content="Simpl.js">
+    <meta name="og:site_name" content="simpljs.com">
+    <meta name="og:image" content="/img/promo.png">
+    <link rel="chrome-webstore-item" href="https://chrome.google.com/webstore/detail/kdkheiopehanfbajkkopimfppjmclgbp">
+    <style>
+      body {
+        font: 16px/1.5 arial, sans-serif;
+        margin: 0;
+      }
+      section {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 20px 10px;
+      }
+      #logo, h1, h2 {
+        font: 500 1.5em "Segoe UI", "Lucida Grande", AvenirNext-Medium, sans-serif;
+        margin: 0;
+      }
+      h1 {
+        font-size: 2em;
+      }
+      h2 {
+        font-size: 1.3em;
+      }
+      #logo {
+        height: 32px;
+        padding-left: 37px;
+        background: url(/img/icon.png) left/32px no-repeat;
+      }
+      #install {
+        float: right;
+        display: inline-block;
+        padding: 5px 10px;
+        text-decoration: none;
+        color: #333;
+        border: solid 1px #e0e0e0;
+      }
+      #install:hover {
+        border-color: #666;
+      }
+      #stage {
+        max-width: none;
+        background: #f7f7f7;
+        padding: 0;
+        position: relative;
+      }
+      #stage div {
+        font-size: 1.3em;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      #stage p {
+        color: #666;
+      }
+      #gallery {
+        background: rgba(100, 100, 100, .9);
+        list-style: none;
+        padding: 5px 0;
+        margin: 0;
+        text-align: center;
+        overflow: hidden;
+      }
+      #gallery li {
+        display: inline-block;
+        vertical-align: bottom;
+        margin: 5px;
+      }
+      #gallery a {
+        display: block;
+        width: 150px;
+        height: 100px;
+        transition: all .5s;
+      }
+      #code {
+        background: url(/img/code.png) -227px -100px;
+      }
+      #docs {
+        background: url(/img/docs.png) -8px -81px;
+      }
+      #settings {
+        background: url(/img/settings.png) -122px -240px;
+      }
+      #logs {
+        background: url(/img/logs.png) -8px -81px;
+      }
+      #features {
+        padding: 50px 10px;
+      }
+      @media only screen and (min-width: 800px) {
+        #stage div {
+          height: 330px;
+          max-width: 340px;
+          padding: 90px 20px 0 540px;
+          background: url(/img/code.png) no-repeat left 40px/480px;
+        }
+        #gallery {
+          position: absolute;
+          bottom: 0;
+          width: 100%;
+          white-space: nowrap;
+        }
+        #gallery a:hover {
+          height: 400px;
+          width: 640px;
+          box-shadow: 0 0 15px rgba(0, 0, 0, .3);
+          background-position: top left;
+        }
+        #features {
+          text-align: center;
+        }
+        #features div {
+          display: inline-block;
+          width: 30%;
+          margin: 0 1.5%;
+          vertical-align: top;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <section>
+      <a id="install" href="https://chrome.google.com/webstore/detail/simpljs/kdkheiopehanfbajkkopimfppjmclgbp">Install Chrome App</a>
+      <div id="logo">Simpl.js</div>
+    </section>
+    <section id="stage">
+      <div>
+        <h1>Code+Run</h1>
+        <p>Simpl.js lets you write and run javascript apps from your browser</p>
+      </div>
+      <ul id="gallery"><li>
+        <a id="code" href="/img/code.png"></a></li><li>
+        <a id="docs" href="/img/docs.png"></a></li><li>
+        <a id="settings" href="/img/settings.png"></a></li><li>
+        <a id="logs" href="/img/logs.png"></a>
+      </li></ul>
+    </section>
+    <section id="features">
+      <div>
+        <h2>One Platform</h2>
+        <p>Your app's back-end code runs in a WebWorker on the same web platform as your front-end code.</p>
+      </div>
+      <div>
+        <h2>Bootstrapped</h2>
+        <p>Getting started is easy with the included sample apps and core modules.</p>
+      </div>
+      <div>
+        <h2>Developer Friendly</h2>
+        <p>Simpl.js supports versioning, manages dependencies and app configuration, and generates module documentation from source code.</p>
+      </div>
+    </section>
+  </body>
+</html>
