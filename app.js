@@ -11,7 +11,7 @@ simpl.add('app', function(o) {
       });
     });
     var appList, moduleList, selected, code, config, major, minor, del, dependencies, search, suggest, timeline, history, log, docs, status, feed, server, unload,
-        icons = {}, dom = o.html.dom;
+        icons = {}, dom = o.html.dom, boilerplate = 'function(modules) {\n  \n}';
     Array.prototype.slice.call(document.getElementById('icons').childNodes).forEach(function(icon) {
       icons[icon.id.substr(5)] = function(el) {
         var ns = 'http://www.w3.org/2000/svg',
@@ -341,9 +341,11 @@ simpl.add('app', function(o) {
               field.focus();
               alert(name ? 'App name taken' : 'Please enter app name');
             } else {
-              apps[name] = [{minor: 0, code: 'function(modules) {\n  \n}', config: {}, dependencies: {}, log: []}];
+              apps[name] = [{minor: 0, code: boilerplate, config: {}, dependencies: {}, doc: CodeMirror.Doc(boilerplate, {name: 'javascript'}), log: []}];
               dom(li(name, 0, null, true), appList);
               toggle(name, 0, true);
+              code.setCursor(1, 2);
+              code.focus();
             }
           }}}
         ]}},
@@ -368,9 +370,11 @@ simpl.add('app', function(o) {
               field.focus();
               alert(name ? 'Module name taken' : 'Please enter module name');
             } else {
-              modules[name] = [{minor: 0, code: 'function(modules) {\n  \n}', dependencies: {}}];
+              modules[name] = [{minor: 0, code: boilerplate, dependencies: {}, doc: CodeMirror.Doc(boilerplate, {name: 'javascript'})}];
               dom(li(name, 0), moduleList);
               toggle(name, 0, false, 'code');
+              code.setCursor(1, 2);
+              code.focus();
             }
           }}}
         ]}},
@@ -452,6 +456,7 @@ simpl.add('app', function(o) {
                 if (!versions.length) delete items[current.name];
                 current.entry.tab.parentNode.removeChild(current.entry.tab);
                 if (selected && selected.entry == current.entry) {
+                  body.classList.remove(selected.app ? 'show-app' : 'show-module');
                   body.classList.remove('show-'+selected.panel);
                   selected = null;
                 }
