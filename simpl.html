@@ -7,7 +7,7 @@
         text-align: center;
         margin: 25px 0 0 0;
       }
-      body, #port {
+      #link, #port {
         font: 13px monospace;
       }
       #link[href], #port:disabled {
@@ -22,8 +22,7 @@
         border: none;
         padding: 0;
       }
-      #error {
-        color: red;
+      #info {
         margin-top: 5px;
       }
     </style>
@@ -33,7 +32,7 @@
       <a id="link" target="simpl">http://localhost:<input id="port" placeholder="port" value="8000" size="4"></a>
       <input id="action" type="submit" value="Launch">
     </form>
-    <div id="error"></div>
+    <div id="info"></div>
     <script src="launcher.js"></script>
   </body>
 </html>

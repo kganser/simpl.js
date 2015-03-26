@@ -2,7 +2,7 @@ var bg = chrome.runtime.connect(),
     link = document.getElementById('link'),
     action = document.getElementById('action'),
     port = document.getElementById('port'),
-    error = document.getElementById('error');
+    info = document.getElementById('info');
 port.focus();
 bg.onMessage.addListener(function(message) {
   var started = message.action == 'start';
@@ -19,18 +19,22 @@ bg.onMessage.addListener(function(message) {
       link.removeAttribute('href');
     }
   }
-  error.textContent = message.error || '';
+  if (started) {
+    info.textContent = message.error || 'Keep this window open while using Simpl.js';
+    info.style.color = message.error ? 'red' : 'black';
+  }
   action.disabled = false;
   if (!(port.disabled = started && !message.error))
     port.focus();
 });
 document.launcher.onsubmit = function(e) {
   e.preventDefault();
-  error.textContent = '';
+  info.textContent = '';
   if (action.value == 'Launch') {
     var p = /^\d+$/.test(port.value) && parseInt(port.value, 10);
     if (!p || p.toString(16).length > 8) {
-      error.textContent = 'Invalid port number';
+      info.textContent = 'Invalid port number';
+      info.style.color = 'red';
       return port.focus();
     }
     bg.postMessage({action: 'start', port: p});
