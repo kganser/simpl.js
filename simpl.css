@@ -235,7 +235,7 @@ nav button, #actions button {
 .toggle:hover, .show-code .toggle:hover {
   background: #666;
 }
-.view, .view svg, .selected.loading .view, .restart, .stop, .running .run, .toggle .icon-right, .collapsed .toggle .icon-left, .show-app #home, .show-module #home {
+.view, .view svg, .selected.loading .view, .restart, .stop, .running .run, .toggle .icon-right, .collapsed .toggle .icon-left {
   display: none;
 }
 .code .icon-code, .settings .icon-settings, .log .icon-log, .docs .icon-info, .toggle .icon-left, .collapsed .toggle .icon-right {
@@ -362,11 +362,13 @@ nav .selected button {
 #log .error, #log .warn, #docs .error {
   color: red;
 }
-#code, #settings, .show-module #configuration, #log, #docs {
-  display: none;
-}
 .show-code #code, .show-settings #settings, .show-log #log, .show-docs #docs {
   display: block;
+}
+#code, #settings, #log, #docs,
+.show-loading #code, .show-loading #settings .show-loading #log, .show-loading #docs,
+.show-module #config, .show-app #home, .show-module #home {
+  display: none;
 }
 #settings section {
   display: inline-block;

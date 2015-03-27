@@ -150,10 +150,10 @@ simpl.add('app', function(o) {
         });
       };
     };
-    var toggle = function(name, version, app, panel, ln, ch) {
+    var toggle = function(name, version, app, panel, ln, ch, refresh) {
       var versions = (app ? apps : modules)[name],
           entry = versions[version],
-          refresh = entry.tab.classList.contains('loading');
+          origPanel = panel;
       if (selected) body.classList.remove('show-'+selected.panel);
       if (!selected || selected.entry != entry || refresh) {
         if (selected) {
@@ -162,7 +162,6 @@ simpl.add('app', function(o) {
         }
         body.classList.add(app ? 'show-app' : 'show-module');
         if ('code' in entry) {
-          code.setOption('readOnly', false);
           code.swapDoc(entry.doc);
           config.update(entry.config || null);
           dependencies(entry.dependencies);
@@ -175,10 +174,8 @@ simpl.add('app', function(o) {
           timeline(name, version, app);
           if (app) dom(entry.log.map(logLine), log, true);
           else docs(name, entry.code);
-          entry.tab.classList.remove('loading');
         } else if (!refresh) {
-          code.setOption('readOnly', 'nocursor');
-          entry.tab.classList.add('loading');
+          entry.tab.classList.add(panel = 'loading');
           o.xhr(url(app, name, version), {responseType: 'json'}, function(e) {
             try {
               if (e.target.status != 200) throw 'error';
@@ -190,13 +187,13 @@ simpl.add('app', function(o) {
               entry.config = response.config;
               entry.dependencies = response.dependencies;
               entry.published = response.published;
-              entry.tab.classList.remove('error');
-              if (entry == selected.entry)
-                toggle(name, version, app, panel, ln, ch);
+              entry.tab.classList.remove('error', 'loading');
+              if (selected && entry == selected.entry)
+                toggle(name, version, app, origPanel, ln, ch, true);
             } catch (e) {
               entry.tab.classList.remove('loading');
               entry.tab.classList.add('error');
-              if (entry == selected.entry) {
+              if (selected && entry == selected.entry) {
                 entry.tab.classList.remove('selected');
                 body.classList.remove('show-'+panel);
                 selected = null;
@@ -209,7 +206,7 @@ simpl.add('app', function(o) {
         selected = {name: name, version: version, app: app, entry: entry};
       }
       var first = app ? entry.running ? 'log' : 'code' : 'docs',
-          next = {settings: first, code: 'settings', log: 'code', docs: 'code'}[selected.panel = panel = panel || first];
+          next = {loading: first, settings: first, code: 'settings', log: 'code', docs: 'code'}[selected.panel = panel = panel || first];
       body.classList.add('show-'+panel);
       body.scrollTop = panel == 'log' ? body.scrollHeight : 0;
       entry.view.className = 'view '+next;
@@ -456,8 +453,7 @@ simpl.add('app', function(o) {
                 if (!versions.length) delete items[current.name];
                 current.entry.tab.parentNode.removeChild(current.entry.tab);
                 if (selected && selected.entry == current.entry) {
-                  body.classList.remove(selected.app ? 'show-app' : 'show-module');
-                  body.classList.remove('show-'+selected.panel);
+                  body.classList.remove(selected.app ? 'show-app' : 'show-module', 'show-'+selected.panel);
                   selected = null;
                 }
               });
@@ -537,7 +533,7 @@ simpl.add('app', function(o) {
               };
             }}
           ]}},
-          {section: {id: 'configuration', children: [
+          {section: {id: 'config', children: [
             {h2: 'Configuration'},
             {pre: function(e) {
               config = o.jsonv(e, selected ? selected.entry.config : null, function(method, path, data) {
