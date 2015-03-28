@@ -476,7 +476,7 @@ simpl.add('app', function(o) {
                   if (value) Object.keys(modules).forEach(function(name) {
                     if (~name.indexOf(value) && (selected.app || name != selected.name))
                       modules[name].forEach(function(version, i) {
-                        results.push({name: name, version: version.minor ? -i-1 : -1}); // current
+                        results.push({name: name, version: -i-1}); // current
                         if (version.minor) results.push({name: name, version: i}); // published
                       });
                   });
