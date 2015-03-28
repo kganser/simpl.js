@@ -72,15 +72,16 @@ simpl = function(s) {
   }
   
   var load = !inWorker ? function(m) { return m; } : function(modules) {
-    var remaining = modules.length, urls = [];
     modules.forEach(function(module) {
       proxy('load', module, function(url) {
         if (url) {
-          urls.push(url);
           blobs[url] = module;
+          try {
+            importScripts(url);
+          } catch (e) {
+            throw e.message+'\n'+url;
+          }
         }
-        if (!--remaining && urls.length)
-          importScripts.apply(null, urls);
       });
     });
     return modules;
@@ -144,8 +145,19 @@ simpl = function(s) {
       
       if (code != null) {
         peer.onerror = function(e) {
-          error(e.message, worker.urls[e.filename], e.lineno);
-          cleanup(workers.indexOf(worker));
+          var url = e.message.split('\n')[1],
+              module = worker.urls[url || e.filename],
+              index = workers.indexOf(worker);
+          if (index < 0) return;
+          if (url) {
+            // get line number by re-running module script that caused importScripts error
+            new Worker(url).onerror = function(e) {
+              error(e.message, module, e.lineno);
+            };
+          } else {
+            error(e.message, module, e.lineno);
+          }
+          cleanup(index);
         };
         workers.push(worker = {
           worker: peer,
@@ -171,10 +183,11 @@ simpl = function(s) {
         send(simpl, peer, module, command, args, callback, transferable);
       };
       
-      return url ? {send: sender, terminate: function(i) {
-        if (~(i = workers.indexOf(worker))) {
+      return url ? {send: sender, terminate: function() {
+        var index = workers.indexOf(worker);
+        if (~index) {
           peer.terminate();
-          cleanup(i);
+          cleanup(index);
         }
       }} : sender;
     };

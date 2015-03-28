@@ -1,6 +1,6 @@
 simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0}, function(o, proxy) {
 
-  var server, ping, loader, lines, icons,
+  var server, ping, loader, lines, icons, workspace,
       db = o.database.open('simpl', {sessions: {}}),
       key = o.crypto.random.randomWords(6, 0), // TODO: store in database
       fromBits = o.crypto.codec.base64.fromBits;
@@ -58,23 +58,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
       });
     }
     var apps = {}, mods = {}, pending = 0;
-    [ {name: '1 Hello World', file: 'hello-world'},
-      {name: '2 Web Server', file: 'web-server', config: {port: 8001}, dependencies: {http: -1}},
-      {name: '3 Database Editor', file: 'database-editor', config: {port: 8002, database: 'simpl'}, dependencies: {database: -1, html: -1, http: -1, xhr: -1}},
-      {name: '4 Simple Login', file: 'simple-login', config: {port: 8003, sessionKey: 'yabadabadoo'}, dependencies: {crypto: -1, database: -1, html: -1, http: -1}},
-      {name: '5 Unit Tests', file: 'unit-tests', dependencies: {async: -1, database: -1, docs: -1, html: -1, http: -1, parser: -1, socket: -1, string: -1, xhr: -1}},
-      {name: 'async'},
-      {name: 'crypto'},
-      {name: 'database'},
-      {name: 'docs', dependencies: {parser: -1}},
-      {name: 'html'},
-      {name: 'http', dependencies: {socket: -1, string: -1}},
-      {name: 'net', proxy: true},
-      {name: 'parser'},
-      {name: 'socket', proxy: true},
-      {name: 'string'},
-      {name: 'xhr'}
-    ].forEach(function(item) {
+    workspace.forEach(function(item) {
       if (scope != 'both' && scope == 'apps' == !item.file) return;
       pending++;
       o.xhr(location.origin+(item.file ? '/apps/'+item.file : '/modules/'+item.name)+'.js', function(e) {
@@ -109,7 +93,6 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
     });
   };
   
-  restore(function() {});
   o.xhr('/simpl.js', function(e) {
     loader = e.target.responseText;
     lines = loader.match(/\n/g).length+1;
@@ -119,6 +102,10 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
     icons = Object.keys(o).map(function(name) {
       return {symbol: {id: 'icon-'+name, viewBox: '0 0 20 20', children: {path: {d: o[name]}}}};
     });
+  });
+  o.xhr('/workspace.json', {responseType: 'json'}, function(e) {
+    workspace = e.target.response;
+    restore(function() {});
   });
   
   chrome.runtime.onConnect.addListener(function(launcher) {
@@ -168,6 +155,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
         
         if (match = request.path.match(/^\/([^\/]*)\.(\d+)\.js$/))
           return db.get('modules/'+match[1]+'/versions/'+match[2]).then(function(module) {
+            if (!module) return response.generic(404);
             response.end(wrap(decodeURIComponent(match[1]), module.code, match[2], module.dependencies), 'js');
           });
         if (/^\/(apps|modules)\/[^\/]*(\/\d+(\/|$)|$)/.test(request.path)) {
@@ -389,12 +377,12 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0},
                     if (!app) return response.error();
                     logs[id] = [];
                     apps[id] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\nsimpl.use('+JSON.stringify(app.dependencies)+','+app.code+');', function(module, callback) {
-                      var i = module.version,
-                          current = i < 1;
-                      if (i) i = current ? -i-1 : i-1;
+                      var v = module.version,
+                          current = v < 0;
+                      if (current) v = -v-1;
                       (function(callback) {
-                        if (local) return db.get('modules/'+encodeURIComponent(module.name)+'/versions/'+i).then(callback);
-                        api('modules/'+encodeURIComponent(module.name)+'/'+i, session.accessToken, function(status, data) {
+                        if (local) return db.get('modules/'+encodeURIComponent(module.name)+'/versions/'+v).then(callback);
+                        api('modules/'+encodeURIComponent(module.name)+'/'+v, session.accessToken, function(status, data) {
                           callback(data);
                         });
                       }(function(record) {
