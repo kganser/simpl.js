@@ -115,7 +115,7 @@ simpl.add('app', function(o) {
       }
       if (string) message.push(string);
       return {div: {className: 'entry '+entry.level, children: [
-        {div: {className: 'location', children: entry.line && entry.module+':'+entry.line, dataset: {
+        {div: {className: 'location', children: entry.module+(entry.line ? ':'+entry.line : ''), dataset: {
           module: entry.module,
           version: entry.version,
           line: entry.line
@@ -150,7 +150,7 @@ simpl.add('app', function(o) {
         });
       };
     };
-    var toggle = function(name, version, app, panel, ln, ch, refresh) {
+    var toggle = function(name, version, app, panel, ln, refresh) {
       var versions = (app ? apps : modules)[name],
           entry = versions[version],
           origPanel = panel;
@@ -188,8 +188,6 @@ simpl.add('app', function(o) {
               entry.dependencies = response.dependencies;
               entry.published = response.published;
               entry.tab.classList.remove('error', 'loading');
-              if (selected && entry == selected.entry)
-                toggle(name, version, app, origPanel, ln, ch, true);
             } catch (e) {
               entry.tab.classList.remove('loading');
               entry.tab.classList.add('error');
@@ -200,6 +198,8 @@ simpl.add('app', function(o) {
               }
               return status('failure', 'Error retrieving '+(app ? 'app' : 'module'));
             }
+            if (selected && entry == selected.entry)
+              toggle(name, version, app, origPanel, ln, true);
           });
         }
         entry.tab.classList.add('selected');
@@ -214,7 +214,7 @@ simpl.add('app', function(o) {
       if (panel == 'code') {
         code.refresh();
         if (ln != null) {
-          code.scrollIntoView({line: ln-1, ch: ch});
+          code.scrollIntoView({line: ln-1, ch: 0});
           var line = code.addLineClass(ln-1, 'background', 'current');
           setTimeout(function() {
             entry.doc.removeLineClass(line, 'background', 'current');
@@ -689,7 +689,7 @@ simpl.add('app', function(o) {
                 name = ref.module || selected.name,
                 version = ref.version ? -parseInt(ref.version, 10)-1 : selected.version;
             if (version >= 0)
-              toggle(name, version, !ref.module, 'code', ref.line, 0);
+              toggle(name, version, !ref.module, 'code', ref.line);
           }
         }}},
         {div: {id: 'docs', children: function(e) {

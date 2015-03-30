@@ -1,4 +1,4 @@
-simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, net: 0, crypto: 0}, function(o, proxy) {
+simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, system: 0, crypto: 0}, function(o, proxy) {
 
   var server, ping, loader, lines, icons, workspace,
       db = o.database.open('simpl', {sessions: {}}),

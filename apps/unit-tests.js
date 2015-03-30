@@ -323,7 +323,23 @@ function(modules) {
           buf = modules.string.toUTF8Buffer(str);
       assert(buf.length == uint8.length && !uint8.some(function(n, i) { return n != buf[i]; }), 'string to buffer');
       assert(modules.string.fromUTF8Buffer(new Uint8Array(uint8).buffer) === str, 'string from buffer');
-      assert(passed == 63, 'tests complete ('+passed+'/63 in '+(Date.now()-start)+'ms)');
+      
+      modules.system.cpu.getInfo(function(info) {
+        assert(info, 'system cpu info');
+        modules.system.display.getInfo(function(info) {
+          assert(info, 'system display info');
+          modules.system.memory.getInfo(function(info) {
+            assert(info, 'system memory info');
+            modules.system.network.getInterfaces(function(info) {
+              assert(info, 'system network info');
+              modules.system.storage.getInfo(function(info) {
+                assert(info, 'system storage info');
+                assert(passed == 68, 'tests complete ('+passed+'/68 in '+(Date.now()-start)+'ms)');
+              });
+            });
+          });
+        });
+      });
     }
   );
 }

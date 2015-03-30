@@ -1,7 +1,7 @@
 simpl.add('xhr', function() {
   /** xhr: function(url:string, options=`{}`:Options|function(ProgressEvent), callback=undefined:function(ProgressEvent)) -> XMLHttpRequest
       
-      A convenience method for issuing an `XMLHttpRequest` in the browser. `callback` is set as the `onload`,
+      A convenience method for issuing an `XMLHttpRequest`. `callback` is set as the `onload`,
       `onerror`, and `ontimeout` handler unless overridden in `options`. Setting `options.json` will also set
       a `Content-Type: application/json` header unless one is specified already in `options.headers`.
   */

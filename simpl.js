@@ -76,11 +76,7 @@ simpl = function(s) {
       proxy('load', module, function(url) {
         if (url) {
           blobs[url] = module;
-          try {
-            importScripts(url);
-          } catch (e) {
-            throw e.message+'\n'+url;
-          }
+          importScripts(url);
         }
       });
     });
@@ -92,7 +88,15 @@ simpl = function(s) {
     do { id = id == Number.MAX_SAFE_INTEGER ? 0 : id + 1; } while (id in log && id != start);
     if (id == start) throw 'message queue full';
     if (callback) log[id] = callback;
-    peer.postMessage({simpl: simpl, module: module, id: id, command: command, args: args}, transferable);
+    var message = {simpl: simpl, module: module, id: id, command: command, args: args};
+    try {
+      peer.postMessage(message, transferable);
+    } catch(e) {
+      if (command == 'log') {
+        message.args.args = ['[unserializable]'];
+        peer.postMessage(message);
+      }
+    }
   };
   var receive = function(e) {
     var id = e.data.id;
@@ -145,18 +149,10 @@ simpl = function(s) {
       
       if (code != null) {
         peer.onerror = function(e) {
-          var url = e.message.split('\n')[1],
-              module = worker.urls[url || e.filename],
+          var module = worker.urls[e.filename]
               index = workers.indexOf(worker);
           if (index < 0) return;
-          if (url) {
-            // get line number by re-running module script that caused importScripts error
-            new Worker(url).onerror = function(e) {
-              error(e.message, module, e.lineno);
-            };
-          } else {
-            error(e.message, module, e.lineno);
-          }
+          error(e.message, module, e.lineno);
           cleanup(index);
         };
         workers.push(worker = {

@@ -246,11 +246,16 @@ simpl.add('socket', function(modules, proxy) {
         name=undefined: string
       } */
   /** ClientSocket: {
-        send: function(data:ArrayBuffer, callback:function({error:string|undefined, bytesSent:number|undefined})),
+        send: function(data:ArrayBuffer, callback:function({info:SendInfo, bytesSent:number|undefined})),
         disconnect: function,
         setNoDelay: function(noDelay:boolean, callback:function(error:string|number)),
         getInfo: function(callback:function(ClientSocketInfo)),
         socketId: number
+      } */
+  /** SendInfo: {
+        resultCode: number,
+        error: string|undefined,
+        bytesSent: number|undefined
       } */
   /** ClientSocketInfo: {
         socketId: number,
