@@ -318,11 +318,16 @@ function(modules) {
       });
     },
     function(next) {
-      var uint8 = [116,101,115,116,32,49,50,51,32,195,161,195,169,195,173,195,179,195,186],
-          str = 'test 123 áéíóú',
-          buf = modules.string.toUTF8Buffer(str);
-      assert(buf.length == uint8.length && !uint8.some(function(n, i) { return n != buf[i]; }), 'string to buffer');
-      assert(modules.string.fromUTF8Buffer(new Uint8Array(uint8).buffer) === str, 'string from buffer');
+      var utf8Str = 'test 123 áéíóú',
+          utf8Chk = new Uint8Array([116,101,115,116,32,49,50,51,32,195,161,195,169,195,173,195,179,195,186]),
+          utf8Buf = modules.string.toUTF8Buffer(utf8Str),
+          base64Str = 'aGVsbG8gd29ybGQ=',
+          base64Chk = new Uint8Array([0x68,0x65,0x6C,0x6C,0x6F,0x20,0x77,0x6F,0x72,0x6C,0x64]),
+          base64Buf = modules.string.base64ToBuffer(base64Str);
+      assert(utf8Buf.length == utf8Chk.length && Array.prototype.every.call(utf8Buf, function(n, i) { return n == utf8Chk[i]; }), 'string to utf-8 buffer');
+      assert(modules.string.fromUTF8Buffer(utf8Chk.buffer) === utf8Str, 'string from utf-8 buffer');
+      assert(base64Buf.length == base64Chk.length && Array.prototype.every.call(base64Buf, function(n, i) { return n == base64Chk[i]; }), 'string base64 to buffer');
+      assert(modules.string.base64FromBuffer(base64Chk.buffer) === base64Str, 'string base64 from buffer');
       
       modules.system.cpu.getInfo(function(info) {
         assert(info, 'system cpu info');
@@ -334,7 +339,7 @@ function(modules) {
               assert(info, 'system network info');
               modules.system.storage.getInfo(function(info) {
                 assert(info, 'system storage info');
-                assert(passed == 68, 'tests complete ('+passed+'/68 in '+(Date.now()-start)+'ms)');
+                assert(passed == 70, 'tests complete ('+passed+'/70 in '+(Date.now()-start)+'ms)');
               });
             });
           });
