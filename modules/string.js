@@ -93,10 +93,10 @@ simpl.add('string', function() {
     base64FromBuffer: function(bytes) {
       bytes = new Uint8Array(bytes);
       var base64 = [];
-      for (var b, len = bytes.length, i = 0; i < len;) {
-        b = bytes[i++] << 16 | bytes[i++] << 8 | bytes[i++];
+      for (var len = bytes.length, i = 0; i < len;) {
+        var b = bytes[i++] << 16 | bytes[i++] << 8 | bytes[i++];
         for (var j = 0; j < 4; j++) {
-          if (bytes[i+j-4] == null) {
+          if (j > 1 && bytes[i+j-4] == null) {
             base64.push('=');
           } else {
             var ch = b >> 6*(3-j) & 63;
