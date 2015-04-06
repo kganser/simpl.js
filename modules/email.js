@@ -23,9 +23,7 @@ simpl.add('email', function(modules) {
         smtpHost='127.0.0.1': string,
         smtpClient='localhost': string,
         port=25: number
-      }
-      
-      If specified, `dkim.key` is a base-64 encoded RSA private key. */
+      } */
   /** SendError: {
         code: null|number,
         text: string
