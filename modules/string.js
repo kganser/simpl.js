@@ -67,7 +67,8 @@ simpl.add('string', function() {
       }
       return string.join('');
     },
-    base64ToBuffer: function(base64) {
+    base64ToBuffer: function(base64, url) {
+      if (url) base64 = base64.replace(/-/g, '+').replace(/_/g, '/');
       base64 = base64.replace(/=+$/, '');
       var mod = base64.length % 4;
       if (mod == 1) throw new RangeError('Invalid base-64 string');
@@ -90,7 +91,7 @@ simpl.add('string', function() {
       }
       return bytes;
     },
-    base64FromBuffer: function(bytes) {
+    base64FromBuffer: function(bytes, url) {
       bytes = new Uint8Array(bytes);
       var base64 = [];
       for (var len = bytes.length, i = 0; i < len;) {
@@ -108,7 +109,8 @@ simpl.add('string', function() {
           }
         }
       }
-      return base64.join('');
+      base64 = base64.join('');
+      return url ? base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '') : base64;
     }
   };
 });
