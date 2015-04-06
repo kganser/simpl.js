@@ -227,7 +227,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, system: 0, crypto: 
                     });
                   });
                 }, response.ok, method, code, true);
-              }, 'utf8', 131072);
+              }, 'utf8', 262144);
             if (method == 'DELETE')
               return forward(uri, function(callback) {
                 db.delete(path).then(callback);

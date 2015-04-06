@@ -3,7 +3,9 @@ simpl.add('string', function() {
         toUTF8Buffer: function(string:string) -> Uint8Array,
         fromUTF8Buffer: function(bytes:ArrayBuffer) -> string,
         base64ToBuffer: function(base64:string) -> Uint8Array,
-        base64FromBuffer: function(bytes:ArrayBuffer) -> string
+        base64FromBuffer: function(bytes:ArrayBuffer) -> string,
+        hexToBuffer: function(hex:string) -> Uint8Array,
+        hexFromBuffer: function(bytes:ArrayBuffer) -> string
       }
       
       Converts between strings and binary data representations. */
@@ -111,6 +113,23 @@ simpl.add('string', function() {
       }
       base64 = base64.join('');
       return url ? base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '') : base64;
+    },
+    hexToBuffer: function(hex) {
+      var len = hex.length;
+      if (/[^0-9a-f]/i.test(hex) || len % 2) throw new RangeError('Invalid hex string');
+      var bytes = new Uint8Array(len / 2);
+      for (var i = 0; i < len; i++)
+        bytes[i] = parseInt(hex.substr(i*2, 2), 16);
+      return bytes;
+    },
+    hexFromBuffer: function(bytes) {
+      bytes = new Uint8Array(bytes);
+      var hex = [];
+      for (var len = bytes.length, i = 0; i < len; i++) {
+        var b = bytes[i];
+        hex.push((b < 16 ? '0' : '')+b.toString(16));
+      }
+      return hex.join('');
     }
   };
 });
