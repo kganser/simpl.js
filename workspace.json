@@ -2,7 +2,7 @@
   {"name": "1 Hello World", "file": "hello-world"},
   {"name": "2 Web Server", "file": "web-server", "config": {"port": 8001}, "dependencies": {"http": -1}},
   {"name": "3 Database Editor", "file": "database-editor", "config": {"port": 8002, "database": "simpl"}, "dependencies": {"database": -1, "html": -1, "http": -1, "xhr": -1}},
-  {"name": "4 Simple Login", "file": "simple-login", "config": {"port": 8003, "sessionKey": "yabadabadoo"}, "dependencies": {"crypto": -1, "database": -1, "html": -1, "http": -1}},
+  {"name": "4 Simple Login", "file": "simple-login", "config": {"port": 8003, "sessionKey": "yabadabadoo"}, "dependencies": {"crypto": -1, "database": -1, "html": -1, "http": -1, "string": -1}},
   {"name": "5 Unit Tests", "file": "unit-tests", "dependencies": {"async": -1, "database": -1, "docs": -1, "html": -1, "http": -1, "parser": -1, "socket": -1, "string": -1, "system": -1, "xhr": -1}},
   {"name": "async"},
   {"name": "crypto"},

@@ -2,16 +2,20 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, system: 0, crypto: 
 
   var server, ping, loader, lines, icons, workspace,
       db = o.database.open('simpl', {sessions: {}}),
-      key = o.crypto.random.randomWords(6, 0), // TODO: store in database
-      fromBits = o.crypto.codec.base64.fromBits;
+      key = new Uint8Array(24),
+      encode = o.string.base64FromBuffer;
+  
+  crypto.getRandomValues(key); // TODO: store in database
   
   var signature = function(value) {
-    if (!Array.isArray(value)) value = o.crypto.codec.base64.toBits(value.split('.')[0], true);
-    return fromBits(new o.crypto.misc.hmac(key).mac(value), true, true);
+    value = value || '';
+    if (typeof value == 'string') value = o.string.base64ToBuffer(value.split('.')[0], true);
+    return encode(o.crypto.hmac(key, value), true);
   };
   var token = function() {
-    var rand = o.crypto.random.randomWords(6, 0);
-    return fromBits(rand, true, true)+'.'+signature(rand);
+    var rand = new Uint8Array(24);
+    crypto.getRandomValues(rand);
+    return encode(rand, true)+'.'+signature(rand);
   };
   var verify = function(signed) {
     if (typeof signed != 'string') return;

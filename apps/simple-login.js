@@ -1,23 +1,24 @@
 function(modules) {
   
   var db = modules.database.open('simple-login', {sessions: {}, users: {}}),
-      key = modules.crypto.codec.utf8String.toBits(config.sessionKey),
-      fromBits = modules.crypto.codec.base64.fromBits,
-      toBits = modules.crypto.codec.base64.toBits;
+      key = modules.string.toUTF8Buffer(config.sessionKey),
+      encode = modules.string.base64FromBuffer,
+      decode = modules.string.base64ToBuffer,
+      hmac = modules.crypto.hmac;
   
   var token = function() {
-    var rand = modules.crypto.random.randomWords(6, 0);
-    return fromBits(rand, true, true)+'.'+fromBits(new modules.crypto.misc.hmac(key).mac(rand), true, true);
+    var rand = new Uint8Array(24);
+    crypto.getRandomValues(rand);
+    return encode(rand, true)+'.'+encode(hmac(key, rand), true);
   };
   var verify = function(signed) {
     try {
       var parts = signed.split('.');
-      return fromBits(new modules.crypto.misc.hmac(key).mac(toBits(parts[0], true)), true, true) == parts[1] && signed;
+      return encode(hmac(key, decode(parts[0], true)), true) == parts[1] && signed;
     } catch (e) {}
   };
   var pbkdf2 = function(password, salt) {
-    var value = modules.crypto.misc.cachedPbkdf2(password, salt && {salt: toBits(salt, true)});
-    return {key: fromBits(value.key, true, true), salt: fromBits(value.salt, true, true)};
+    return encode(modules.crypto.pbkdf2(modules.string.toUTF8Buffer(password), salt));
   };
   
   modules.http.serve({port: config.port}, function(request, response) {
@@ -50,7 +51,7 @@ function(modules) {
         if (request.method == 'POST' && (request.headers['Content-Type'] || '').split(';')[0] == 'application/x-www-form-urlencoded')
           return request.slurp(function(body) {
             db.get('users/'+encodeURIComponent(body.username), true).then(function(user) {
-              if (!user || user.password !== pbkdf2(body.password, user.salt).key)
+              if (!user || user.password !== pbkdf2(body.password, decode(user.salt)))
                 return render(['Invalid login. ', {a: {href: '/login', children: 'Try again'}}], 401);
               this.put('sessions/'+(sid = token()), body.username).then(function() {
                 response.generic(303, {'Set-Cookie': 'sid='+sid, Location: '/'});
@@ -70,8 +71,9 @@ function(modules) {
             var path = 'users/'+encodeURIComponent(body.username);
             db.get(path, true).then(function(user) {
               if (user) return render(['Username '+body.username+' is already taken. ', {a: {href: '/register', children: 'Try again'}}], 401);
-              var hash = pbkdf2(body.password);
-              this.put(path, {name: body.name, password: hash.key, salt: hash.salt})
+              var salt = new Uint8Array(8);
+              crypto.getRandomValues(salt);
+              this.put(path, {name: body.name, password: pbkdf2(body.password, salt), salt: encode(salt)})
                   .put('sessions/'+(sid = token()), body.username)
                   .then(function() { response.generic(303, {'Set-Cookie': 'sid='+sid, Location: '/'}); });
             });
