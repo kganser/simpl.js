@@ -1,24 +1,23 @@
 function(modules) {
   
   var db = modules.database.open('simple-login', {sessions: {}, users: {}}),
-      key = modules.string.toUTF8Buffer(config.sessionKey),
       encode = modules.string.base64FromBuffer,
       decode = modules.string.base64ToBuffer,
-      hmac = modules.crypto.hmac;
+      utf8 = modules.string.toUTF8Buffer,
+      mac = modules.crypto.hmac(utf8(config.sessionKey));
   
   var token = function() {
     var rand = new Uint8Array(24);
     crypto.getRandomValues(rand);
-    return encode(rand, true)+'.'+encode(hmac(key, rand), true);
+    return encode(rand, true)+'.'+encode(mac(rand), true);
   };
   var verify = function(signed) {
-    try {
-      var parts = signed.split('.');
-      return encode(hmac(key, decode(parts[0], true)), true) == parts[1] && signed;
-    } catch (e) {}
+    if (typeof signed != 'string') return;
+    var parts = signed.split('.');
+    return encode(mac(decode(parts[0], true)), true) == parts[1] && signed;
   };
   var pbkdf2 = function(password, salt) {
-    return encode(modules.crypto.pbkdf2(modules.string.toUTF8Buffer(password), salt));
+    return encode(modules.crypto.pbkdf2(utf8(password), salt));
   };
   
   modules.http.serve({port: config.port}, function(request, response) {
