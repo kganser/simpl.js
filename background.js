@@ -65,7 +65,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, system: 0, crypto: 
     workspace.forEach(function(item) {
       if (scope != 'both' && scope == 'apps' == !item.file) return;
       pending++;
-      o.xhr(location.origin+(item.file ? '/apps/'+item.file : '/modules/'+item.name)+'.js', function(e) {
+      o.xhr((item.file ? '/apps/'+item.file : '/modules/'+item.name)+'.js', function(e) {
         var code = e.target.responseText;
         if (item.file) {
           apps[item.name] = {versions: [{
@@ -171,6 +171,16 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, system: 0, crypto: 
           parts.splice(2, 0, 'versions');
           var path = parts.join('/');
           
+          var create = function(trans, code, config, dependency) {
+            var record = {
+              code: code || 'function(modules) {\n  \n}',
+              dependencies: dependency || {},
+              published: []
+            };
+            if (app) record.config = config;
+            return trans.put(parts[0]+'/'+parts[1], {versions: [record]});
+          };
+          
           if (parts.length < 5 && method == 'POST') {
             var upgrade = parts.length == 3;
             if (upgrade && !/\d+/.test(request.query.source)) return response.error();
@@ -218,26 +228,32 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, system: 0, crypto: 
                   db.put(path+'/code', code).then(function(error) { // TODO: check If-Match header
                     if (!error) return callback();
                     if (parts[3] != '0') return response.error();
-                    this.get(path).then(function(existing) {
-                      if (existing) return response.error();
-                      this.put(parts[0]+'/'+parts[1], {versions: [app
-                        ? {code: code, config: {}, dependencies: {}, published: []}
-                        : {code: code, dependencies: {}, published: []}
-                      ]}).then(callback);
-                    });
+                    create(this, code).then(callback);
                   });
                 }, response.ok, method, code, true);
               }, 'utf8', 262144);
             if (method == 'DELETE')
               return forward(uri, function(callback) {
-                db.delete(path).then(callback);
+                db.delete(path).then(function() {
+                  parts[3] = '0';
+                  var empty = true;
+                  this.get(parts.join('/'), function() { return empty = false; }).then(function() {
+                    if (!empty) return callback();
+                    this.delete(parts[0]+'/'+parts[1]).then(callback);
+                  });
+                });
               }, response.ok, method);
           } else if (parts.length == 5 && parts[4] == 'config') {
             if (method == 'PUT')
               return request.slurp(function(body) {
                 if (body === undefined) return response.generic(415);
                 forward(uri, function(callback) {
-                  db.put(path, body).then(callback); // TODO: create app/module record if not exists
+                  if (!app) return response.error();
+                  db.put(path, body).then(function(error) {
+                    if (!error) return callback();
+                    if (parts[3] != '0') return response.error();
+                    create(this, null, body).then(callback);
+                  });
                 }, response.ok, method, body);
               }, 'json');
             if (method == 'DELETE')
@@ -250,7 +266,13 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, system: 0, crypto: 
                 if (body === undefined) return response.generic(415);
                 if (body.name == null || typeof body.version != 'number') return response.error();
                 forward(uri, function(callback) {
-                  db.put(path+'/'+encodeURIComponent(body.name), body.version).then(callback);
+                  db.put(path+'/'+encodeURIComponent(body.name), body.version).then(function(error) {
+                    if (!error) return callback();
+                    if (parts[3] != '0') return response.error();
+                    var dependency = {};
+                    dependency[body.name] = body.version;
+                    create(this, null, null, dependency).then(callback);
+                  });
                 }, response.ok, method, body);
               }, 'json');
             if (method == 'DELETE' && parts.length == 6)
@@ -335,7 +357,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, system: 0, crypto: 
             gcSessions(db).put('sessions/'+sid, {secret: secret, expires: Date.now()+86400000}).then(function() {
               response.generic(303, {
                 'Set-Cookie': 'sid='+sid,
-                Location: 'http://simpljs.com/authorize?client_id=simpljs&redirect_uri=http%3A%2F%2Flocalhost%3A'+port+'%2Fauth&state='+signature(sid)
+                Location: 'http://simpljs.com/authorize?client_id=simpljs&redirect_uri='+encodeURIComponent('http://'+request.headers.Host+'/auth')+'&state='+signature(sid)
               });
             });
           });
@@ -469,7 +491,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, system: 0, crypto: 
             ]), 'html');
           });
         }
-        o.xhr(location.origin+request.path, {responseType: 'arraybuffer'}, function(e) {
+        o.xhr(request.path, {responseType: 'arraybuffer'}, function(e) {
           if (e.target.status != 200)
             return response.generic(404);
           response.end(e.target.response, (request.path.match(/\.([^.]*)$/) || [])[1]);

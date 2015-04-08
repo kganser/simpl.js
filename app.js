@@ -30,7 +30,7 @@ simpl.add('app', function(o) {
       appList.classList.add('disabled');
       Object.keys(apps).forEach(function(app) {
         apps[app].forEach(function(entry) {
-          entry.tab.classList.remove('running');
+          entry.tab.classList.remove('running', 'error');
           entry.running = false;
           entry.log = [];
         });
@@ -167,7 +167,7 @@ simpl.add('app', function(o) {
           dependencies(entry.dependencies);
           search.value = '';
           suggest();
-          del.style.display = entry.minor ? 'none' : 'inline-block';
+          del.style.display = entry.minor || version ? 'none' : 'inline-block';
           major.parentNode.style.display = entry.minor ? 'inline-block' : 'none';
           major.textContent = 'Publish v'+(versions.length+1)+'.0';
           minor.textContent = 'Publish v'+(version+1)+'.'+entry.minor;
@@ -225,7 +225,10 @@ simpl.add('app', function(o) {
     var publish = function(upgrade) {
       var current = selected,
           entry = selected.entry,
-          published = entry.published.slice(-1).pop();
+          published = entry.published;
+      if (!published || entry.dirty)
+        return alert('Please save your code before publishing. Use Ctrl-s in the code editor.');
+      published = published.slice(-1).pop();
       if (Object.keys(entry.dependencies).some(function(name) { return entry.dependencies[name] < 0; }))
         return alert('All dependencies must be published module versions');
       if (published && entry.code == published.code &&
@@ -426,6 +429,7 @@ simpl.add('app', function(o) {
               status('success', 'Saved');
               entry.tab.classList.remove('changed');
               entry.code = code;
+              if (!entry.published) entry.published = [];
               if (selected && !selected.app && selected.entry == entry)
                 docs(selected.name, entry.code);
             });
@@ -447,10 +451,7 @@ simpl.add('app', function(o) {
                 if (e.target.status != 200)
                   return status('failure', 'Error deleting '+type);
                 status('success', 'Deleted');
-                var items = current.app ? apps : modules,
-                    versions = items[current.name];
-                delete versions[current.version];
-                if (!versions.length) delete items[current.name];
+                delete (current.app ? apps : modules)[current.name];
                 current.entry.tab.parentNode.removeChild(current.entry.tab);
                 if (selected && selected.entry == current.entry) {
                   body.classList.remove(selected.app ? 'show-app' : 'show-module', 'show-'+selected.panel);
