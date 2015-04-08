@@ -2,13 +2,14 @@ simpl.add('string', function() {
   /** string: {
         toUTF8Buffer: function(string:string) -> Uint8Array,
         fromUTF8Buffer: function(bytes:ArrayBuffer) -> string,
-        base64ToBuffer: function(base64:string) -> Uint8Array,
-        base64FromBuffer: function(bytes:ArrayBuffer) -> string,
+        base64ToBuffer: function(base64:string, url=false:boolean) -> Uint8Array,
+        base64FromBuffer: function(bytes:ArrayBuffer, url=false:boolean) -> string,
         hexToBuffer: function(hex:string) -> Uint8Array,
         hexFromBuffer: function(bytes:ArrayBuffer) -> string
       }
       
-      Converts between strings and binary data representations. */
+      Converts between strings and binary data representations. Base 64 functions support a URL-safe encoding that
+      removes `=` and replaces `+` and `/` with `-` and `_`, respectively. */
   return {
     toUTF8Buffer: function(string) {
       var c, len = string.length;
