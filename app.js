@@ -415,10 +415,13 @@ simpl.add('app', function(o) {
             matchBrackets: true,
             highlightSelectionMatches: true
           });
-          code.on('changes', function(e) {
+          code.on('changes', function() {
             selected.entry.dirty = true;
             selected.entry.tab.classList.add('changed');
           });
+          code.setOption('extraKeys', {Tab: function() {
+            code.replaceSelection('  ');
+          }});
           CodeMirror.commands.save = function() {
             var entry = selected.entry,
                 code = entry.doc.getValue();
