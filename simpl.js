@@ -16,15 +16,19 @@ var simpl = function(modules, clients) {
           available[name] = modules[name][version];
       });
       if (Object.keys(available).length == needed.length) {
-        needed.forEach(function(name) {
-          var module = available[name];
-          if (!module.init) {
-            module.init = true;
-            module.export = module.export();
-          }
-          client.dependencies[name] = module.export;
-        });
-        clients.splice(i--, 1)[0].callback(client.dependencies);
+        try {
+          needed.forEach(function(name) {
+            var module = available[name];
+            if (!module.init) {
+              module.init = true;
+              module.export = module.export();
+            }
+            client.dependencies[name] = module.export;
+          });
+          clients.splice(i--, 1)[0].callback(client.dependencies);
+        } catch (e) {
+          throw e.stack || e;
+        }
       }
     }
     return requested;
@@ -76,7 +80,11 @@ simpl = function(s) {
       proxy('load', module, function(url) {
         if (url) {
           blobs[url] = module;
-          importScripts(url);
+          try {
+            importScripts(url);
+          } catch (e) {
+            throw e.message+'\n    at '+url;
+          }
         }
       });
     });
@@ -149,10 +157,20 @@ simpl = function(s) {
       
       if (code != null) {
         peer.onerror = function(e) {
-          var module = worker.urls[e.filename]
-              index = workers.indexOf(worker);
+          var index = workers.indexOf(worker);
           if (index < 0) return;
-          error(e.message, module, e.lineno);
+          var message = (e.message.replace(/^Uncaught Uncaught/, 'Uncaught')+'\n').split('\n'),
+              source = message[1].match(/^    at (?:[^ ]+ \()?(blob:[^:]+)(?::(\d+):\d+\)?)?$/),
+              file = source ? source[1] : e.filename,
+              line = source ? source[2] : e.lineno,
+              module = worker.urls[file];
+          message = message[0];
+          if (module && !line && /^Uncaught SyntaxError:/.test(message))
+            return new Worker(file).onerror = function(e) {
+              error(message, module, e.lineno);
+              cleanup(index);
+            };
+          error(message, module, line);
           cleanup(index);
         };
         workers.push(worker = {
