@@ -236,8 +236,8 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, system: 0, crypto: 
               return forward(uri, function(callback) {
                 db.delete(path).then(function() {
                   parts[3] = '0';
-                  this.get(parts.join('/'), false).then(function(existing) {
-                    if (!existing) return callback();
+                  this.get(parts.join('/'), false).then(function(exists) {
+                    if (exists) return callback();
                     this.delete(parts[0]+'/'+parts[1]).then(callback);
                   });
                 });
