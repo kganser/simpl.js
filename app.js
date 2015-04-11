@@ -92,6 +92,7 @@ simpl.add('app', function(o) {
       };
       feed.onerror = function() {
         status('failure', 'Connection lost; please refresh', true);
+        appList.classList.add('disabled');
         feed.close();
         feed = null;
       };

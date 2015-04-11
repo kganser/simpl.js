@@ -178,7 +178,7 @@ nav .name span, #dependencies .name span {
   color: #999;
   margin-left: 10px;
 }
-nav .disabled .controls {
+nav .disabled .run, nav .disabled .stop, nav .disabled .restart {
   display: none;
 }
 nav .icon-loading, nav .icon-error {
@@ -191,7 +191,7 @@ nav .icon-loading, nav .icon-error {
 nav .icon-error {
   color: #c33;
 }
-nav .disabled .icon-loading, nav .error .icon-error, nav .loading .icon-loading {
+nav .error .icon-error, nav .loading .icon-loading {
   display: inline-block;
 }
 nav .changed .name:before {
@@ -392,7 +392,7 @@ nav .selected button {
   display: inline-block;
   vertical-align: top;
   box-sizing: border-box;
-  width: 33.33%;
+  width: 25%;
   min-height: 199px;
   border-left: 1px solid white;
 }
@@ -406,7 +406,7 @@ nav .selected button {
   padding-top: 50px;
   text-align: center;
 }
-.show-module #settings section {
+.show-module #settings section, #settings #config {
   width: 50%;
 }
 #home button, #actions button {
