@@ -48,6 +48,9 @@ simpl.add('socket', function(modules, proxy) {
         send: function(data, callback) {
           proxy('send', [clientSocketId, data], callback, [data]);
         },
+        secure: function(options, callback) {
+          proxy('secure', [clientSocketId, options], callback);
+        },
         disconnect: function() {
           proxy('disconnect', [clientSocketId]);
           delete clients[clientSocketId];
@@ -68,6 +71,9 @@ simpl.add('socket', function(modules, proxy) {
     },
     send: function(args, callback) {
       send(args[0], args[1], callback);
+    },
+    secure: function(args, callback) {
+      secure(args[0], args[1], callback);
     },
     setNoDelay: function(args, callback) {
       setNoDelay(args[0], args[1], callback);
@@ -109,6 +115,9 @@ simpl.add('socket', function(modules, proxy) {
           send: function(data, callback) {
             proxy('send', [socketId, data], callback, [data]);
           },
+          secure: function(options, callback) {
+            proxy('secure', [socketId, options], callback);
+          },
           disconnect: function() {
             proxy('disconnect', [socketId]);
             delete clients[socketId];
@@ -136,6 +145,9 @@ simpl.add('socket', function(modules, proxy) {
     clients[clientSocketId] = {server: serverSocketId, callback: servers[serverSocketId].callback({
       send: function(data, callback) {
         send(clientSocketId, data, callback);
+      },
+      secure: function(options, callback) {
+        secure(clientSocketId, options, callback);
       },
       disconnect: function() {
         disconnect(clientSocketId);
@@ -196,6 +208,16 @@ simpl.add('socket', function(modules, proxy) {
       if (callback) callback(info);
     });
   };
+  var secure = function(socketId, options, callback) {
+    if (!clients[socketId]) return callback && callback('Already disconnected');
+    sockets.tcp.setPaused(socketId, true, function() {
+      sockets.tcp.secure(socketId, options, function(error) {
+        sockets.tcp.setPaused(socketId, false, function() {
+          if (callback) callback(error);
+        });
+      });
+    });
+  };
   var setNoDelay = function(socketId, noDelay, callback) {
     if (!clients[socketId]) return callback && callback('Already disconnected');
     sockets.tcp.setNoDelay(socketId, noDelay, callback || function() {});
@@ -247,6 +269,7 @@ simpl.add('socket', function(modules, proxy) {
       } */
   /** ClientSocket: {
         send: function(data:ArrayBuffer, callback:function({info:SendInfo, bytesSent:number|undefined})),
+        secure: function(options=undefined:SecureOptions, callback:function(error:string|number)),
         disconnect: function,
         setNoDelay: function(noDelay:boolean, callback:function(error:string|number)),
         getInfo: function(callback:function(ClientSocketInfo)),
@@ -257,6 +280,11 @@ simpl.add('socket', function(modules, proxy) {
         error: string|undefined,
         bytesSent: number|undefined
       } */
+  /** SecureOptions: {
+        tlsVersion: {min: undefined|string, max:undefined|string}
+      }
+
+      `tlsVersion` values can be `'ssl3'`, `'tls1'`, `'tls1.1'`, or `'tls1.2'`. */
   /** ClientSocketInfo: {
         socketId: number,
         name: string|undefined,
@@ -294,6 +322,9 @@ simpl.add('socket', function(modules, proxy) {
         callback(error, !error && {
           send: function(data, callback) {
             send(socketId, data, callback);
+          },
+          secure: function(options, callback) {
+            secure(socketId, options, callback);
           },
           disconnect: function() {
             disconnect(socketId);
