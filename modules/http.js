@@ -15,7 +15,7 @@ simpl.add('http', function(modules) {
         headers = {'Content-Type': self.mimeType(headers)};
       if (headers['Content-Type'] === undefined)
         headers['Content-Type'] = 'text/plain';
-      if (!chunk && headers['Content-Length'] === undefined))
+      if (!chunk && headers['Content-Length'] === undefined)
         headers['Content-Length'] = body.length;
       if (chunk && headers['Transfer-Encoding'] === undefined)
         headers['Transfer-Encoding'] = 'chunked';
