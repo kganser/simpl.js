@@ -4,16 +4,22 @@ simpl.add('email', function(modules) {
         send: function(message:Message, config:Config, callback:function(error:false|SendError, undelivered:EmailAddresses))
       }
       
-      SMTP client. Rejected recipients are specified in `undelivered` as an array of objects if the message was
-      otherwise accepted by the SMTP server.*/
+      SMTP client. Rejected recipients are specified in `undelivered` as an array of `EmailAddress` objects if the
+      message was otherwise accepted by the SMTP server. */
+      
   /** Message: {
         from: EmailAddress,
         to: EmailAddresses,
         cc: EmailAddresses,
         bcc: EmailAddresses,
         subject: string,
-        body: string
-      } */
+        body: string,
+        headers: object
+      }
+      
+      `Content-Type`, `Date`, and `Message-ID` headers are added by default, and can be overridden in the `headers`
+      object, whose values can be null, strings, or string arrays. New lines in `body` are normalized to `\r\n`. */
+      
   /** EmailAddresses: undefined|EmailAddress|[EmailAddress, ...] */
   /** EmailAddress: string|{
         email: string,
@@ -26,7 +32,7 @@ simpl.add('email', function(modules) {
       } */
   /** SendError: {
         code: null|number,
-        text: string
+        message: string
       } */
   var normalize = function(addrs) {
     return (addrs ? Array.isArray(addrs) ? addrs : [addrs] : []).map(function(addr) {
@@ -35,6 +41,9 @@ simpl.add('email', function(modules) {
   };
   var format = function(addr) {
     return (addr.name ? addr.name+' ' : '')+'<'+addr.email+'>';
+  };
+  var base64 = function(string) {
+    return modules.string.base64FromBuffer(modules.string.toUTF8Buffer(string));
   };
   return {
     send: function(message, config, callback) {
@@ -47,13 +56,16 @@ simpl.add('email', function(modules) {
           to = normalize(message.to),
           cc = normalize(message.cc),
           bcc = normalize(message.bcc),
-          all = to.concat(cc).concat(bcc),
-          total = all.length,
+          subject = (message.subject || '(no subject)').replace(/\r|\n/g, '').trim(),
+          body = (message.body || '').replace(/\r\n?/g, '\n').replace(/\n(\n+$)?/g, '\r\n').replace(/^\./gm, '..'),
+          headers = message.headers || {},
+          recipients = to.concat(cc).concat(bcc),
+          total = recipients.length,
           undelivered = [];
       
       if (!total) return callback(false, undelivered);
       modules.socket.connect({address: config.smtpHost, port: config.port}, function(error, socket) {
-        if (error) return callback({text: 'Unable to connect to SMTP host '+config.smtpHost+':'+config.port});
+        if (error) return callback({message: 'Unable to connect to SMTP host '+config.smtpHost+':'+config.port});
         var reader, read = function(callback) {
           var buffer = '';
           reader = function(data) {
@@ -61,25 +73,41 @@ simpl.add('email', function(modules) {
               //console.log('>>> '+buffer);
               reader = null;
               var parts = buffer.match(/^(\d{3})[ -](?:\d\.\d\.\d )?([^\r\n]*)/) || [null, '0', buffer.split(/\r\n?|\n/)[0]];
-              callback(parseInt(parts[1], 10) || null, parts[2]);
+              callback({code: parseInt(parts[1], 10) || null, message: parts[2]});
             }
           };
         };
         var send = function(command, expect, success) {
           socket.send(modules.string.toUTF8Buffer(command+'\r\n').buffer, function(result) {
-            if (result.error) return callback({text: 'TCP send error: '+result.error});
+            if (result.error) return callback({message: 'TCP send error: '+result.error});
             //console.log('<<< '+command);
-            read(function(code, text) {
-              if (expect && expect !== code) return callback({code: code, text: text});
-              success(code);
+            read(function(result) {
+              if (expect && expect !== result.code) return callback(result);
+              success(result.code);
             });
           });
         };
-        read(function(result) {
-          if (result.code == 421) return callback(result);
-          send('EHLO '+config.smtpClient, 250, function() { // TODO: attempt HELO if this fails
+        read(function hello(result, secure) {
+          if (result && result.code == 421) return callback(result);
+          send('EHLO '+config.smtpClient, 250, function start(code, authenticated) { // TODO: attempt HELO if this fails
+            // TODO: Enable when socket.setPaused issue is resolved: https://code.google.com/p/chromium/issues/detail?id=467677
+            //if (!authenticated && config.auth && config.auth.user && config.auth.password) {
+            //  if (secure) return send('AUTH LOGIN', 334, function() {
+            //    send(base64(config.auth.user), 334, function() {
+            //      send(base64(config.auth.password), 235, function() {
+            //        start(null, true);
+            //      });
+            //    });
+            //  });
+            //  return send('STARTTLS', 220, function() {
+            //    socket.secure(null, function(error) {
+            //      if (error) return callback({message: 'TLS error: '+error});
+            //      hello(null, true);
+            //    });
+            //  });
+            //}
             send('MAIL FROM:<'+from.email+'>', 250, function rcpt() {
-              var addr = all.shift();
+              var addr = recipients.shift();
               if (addr) {
                 send('RCPT TO:<'+addr.email+'>', false, function(code) {
                   if (code != 250 && code != 251) undelivered.push(addr);
@@ -87,14 +115,22 @@ simpl.add('email', function(modules) {
                 });
               } else if (undelivered.length < total) {
                 send('DATA', 354, function() {
-                  send([
-                    'Date: '+new Date().toUTCString(),
-                    (to.length ? 'To: '+to.map(format).join(', ')+'\r\n' : cc.length ? '' : 'To: undisclosed-recipients:;\r\n')+
-                    (cc.length ? 'Cc: '+cc.map(format).join(', ')+'\r\n' : '')+
-                    'From: '+format(from),
-                    'Subject: '+message.subject, '',
-                    message.body, '.', '' // TODO: line breaks
-                  ].join('\r\n'), 250, function() {
+                  if (headers.Date === undefined) headers.Date = new Date().toUTCString();
+                  if (headers['Content-Type'] === undefined) headers['Content-Type'] = 'text/plain; charset=utf-8';
+                  if (headers['Message-ID'] === undefined) {
+                    var id = new Uint8Array(16);
+                    crypto.getRandomValues(id);
+                    headers['Message-ID'] = '<'+modules.string.hexFromBuffer(id)+'@'+config.smtpClient+'>';
+                  }
+                  headers.From = format(from);
+                  if (to.length || !cc.length) headers.To = to.length ? to.map(format).join(', ') : 'undisclosed-recipients:;';
+                  if (cc.length) headers.Cc = cc.map(format).join(', ');
+                  headers.Subject = subject;
+                  
+                  send(Object.keys(headers).map(function hdr(name) {
+                    var header = headers[name];
+                    return Array.isArray(header) ? header.map(hdr).join('\r\n') : name+': '+header;
+                  }).join('\r\n')+'\r\n\r\n'+body+'\r\n.\r\n', 250, function() {
                     send('QUIT', 221, function() {
                       socket.disconnect();
                       callback(false, undelivered);
