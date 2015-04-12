@@ -13,17 +13,15 @@ simpl.add('http', function(modules) {
     if (headers) {
       if (typeof headers == 'string')
         headers = {'Content-Type': self.mimeType(headers)};
-      if (!('Content-Type' in headers))
+      if (headers['Content-Type'] === undefined)
         headers['Content-Type'] = 'text/plain';
-      if (!chunk && !('Content-Length' in headers))
+      if (!chunk && headers['Content-Length'] === undefined))
         headers['Content-Length'] = body.length;
-      if (chunk && !('Transfer-Encoding' in headers))
+      if (chunk && headers['Transfer-Encoding'] === undefined)
         headers['Transfer-Encoding'] = 'chunked';
-      pre += 'HTTP/1.1 '+self.statusMessage(status)+'\r\n'+Object.keys(headers).map(function(name) {
+      pre += 'HTTP/1.1 '+self.statusMessage(status)+'\r\n'+Object.keys(headers).map(function flatten(name) {
         var value = headers[name];
-        return Array.isArray(value) ? value.map(function(v) { return name+': '+v+'\r\n'; }).join('')
-          : value == null ? ''
-          : name+': '+value+'\r\n';
+        return value ? Array.isArray(value) ? value.map(flatten).join('') : name+': '+value+'\r\n' : '';
       }).join('')+'\r\n';
     }
     

@@ -127,10 +127,10 @@ simpl.add('email', function(modules) {
                   if (cc.length) headers.Cc = cc.map(format).join(', ');
                   headers.Subject = subject;
                   
-                  send(Object.keys(headers).map(function hdr(name) {
-                    var header = headers[name];
-                    return Array.isArray(header) ? header.map(hdr).join('\r\n') : name+': '+header;
-                  }).join('\r\n')+'\r\n\r\n'+body+'\r\n.\r\n', 250, function() {
+                  send(Object.keys(headers).map(function flatten(name) {
+                    var value = headers[name];
+                    return value ? Array.isArray(value) ? value.map(flatten).join('') : name+': '+value+'\r\n' : '';
+                  }).join('')+'\r\n'+body+'\r\n.\r\n', 250, function() {
                     send('QUIT', 221, function() {
                       socket.disconnect();
                       callback(false, undelivered);
