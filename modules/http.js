@@ -34,17 +34,28 @@ simpl.add('http', function(modules) {
     
     return data.buffer;
   };
+  
   /** http: {
-        serve: function(options:ListenOptions, onRequest:RequestCallback, callback:ListenCallback),
+        serve: function(options:ListenOptions, onRequest:RequestCallback, callback:function(error:string|null, socket:ServerSocket|false)),
         statusMessage: function(code:number) -> string,
         mimeType: function(extension:string) -> string,
         parseQuery: function(query:string) -> object
       }
       
-      HTTP/1.1 server and utilities. `serve` uses `ListenOptions`, `ListenCallback`, and `ClientSocket` from the
-      `socket` module. `parseQuery` object values are strings or arrays of strings if more than one string value is
-      specified for a key. */
-      
+      HTTP/1.1 server and utilities. `ServerSocket` and `ClientSocket` are defined in the `socket` module. `parseQuery`
+      object values are strings or arrays of strings if more than one string value is specified for a key. */
+  
+  /** ListenOptions: {
+        address='0.0.0.0': string,
+        port: number,
+        backlog=50: number,
+        name=undefined: string,
+        maxHeaderSize=8192: number
+      }
+
+      If a request's header exceeds `maxHeaderSize` bytes, the server responds with a generic `413 Request Entity Too
+      Large` and disconnects the client socket. */
+  
   /** RequestCallback: function(request:Request, response:Response, socket:ClientSocket) -> function(data:ArrayBuffer)|null
       
       If a function is returned, it is called with data received in the body of the request. To buffer the request
@@ -68,7 +79,7 @@ simpl.add('http', function(modules) {
       synchronously inside `RequestCallback`. If `format` is `'utf8'`, `'url'`, or `'json'`, the body is converted to a
       string, `parseQuery` object, or json structure, respectively. Otherwise, `body` is an `ArrayBuffer`. If the max
       size is exceeded, `callback` is not issued and the server responds with a generic `413 Request Entity Too Large`. */
-      
+  
   /** Response: {
         send: function(body='':ArrayBuffer|string, headers=`{}`:object|string, status=200:number, callback:function(error:string|undefined)),
         end: function(body='':ArrayBuffer|string, headers=`{}`:object|string, status=200:number, callback:function(error:string|undefined)),
@@ -85,95 +96,103 @@ simpl.add('http', function(modules) {
       and `error` are nullary convenience methods that call `generic()` and `generic(400)`, respectively. */
   return self = {
     serve: function(options, onRequest, callback) {
+      var maxHeaderSize = options && options.maxHeaderSize || 8192;
       modules.socket.listen(options, function(socket) {
-        var slurp = function(callback, format, maxSize) {
-          var body = new Uint8Array(0);
-          read = function(data) {
-            if (!data) {
-              if (format == 'utf8' || format == 'url' || format == 'json')
-                body = modules.string.fromUTF8Buffer(body);
-              if (format == 'url')
-                return callback(self.parseQuery(body));
-              if (format == 'json')
-                try { body = JSON.parse(body); }
-                catch (e) { body = undefined; }
-              return callback(body);
-            }
-            var length = body.byteLength + data.byteLength;
-            if (length > (maxSize || 4096)) {
-              read = null;
-              return response.generic(413);
-            }
-            var b = new Uint8Array(length);
-            b.set(new Uint8Array(body), 0);
-            b.set(new Uint8Array(data), body.byteLength);
-            body = b.buffer;
+        var dispatch = function(headers) {
+          var headersSent, sent,
+              line = headers.shift().split(' '),
+              uri = line[1] ? line[1].split('?', 2) : [];
+          var response = {
+            send: function(body, headers, status, callback) {
+              if (sent) return callback && callback({resultCode: -1, error: 'Already issued response'});
+              socket.send(entity(status, headers, body, headersSent, headersSent = true), callback);
+            },
+            end: function(body, headers, status, callback) {
+              if (sent) return callback && callback({resultCode: -1, error: 'Already issued response'});
+              socket.send(entity(status, headers, body, headersSent, headersSent, sent = true), callback);
+            },
+            generic: function(status, headers) {
+              response.end(self.statusMessage(status), headers, status || 200);
+            },
+            ok: function() { response.generic(); },
+            error: function() { response.generic(400); }
           };
+          // TODO: sanity check headers
+          // TODO: decode chunks if chunk-encoded (or emit 411 Length Required)
+          var request = {
+            protocol: line[2],
+            method: line[0].toUpperCase(),
+            uri: line[1],
+            path: uri[0],
+            query: self.parseQuery(uri[1]),
+            headers: {},
+            cookie: {},
+            slurp: function(callback, format, maxSize) {
+              var body = new Uint8Array(0);
+              o.receive = function(data) {
+                if (!data) {
+                  if (format == 'utf8' || format == 'url' || format == 'json')
+                    body = modules.string.fromUTF8Buffer(body);
+                  if (format == 'url')
+                    return callback(self.parseQuery(body));
+                  if (format == 'json')
+                    try { body = JSON.parse(body); }
+                    catch (e) { body = undefined; }
+                  return callback(body);
+                }
+                var length = body.byteLength + data.byteLength;
+                if (length > (maxSize || 4096)) {
+                  o.receive = null;
+                  return response.generic(413);
+                }
+                var b = new Uint8Array(length);
+                b.set(new Uint8Array(body), 0);
+                b.set(new Uint8Array(data), body.byteLength);
+                body = b.buffer;
+              };
+            }
+          };
+          headers.forEach(function(line) {
+            line = line.split(': ', 2);
+            request.headers[line[0]] = line[1];
+          });
+          if (request.headers.Cookie) request.headers.Cookie.split(/; */).forEach(function(pair) {
+            pair = pair.split('=', 2);
+            if (pair.length < 2) return;
+            var value = pair[1];
+            request.cookie[pair[0]] = decodeURIComponent(value[0] == '"' ? value.slice(1, -1) : value);
+          });
+          var o = {length: parseInt(request.headers['Content-Length'], 10) || 0},
+              r = onRequest(request, response, socket);
+          if (!o.receive && typeof r == 'function') o.receive = r;
+          return o;
         };
-        var request = {cookie: {}, slurp: slurp}, response,
-            headers = '', remaining, read, headersSent;
+        var request, remaining, headers = '';
         return function(buffer) {
           do {
             var start = 0, end = buffer.byteLength;
-            // TODO: 414 Request-URI Too Long and 413 Request Entity Too Large while buffering headers
-            if (!request.headers) {
+            if (request) {
+              if (end > remaining) end = remaining;
+              remaining -= end;
+            } else {
               var split, offset = headers.length;
-              headers += modules.string.fromUTF8Buffer(buffer);
-              if ((split = headers.indexOf('\r\n\r\n')) > -1) {
-                headers = headers.substr(0, split).split('\r\n');
-                var line = headers.shift().split(' '),
-                    uri = line[1] ? line[1].split('?', 2) : [];
-                request.protocol = line[2];
-                request.method = line[0].toUpperCase();
-                request.uri = line[1];
-                request.path = uri[0];
-                request.query = self.parseQuery(uri[1]);
-                request.headers = {};
-                headers.forEach(function(line) {
-                  line = line.split(': ', 2);
-                  request.headers[line[0]] = line[1];
-                });
-                if (request.headers.Cookie) request.headers.Cookie.split(/; */).forEach(function(pair) {
-                  pair = pair.split('=', 2);
-                  if (pair.length < 2) return;
-                  var value = pair[1];
-                  request.cookie[pair[0]] = decodeURIComponent(value[0] == '"' ? value.slice(1, -1) : value);
-                });
-                remaining = request.headers['Content-Length'] || 0;
+              headers += modules.string.fromLatin1Buffer(buffer);
+              if (headers.length-3 > maxHeaderSize)
+                return socket.send(entity(413, null, self.statusMessage(413), false, false, true), socket.disconnect);
+              if ((split = headers.indexOf('\r\n\r\n', offset-3)) > -1) {
+                request = dispatch(headers.substr(0, split).split('\r\n'));
+                remaining = request.length;
                 start = split + 4 - offset;
                 end = Math.min(start + remaining, end);
                 remaining -= end - start;
-                headers = headersSent = '';
-                var r = onRequest(request, response = {
-                  send: function(body, headers, status, callback) {
-                    socket.send(entity(status, headers, body, headersSent, headersSent = true), callback);
-                  },
-                  end: function(body, headers, status, callback) {
-                    socket.send(entity(status, headers, body, headersSent, headersSent, true), callback);
-                  },
-                  generic: function(status, headers) {
-                    response.end(self.statusMessage(status), headers, status || 200);
-                  },
-                  ok: function() {
-                    response.generic();
-                  },
-                  error: function() {
-                    response.generic(400);
-                  }
-                }, socket);
-                if (!read && typeof r == 'function') read = r;
-              }
-            } else {
-              if (end > remaining) end = remaining;
-              remaining -= end;
+                headers = '';
+              } 
             }
-            // TODO: decode chunks if chunk-encoded (or emit 411 Length Required)
-            if (read) read(buffer.slice(start, end));
-            if (!remaining) {
-              if (read) read();
-              read = null;
-              request = {cookie: {}, slurp: slurp};
+            if (request && request.receive) {
+              request.receive(buffer.slice(start, end));
+              if (!remaining) request.receive();
             }
+            if (!remaining) request = null;
             buffer = buffer.slice(end);
           } while (buffer.byteLength);
         };

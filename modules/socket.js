@@ -268,7 +268,7 @@ simpl.add('socket', function(modules, proxy) {
         name=undefined: string
       } */
   /** ClientSocket: {
-        send: function(data:ArrayBuffer, callback:function({info:SendInfo, bytesSent:number|undefined})),
+        send: function(data:ArrayBuffer, callback:function(info:SendInfo)),
         secure: function(options=undefined:SecureOptions, callback:function(error:string|number)),
         disconnect: function,
         setNoDelay: function(noDelay:boolean, callback:function(error:string|number)),
