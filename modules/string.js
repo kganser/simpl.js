@@ -2,6 +2,7 @@ simpl.add('string', function() {
   /** string: {
         toUTF8Buffer: function(string:string) -> Uint8Array,
         fromUTF8Buffer: function(bytes:ArrayBuffer) -> string,
+        fromLatin1Buffer: function(bytes:ArrayBuffer) -> string,
         base64ToBuffer: function(base64:string, url=false:boolean) -> Uint8Array,
         base64FromBuffer: function(bytes:ArrayBuffer, url=false:boolean) -> string,
         hexToBuffer: function(hex:string) -> Uint8Array,
@@ -67,6 +68,14 @@ simpl.add('string', function() {
                 : n > 191 && n < 224 && i + 1 < len
                   ? (n - 192 << 6) + bytes[++i] - 128
                   : n));
+      }
+      return string.join('');
+    },
+    fromLatin1Buffer: function(bytes) {
+      bytes = new Uint8Array(bytes);
+      var string = [];
+      for (var len = bytes.length, i = 0; i < len; i++) {
+        string.push(String.fromCharCode(bytes[i]));
       }
       return string.join('');
     },
