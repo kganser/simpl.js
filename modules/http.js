@@ -175,11 +175,12 @@ simpl.add('http', function(modules) {
               if (end > remaining) end = remaining;
               remaining -= end;
             } else {
-              var split, offset = headers.length;
+              var offset = headers.length;
               headers += modules.string.fromLatin1Buffer(buffer);
-              if (headers.length-3 > maxHeaderSize)
+              var split = headers.indexOf('\r\n\r\n', offset-3);
+              if (split == -1 && headers.length-3 > maxHeaderSize || split > maxHeaderSize)
                 return socket.send(entity(413, null, self.statusMessage(413), false, false, true), socket.disconnect);
-              if ((split = headers.indexOf('\r\n\r\n', offset-3)) > -1) {
+              if (split > -1) {
                 request = dispatch(headers.substr(0, split).split('\r\n'));
                 remaining = request.length;
                 start = split + 4 - offset;
