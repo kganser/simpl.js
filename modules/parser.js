@@ -156,7 +156,7 @@ simpl.add('parser', function() {
           });
         });
         
-        if (!grammar.hasOwnProperty(oldStart)) throw 'Start symbol does not appear in grammar';
+        if (!grammar.hasOwnProperty(oldStart)) throw new Error('Start symbol does not appear in grammar');
         grammar[start = unique(oldStart, symbols)] = [[[oldStart], function(e) { return e; }]];
         
         // compute first sets
@@ -288,12 +288,12 @@ simpl.add('parser', function() {
             var next = item[1][item[2]];
             if (!next) {
               Object.keys(item[3]).forEach(function(next) {
-                if (state.transitions.hasOwnProperty(next)) throw 'Shift-reduce conflict on input "'+next+'"\n  '+stringify(state.transitions[next].items[0])+' (shift)\n  '+stringify(item)+' (reduce)';
-                if (state.reductions.hasOwnProperty(next)) throw 'Reduce-reduce conflict on input "'+next+'"\n  '+stringify(state.reductions[next])+'\n  '+stringify(item);
+                if (state.transitions.hasOwnProperty(next)) throw new Error('Shift-reduce conflict on input "'+next+'"\n  '+stringify(state.transitions[next].items[0])+' (shift)\n  '+stringify(item)+' (reduce)');
+                if (state.reductions.hasOwnProperty(next)) throw new Error('Reduce-reduce conflict on input "'+next+'"\n  '+stringify(state.reductions[next])+'\n  '+stringify(item));
                 state.reductions[next] = item;
               });
             } else if (state.reductions.hasOwnProperty(next)) {
-              throw 'Shift-reduce conflict on input "'+next+'"\n  '+stringify(item)+' (shift)\n  '+stringify(state.reductions[next])+' (reduce)';
+              throw new Error('Shift-reduce conflict on input "'+next+'"\n  '+stringify(item)+' (shift)\n  '+stringify(state.reductions[next])+' (reduce)');
             }
           });
         });

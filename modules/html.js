@@ -172,7 +172,7 @@ simpl.add('html', function() {
           view: function(parent:DOMElement)
         } */
     model: function(data, insert) {
-      if (typeof data != 'object' || !data) throw 'data must be object or array';
+      if (typeof data != 'object' || !data) throw new Error('Model data must be object or array');
       var model, elem,
           keys = !Array.isArray(data) && Object.keys(data);
       return model = {
@@ -194,7 +194,7 @@ simpl.add('html', function() {
           return model;
         },
         insert: function(value, key) {
-          if (keys && key == null) throw 'insert to object must specify a key';
+          if (keys && key == null) throw new Error('Insert to object must specify a key');
           var index = key == null ? data.length : key;
           if (keys) {
             if ((index = keys.indexOf(key)) < 0) {
@@ -212,12 +212,12 @@ simpl.add('html', function() {
         },
         insertAll: function(values) {
           if (keys) {
-            if (typeof values != 'object' || Array.isArray(values) || !values) throw 'values must be an object';
+            if (typeof values != 'object' || Array.isArray(values) || !values) throw new Error('Inserted values must be an object');
             Object.keys(values).forEach(function(key) {
               model.insert(values[key], key);
             });
           } else {
-            if (!Array.isArray(values)) throw 'values must be an array';
+            if (!Array.isArray(values)) throw new Error('Inserted values must be an array');
             values.forEach(function(value) {
               model.insert(value);
             });

@@ -160,7 +160,7 @@ simpl.add('database', function() {
             newVersion: e.newVersion,
             createObjectStore: function(name, data) {
               if (db.objectStoreNames.contains(name))
-                throw 'objectStore already exists';
+                throw new Error('objectStore already exists');
               put(db.createObjectStore(name, {keyPath: ['parent', 'key']}), [], data === undefined ? {} : data, function() {});
               return self;
             },

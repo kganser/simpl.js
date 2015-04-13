@@ -1,7 +1,7 @@
 simpl.add('http', function(modules) {
   
-  var self, entity = function(status, headers, body, headersSent, chunk, end) {
-    if (headersSent && (headers || status)) throw 'HTTP headers already sent';
+  var self, message = function(status, headers, body, headersSent, chunk, end) {
+    if (headersSent && (headers || status)) throw new Error('HTTP headers already sent');
     headers = headersSent ? false : (headers || {});
     
     if (body instanceof ArrayBuffer)
@@ -105,11 +105,11 @@ simpl.add('http', function(modules) {
           var response = {
             send: function(body, headers, status, callback) {
               if (sent) return callback && callback({resultCode: -1, error: 'Already issued response'});
-              socket.send(entity(status, headers, body, headersSent, headersSent = true), callback);
+              socket.send(message(status, headers, body, headersSent, headersSent = true), callback);
             },
             end: function(body, headers, status, callback) {
               if (sent) return callback && callback({resultCode: -1, error: 'Already issued response'});
-              socket.send(entity(status, headers, body, headersSent, headersSent, sent = true), callback);
+              socket.send(message(status, headers, body, headersSent, headersSent, sent = true), callback);
             },
             generic: function(status, headers) {
               response.end(self.statusMessage(status), headers, status || 200);
@@ -179,7 +179,7 @@ simpl.add('http', function(modules) {
               headers += modules.string.fromLatin1Buffer(buffer);
               var split = headers.indexOf('\r\n\r\n', offset-3);
               if (split == -1 && headers.length-3 > maxHeaderSize || split > maxHeaderSize)
-                return socket.send(entity(413, null, self.statusMessage(413), false, false, true), socket.disconnect);
+                return socket.send(message(413, null, self.statusMessage(413), false, false, true), socket.disconnect);
               if (split > -1) {
                 request = dispatch(headers.substr(0, split).split('\r\n'));
                 remaining = request.length;
