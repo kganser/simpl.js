@@ -693,8 +693,8 @@ function(modules) {
       assert(modules.html.markup([{a: {title: '"hello & goodbye"', children: 'hello <& goodbye'}}, {script: function() { '</script>'; }}]) === '<a title="&quot;hello &amp; goodbye&quot;">hello &lt;&amp; goodbye</a><script>(function () { \'<\\/script>\'; }());</script>',
         'html markup escaped');
       
-      var i = 1, j = 1;
-      modules.http.serve({port: 9123, ip: '127.0.0.1'}, function(request, response, socket) {
+      var i = 1, large = new Array(1000).join('yabadabadoo');
+      modules.http.serve({port: 9123, address: '127.0.0.1'}, function(request, response, socket) {
         if (i == 1 && i++) {
           assert(request.method === 'GET' && request.path === '/', 'http get request');
           return response.end('hello');
@@ -711,11 +711,11 @@ function(modules) {
         if (i == 6 && i++) {
           return request.slurp(function(body) {
             assert(i++ == 7 && request.method === 'POST' && body === 'yabadaba', 'http request body slurp');
-            response.generic();
+            response.ok();
           }, 'utf8');
         }
         if (i == 9 && i++) {
-          assert(request.path === '/first' && request.method === 'POST' && request.headers['Content-Length'] == 7992,
+          assert(request.method === 'POST' && request.headers['Content-Length'] == large.length,
             'http large request body');
           return request.slurp(function(body) { i++; });
         }
@@ -723,10 +723,12 @@ function(modules) {
           assert(request.method === 'POST' && request.headers['Content-Length'] == 19,
             'http concurrent request');
           return request.slurp(function(body) {
-            assert(body == null, 'http malformed json request');
+            assert(body === undefined, 'http malformed json request');
             response.error();
           }, 'json');
         }
+        i++;
+        response.error();
       }, function(error, server) {
         assert(!error, 'http listen on port 9123');
         if (error) return next();
@@ -740,22 +742,27 @@ function(modules) {
             modules.xhr(host, {method: 'POST', data: 'yabadaba'}, function(e) {
               assert(i++ == 8 && e.target.status == 200 && e.target.responseText === '200 OK',
                 'http response after slurp');
-              modules.xhr(host+'/first', {method: 'POST', data: new Array(1000).join('yabadaba')}, function(e) {
+              modules.xhr(host, {method: 'POST', data: large}, function(e) {
                 assert(i++ == 10 && e.target.status == 413,
-                  'http request too large error');
-              });
-              modules.xhr(host+'/second', {method: 'POST', data: '{"malformed": json}'}, function(e) {
-                assert(i++ == 11 && e.target.status == 400 && e.target.responseText === '400 Bad Request',
-                  'http response to malformed body');
-                server.disconnect();
-                next();
+                  'http request body too large error');
+                modules.xhr(host+'/first', {headers: {'X-Large-Header': large}}, function(e) {
+                  assert(i++ < 13 && e.target.status == 413,
+                    'http request header too large error');
+                  if (i == 13) next(server);
+                });
+                modules.xhr(host+'/second', {method: 'POST', data: '{"malformed": json}'}, function(e) {
+                  assert(i++ < 13 && e.target.status == 400 && e.target.responseText === '400 Bad Request',
+                    'http response to malformed body');
+                  if (i == 13) next(server);
+                });
               });
             });
           });
         });
       });
     },
-    function(next) {
+    function(next, server) {
+      server.disconnect();
       var grammar = {
         addition: [
           'addition', '+', 'multiplication', function(e) { return e[0] + e[2]; },
@@ -871,6 +878,7 @@ function(modules) {
       var utf8Str = 'test 123 áéíóú',
           utf8Chk = new Uint8Array([0x74,0x65,0x73,0x74,0x20,0x31,0x32,0x33,0x20,0xc3,0xa1,0xc3,0xa9,0xc3,0xad,0xc3,0xb3,0xc3,0xba]),
           utf8Buf = modules.string.toUTF8Buffer(utf8Str),
+          latin1Chk = new Uint8Array([0x74,0x65,0x73,0x74,0x20,0x31,0x32,0x33,0x20,0xe1,0xe9,0xed,0xf3,0xfa]),
           base64Str = 'aGVsbG8gd29ybGQ=',
           base64Chk = new Uint8Array([0x68,0x65,0x6c,0x6c,0x6f,0x20,0x77,0x6f,0x72,0x6c,0x64]),
           base64Buf = modules.string.base64ToBuffer(base64Str),
@@ -879,6 +887,7 @@ function(modules) {
           hexBuf = modules.string.hexToBuffer(hexStr);
       assert(utf8Buf.length == utf8Chk.length && Array.prototype.every.call(utf8Buf, function(n, i) { return n == utf8Chk[i]; }), 'string to utf-8 buffer');
       assert(modules.string.fromUTF8Buffer(utf8Chk.buffer) === utf8Str, 'string from utf-8 buffer');
+      assert(modules.string.fromLatin1Buffer(latin1Chk.buffer) === utf8Str, 'string from latin-1 buffer');
       assert(base64Buf.length == base64Chk.length && Array.prototype.every.call(base64Buf, function(n, i) { return n == base64Chk[i]; }), 'string base64 to buffer');
       assert(modules.string.base64FromBuffer(base64Chk.buffer) === base64Str, 'string base64 from buffer');
       assert(hexBuf.length == hexChk.length && Array.prototype.every.call(hexBuf, function(n, i) { return n == hexChk[i]; }), 'string hex to buffer');
@@ -894,7 +903,7 @@ function(modules) {
               assert(info, 'system network info');
               modules.system.storage.getInfo(function(info) {
                 assert(info, 'system storage info');
-                assert(passed == 75, 'tests complete ('+passed+'/75 in '+(Date.now()-start)+'ms)');
+                assert(passed == 77, 'tests complete ('+passed+'/77 in '+(Date.now()-start)+'ms)');
               });
             });
           });
