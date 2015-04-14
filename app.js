@@ -12,6 +12,7 @@ simpl.add('app', function(o) {
     });
     var appList, moduleList, selected, code, config, major, minor, del, dependencies, search, suggest, timeline, history, log, docs, status, feed, server, unload,
         icons = {}, dom = o.html.dom, boilerplate = 'function(modules) {\n  \n}';
+    // Entypo pictograms by Daniel Bruce — www.entypo.com
     Array.prototype.slice.call(document.getElementById('icons').childNodes).forEach(function(icon) {
       icons[icon.id.substr(5)] = function(el) {
         var ns = 'http://www.w3.org/2000/svg',
@@ -22,6 +23,11 @@ simpl.add('app', function(o) {
           .setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#'+icon.id);
       };
     });
+    var popup = function(e) {
+      e.preventDefault();
+      var size = {facebook: [500, 508], twitter: [500, 255], google: [512, 607]}[this.id];
+      open(this.getAttribute('href'), this.id, size ? 'width='+size[0]+',height='+size[1] : undefined);
+    };
     var connect = function(host) {
       if (!window.EventSource) return status('failure', 'EventSource is not supported in this browser', true);
       if (feed) feed.close();
@@ -398,11 +404,17 @@ simpl.add('app', function(o) {
           {p: ['Simpl.js makes it easy to develop software that runs in your browser with access to low-level system APIs. ', {strong: 'Apps'}, ' run in separate WebWorker threads with ', {code: 'modules'}, ' and ', {code: 'config'}, ' objects as specified in the app\'s ', icons.settings,'settings panel. Any ', {code: 'console'}, ' output is streamed to the app\'s ', icons.log,'log panel. ', {strong: 'Modules'}, ' are libraries imported as dependencies by apps and other modules. Module documentation is generated using the ', {code: 'docs'}, ' module syntax.']},
           {p: 'Apps and modules can be published with a major-minor versioning scheme. Major versions can be developed in parallel, while minor versions represent backward-compatible incremental changes.'},
           {p: 'Browse the core modules and run the included demo apps to get started.'},
+          {div: [
+            {a: {target: '_blank', href: 'https://groups.google.com/d/forum/simpljs', children: [icons.megaphone, {span: 'Simpl.js Forum'}]}},
+            {a: {id: 'facebook', onclick: popup, href: 'https://www.facebook.com/sharer/sharer.php?u=http://simpljs.com', children: icons.facebook}},
+            {a: {id: 'twitter', onclick: popup, href: 'https://twitter.com/intent/tweet?text=Develop%20your%20next%20app%20using%20Simpl.js!&url=http://simpljs.com&via=simpljs&source=webclient', children: icons.twitter}},
+            {a: {id: 'google', onclick: popup, href: 'https://plus.google.com/share?url=http://simpljs.com', children: icons.google}}
+          ]},
           {form: {method: 'post', action: '/restore', children: [
             {button: {className: 'revert', type: 'submit', name: 'scope', value: 'modules', children: [icons.revert, 'Restore Modules'], onclick: function(e) {
               if (!confirm('This will delete and restore all preinstalled modules in your workspace. Are you sure?'))
                 e.preventDefault();
-            }}}, ' ',
+            }}},
             {button: {className: 'revert', type: 'submit', name: 'scope', value: 'full', children: [icons.revert, 'Reset Workspace'], onclick: function(e) {
               if (!confirm('This will delete your entire workspace and restore default apps and modules. Are you sure?'))
                 e.preventDefault();

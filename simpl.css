@@ -26,6 +26,10 @@ p svg {
   height: 1.5em;
   margin: 0 2px;
 }
+p button svg, p a svg {
+  height: 15px;
+  margin: 0;
+}
 pre, code, kbd, samp, tt, .CodeMirror {
   font-family: Consolas, monospace;
 }
@@ -212,7 +216,7 @@ button, .logout {
 button:hover, .home button, .logout {
   color: white;
 }
-button:active {
+button:active, a:active {
   opacity: .7;
 }
 nav button, .logout {
@@ -409,12 +413,35 @@ nav .selected button {
 .show-module #settings section, #settings #config {
   width: 50%;
 }
-#home button, #actions button {
+#home a {
+  display: inline-block;
+  font-size: 13px;
+  text-decoration: none;
+  background: #f7f7f7;
+  color: #666;
+}
+#home a:hover {
+  color: white;
+  background: #3c3;
+}
+#home button, #home a, #actions button {
   padding: 5px 10px;
-  margin-bottom: 3px;
+  margin: 0 5px 5px 0;
+}
+#home #facebook:hover {
+  background: #3b5998;
+}
+#home #twitter:hover {
+  background: #55acee;
+}
+#home #google:hover {
+  background: #d73d32;
 }
 #home button svg, #actions button svg {
   margin-right: 8px;
+}
+#home a span {
+  margin-left: 8px;
 }
 .search {
   position: relative;
