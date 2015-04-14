@@ -52,7 +52,7 @@ var simpl = function(modules, clients) {
 }({}, []);
 
 // Loader extension for worker creation, messaging, and dependency loading
-simpl = function(s) {
+if (location.protocol != 'http:') simpl = function(s) {
   var id = 0, log = {}, workers = [], blobs = {}, moduleListeners = {}, globalListeners,
       inWorker = typeof WorkerGlobalScope != 'undefined';
   
