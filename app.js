@@ -410,7 +410,7 @@ simpl.add('app', function(o) {
             {a: {id: 'twitter', onclick: popup, href: 'https://twitter.com/intent/tweet?text=Develop%20your%20next%20app%20using%20Simpl.js!&url=http://simpljs.com&via=simpljs&source=webclient', children: icons.twitter}},
             {a: {id: 'google', onclick: popup, href: 'https://plus.google.com/share?url=http://simpljs.com', children: icons.google}}
           ]},
-          {form: {method: 'post', action: '/restore', children: [
+          !user && {form: {method: 'post', action: '/restore', children: [
             {button: {className: 'revert', type: 'submit', name: 'scope', value: 'modules', children: [icons.revert, 'Restore Modules'], onclick: function(e) {
               if (!confirm('This will delete and restore all preinstalled modules in your workspace. Are you sure?'))
                 e.preventDefault();
