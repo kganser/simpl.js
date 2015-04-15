@@ -65,7 +65,7 @@ nav:after {
   box-shadow: 0 0 3px rgba(0, 0, 0, .3);
 }
 h1 {
-  font: 500 2em "Segoe UI", "Lucida Grande", AvenirNext-Medium, sans-serif;
+  font: 500 2em "Segoe UI", ArialMT, sans-serif;
   margin: 0 0 .5em 0;
 } 
 #home h1 {
@@ -83,16 +83,13 @@ nav h2, #settings h2 {
   color: #ddd;
 }
 .home {
-  font: 500 15px "Segoe UI", "Lucida Grande", AvenirNext-Medium, sans-serif;
+  font: 500 15px/25px "Segoe UI", ArialMT, sans-serif;
   background: url(/favicon.ico) 10px no-repeat;
-  padding: 2px 0 0 30px;
-  height: 23px;
+  padding-left: 30px;
+  height: 25px;
   margin-bottom: 1px;
   position: relative;
   cursor: default;
-}
-.home .controls {
-  margin-top: -2px;
 }
 .show-app .home:after, .show-module .home:after {
   display: none;
