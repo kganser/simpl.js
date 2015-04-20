@@ -846,13 +846,13 @@ function(modules) {
         assert(false, 'parser error compiling non-LALR grammar');
       } catch (e) {
         assert(true, 'parser error compiling non-LALR grammar');
-        assert(!e.indexOf('Shift-reduce conflict'), 'parser shift-reduce error detection');
+        assert(!e.message.indexOf('Shift-reduce conflict'), 'parser shift-reduce error detection');
       }
       try {
         modules.parser.generate({S: ['A', 0, 'A', 0]}, 'S');
         assert(false, 'parser reduce-reduce error detection');
       } catch (e) {
-        assert(!e.indexOf('Reduce-reduce conflict'), 'parser reduce-reduce error detection');
+        assert(!e.message.indexOf('Reduce-reduce conflict'), 'parser reduce-reduce error detection');
       }
       
       var i = 1, server;

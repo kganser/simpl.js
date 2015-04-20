@@ -575,10 +575,40 @@ simpl.add('app', function(o) {
             {h2: 'History'},
             {ul: {className: 'timeline', children: function(elem) {
               var first, last, diff = function(dmp) {
-                return function(versions) {
-                  var diff = dmp.diff_main(versions[1], versions[0]);
+                return function(a, b) {
+                  var diff = dmp.diff_main(a.replace(/\r\n/g, '\n'), b.replace(/\r\n/g, '\n')),
+                      lines = [], insert = [],
+                      ln = {change: 0, spans: []},
+                      rm = {change: 0, spans: []};
                   dmp.diff_cleanupSemantic(diff);
-                  return diff;
+                  diff.forEach(function(chunk) {
+                    var change = chunk[0];
+                    chunk[1].split('\n').forEach(function(chunk, i) {
+                      if (i) {
+                        if (change <= 0) {
+                          if (rm.change) lines.push(rm);
+                          rm = {change: 0, spans: []};
+                        }
+                        if (change >= 0) {
+                          insert.push(ln);
+                          ln = {change: 0, spans: []};
+                        }
+                        if (!change) {
+                          lines = lines.concat(insert);
+                          insert = [];
+                        }
+                      }
+                      if (chunk) {
+                        if (change < 0 || ln.spans.length) rm.change = -1;
+                        if (change > 0 || rm.spans.length) ln.change = 1;
+                        if (change <= 0) rm.spans.push({change: change, text: chunk});
+                        if (change >= 0) ln.spans.push({change: change, text: chunk});
+                      }
+                    });
+                  });
+                  if (rm.change) lines.push(rm);
+                  if (ln.spans.length) insert.push(ln);
+                  return lines.concat(insert);
                 };
               }(new diff_match_patch);
               elem.onclick = function(e) {
@@ -593,67 +623,42 @@ simpl.add('app', function(o) {
                 } else {
                   first = target;
                 }
-                var versions = [], span = first && last;
+                var versions = [], range = first && last;
                 for (var i = 0, node = this.firstChild; node; node = node.nextSibling, i++) {
                   if (node == first || node == last) {
                     versions.push(i ? selected.entry.published[selected.entry.published.length-i].code : selected.entry.code);
-                    node.className = span ? versions.length > 1 ? 'last selected' : 'first selected' : 'selected';
+                    node.className = range ? versions.length > 1 ? 'last selected' : 'first selected' : 'selected';
                   } else {
-                    node.className = span && versions.length == 1 ? 'inner' : '';
+                    node.className = range && versions.length == 1 ? 'inner' : '';
                   }
                 }
-                if (span) {
-                  // TODO: collapse lines differing only by trailing and leading \n chunks
-                  var line = {change: 0, spans: []}, section = {lines: []},
-                      ins = [], insLines = [], gap = [], sections = [], i = 0, a = 1, b = 1;
-                  diff(versions).forEach(function(chunk) {
-                    // current line
-                    var change = chunk[0], chunks = chunk[1].split('\n');
-                    if (!section.change) section.change = change;
-                    if (!line.change && change) {
-                      line.change = -1;
-                      ins = line.spans.slice();
+                if (range) {
+                  var sections = [], gap = [], section = {lines: []},
+                      context = 3, i = 0, a = 1, b = 1;
+                  diff(versions[1], versions[0]).forEach(function(line) {
+                    if (line.change) {
+                      i = 0;
+                      section.change = true;
+                    } else if (!section.change && i == context) {
+                      gap.push(section.lines.shift());
+                    } else if (section.change && i == context*2) {
+                      if (gap.length) sections.push({lines: gap});
+                      sections.push(section);
+                      gap = section.lines.splice(-context, 1);
+                      section = {lines: section.lines.splice(-context+1)};
+                      i = context;
+                    } else {
+                      i++;
                     }
-                    chunk = {change: change, text: chunks.shift()};
-                    if (change <= 0) line.spans.push(chunk);
-                    if (line.change && change >= 0) ins.push(chunk);
-                    chunks.forEach(function(chunk) {
-                      // new line
-                      chunk = [{change: change, text: chunk}];
-                      if (change >= 0 && ins.length) {
-                        insLines.push({change: 1, number: [!line.change && a, b++], spans: ins});
-                        ins = change ? chunk : [];
-                      }
-                      if (line.change) {
-                        i = 0;
-                      } else if (i == 3) {
-                        if (section.change) {
-                          if (gap.length) {
-                            sections.push({change: 0, lines: gap});
-                            gap = [];
-                          }
-                          sections.push(section);
-                          section = {change: change, lines: []};
-                          i = 1;
-                        } else {
-                          gap.push(section.lines.shift());
-                        }
-                      } else if (!i++) {
-                        section.lines = section.lines.concat(insLines);
-                        insLines = [];
-                      }
-                      if (change <= 0 && line.spans.length) {
-                        section.lines.push({change: line.change, number: [a++, !line.change && b++], spans: line.spans});
-                        line = {change: change && -1, spans: chunk};
-                      }
-                    });
+                    line.number = [line.change <= 0 && a++, line.change >= 0 && b++];
+                    section.lines.push(line);
                   });
-                  if (ins.length) insLines.push({change: 1, number: [!line.change && a, b], spans: ins});
-                  if (line.spans.length) (line.change ? section.lines : insLines).push({change: line.change, number: [a, !line.change && b], spans: line.spans});
-                  section.lines = section.lines.concat(insLines);
                   if (!section.change) gap = gap.concat(section.lines);
-                  if (gap.length) sections.push({change: 0, lines: gap});
-                  if (section.change && section.lines.length) sections.push(section);
+                  if (gap.length) sections.push({lines: gap});
+                  if (section.change) {
+                    sections.push(section);
+                    if (i > context) sections.push(section.lines.splice(context-i));
+                  }
                   var ellipses = [a, b].map(function(n) { return String(n).replace(/./g, '·'); });
                   history(sections.map(function(section) {
                     if (!section.change) section.lines.push(null);
