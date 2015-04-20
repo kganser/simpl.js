@@ -55,8 +55,8 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, system: 0, crypto: 
   };
   var restore = function(callback, scope, sparse) {
     if (!scope) {
-      var immediate = function(path) { return !path.length; };
-      return db.get('apps', false, immediate).get('modules', immediate).then(function(apps, mods) {
+      var exists = function() { return false; };
+      return db.get('apps', false, exists).get('modules', exists).then(function(apps, mods) {
         if (apps && mods) return callback();
         restore(callback, apps ? 'modules' : mods ? 'apps' : 'both');
       });
@@ -501,10 +501,14 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, system: 0, crypto: 
           port = command.port;
         }
         launcher.postMessage({error: error, action: 'start', port: port, path: path});
+        path = '';
       });
     });
     
-    if (server) launcher.postMessage({action: 'start', port: port, path: path});
+    if (server) {
+      launcher.postMessage({action: 'start', port: port, path: path});
+      path = '';
+    }
   });
   
   chrome.runtime.onSuspend.addListener(function() {
