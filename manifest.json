@@ -2,10 +2,10 @@
   "manifest_version": 2,
   "name": "Simpl.js",
   "short_name": "Simpl.js",
-  "description": "Simpl.js lets you write and run javascript apps from your browser",
+  "description": "Simpl.js lets you write and run full-stack javascript apps in your browser",
   "offline_enabled": true,
   "icons": {"128": "icon.png"},
-  "version": "0.11",
+  "version": "0.12",
   "minimum_chrome_version": "33",
   "permissions": [
     "unlimitedStorage",
