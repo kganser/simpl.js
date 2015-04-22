@@ -19,9 +19,9 @@ simpl.add('http', function(modules) {
         headers['Content-Length'] = body.length;
       if (chunk && headers['Transfer-Encoding'] === undefined)
         headers['Transfer-Encoding'] = 'chunked';
-      pre += 'HTTP/1.1 '+self.statusMessage(status)+'\r\n'+Object.keys(headers).map(function flatten(name) {
+      pre += 'HTTP/1.1 '+self.statusMessage(status)+'\r\n'+Object.keys(headers).map(function(name) {
         var value = headers[name];
-        return value ? Array.isArray(value) ? value.map(flatten).join('') : name+': '+value+'\r\n' : '';
+        return value ? Array.isArray(value) ? value.map(function(value) { return name+': '+value+'\r\n'; }).join('') : name+': '+value+'\r\n' : '';
       }).join('')+'\r\n';
     }
     
