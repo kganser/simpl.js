@@ -7,8 +7,7 @@ function(modules) {
       mac = modules.crypto.hmac(utf8(config.sessionKey));
   
   var token = function() {
-    var rand = new Uint8Array(24);
-    crypto.getRandomValues(rand);
+    var rand = crypto.getRandomValues(new Uint8Array(24));
     return encode(rand, true)+'.'+encode(mac(rand), true);
   };
   var verify = function(signed) {
@@ -70,8 +69,7 @@ function(modules) {
             var path = 'users/'+encodeURIComponent(body.username);
             db.get(path, true).then(function(user) {
               if (user) return render(['Username '+body.username+' is already taken. ', {a: {href: '/register', children: 'Try again'}}], 401);
-              var salt = new Uint8Array(8);
-              crypto.getRandomValues(salt);
+              var salt = crypto.getRandomValues(new Uint8Array(8));
               this.put(path, {name: body.name, password: pbkdf2(body.password, salt), salt: encode(salt)})
                   .put('sessions/'+(sid = token()), body.username)
                   .then(function() { response.generic(303, {'Set-Cookie': 'sid='+sid, Location: '/'}); });
