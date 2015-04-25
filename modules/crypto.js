@@ -197,8 +197,8 @@ simpl.add('crypto', function() {
       var hash = sha256(0, 0);
       return data ? hash.update(data).digest() : hash;
     },
-    hmac: function(key, data) {
-      var hash = self.sha256, k,
+    hmac: function(key, data, algorithm) {
+      var hash = algorithm || self.sha256, k,
           a = new DataView(new ArrayBuffer(64)),
           b = new DataView(new ArrayBuffer(64));
       if (key.byteLength > 64)
