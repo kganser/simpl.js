@@ -84,7 +84,7 @@ nav h2, #settings h2 {
 }
 .home {
   font: 500 15px/25px "Segoe UI", ArialMT, sans-serif;
-  background: url(/favicon.ico) 10px no-repeat;
+  background: url(/icon.png) 10px/16px no-repeat;
   padding-left: 30px;
   height: 25px;
   margin-bottom: 1px;
