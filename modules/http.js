@@ -1,15 +1,20 @@
 simpl.add('http', function(modules) {
   
-  var self, message = function(status, headers, body, headersSent, chunk, end) {
+  var utf8 = modules.string.toUTF8Buffer,
+      utf8decode = modules.string.fromUTF8Buffer,
+      latin1decode = modules.string.fromLatin1Buffer,
+      self;
+      
+  var message = function(status, headers, body, headersSent, chunk, end) {
     if (headersSent && (headers || status)) throw new Error('HTTP headers already sent');
     headers = headersSent ? false : (headers || {});
     
     if (body instanceof ArrayBuffer)
       body = new Uint8Array(body);
     else if (!(body instanceof Uint8Array))
-      body = modules.string.toUTF8Buffer(body ? String(body) : '');
+      body = utf8(body ? String(body) : '');
     
-    var pre = '';
+    var head = '';
     if (headers) {
       if (typeof headers == 'string')
         headers = {'Content-Type': self.mimeType(headers)};
@@ -19,20 +24,46 @@ simpl.add('http', function(modules) {
         headers['Content-Length'] = body.length;
       if (chunk && headers['Transfer-Encoding'] === undefined)
         headers['Transfer-Encoding'] = 'chunked';
-      pre += 'HTTP/1.1 '+self.statusMessage(status)+'\r\n'+Object.keys(headers).map(function(name) {
+      head += 'HTTP/1.1 '+self.statusMessage(status)+'\r\n'+Object.keys(headers).map(function(name) {
         var value = headers[name];
         return value ? Array.isArray(value) ? value.map(function(value) { return name+': '+value+'\r\n'; }).join('') : name+': '+value+'\r\n' : '';
       }).join('')+'\r\n';
     }
     
-    if (chunk) pre += body.length.toString(16)+'\r\n';
-    pre = modules.string.toUTF8Buffer(pre);
-    var data = new Uint8Array(pre.length + body.length + (chunk ? end ? 7 : 2 : 0));
-    data.set(pre, 0);
-    data.set(body, pre.length);
+    if (chunk) head += body.length.toString(16)+'\r\n';
+    head = utf8(head);
+    var data = new Uint8Array(head.length + body.length + (chunk ? end ? 7 : 2 : 0));
+    data.set(head, 0);
+    data.set(body, head.length);
     if (chunk) data.set(end ? [13,10,48,13,10,13,10] : [13,10], data.length - (end ? 7 : 2));
     
     return data.buffer;
+  };
+  
+  var slurp = function(callback, format, maxSize, error) {
+    var done, body = new Uint8Array(0);
+    return function(data) {
+      if (done) return;
+      if (!data) {
+        if (format == 'utf8' || format == 'url' || format == 'json')
+          body = utf8decode(body);
+        if (format == 'url')
+          return callback(self.parseQuery(body));
+        if (format == 'json')
+          try { body = JSON.parse(body); }
+          catch (e) { body = undefined; }
+        return callback(body);
+      }
+      var length = body.byteLength + data.byteLength;
+      if (length > maxSize) {
+        done = true;
+        return error();
+      }
+      var b = new Uint8Array(length);
+      b.set(new Uint8Array(body), 0);
+      b.set(new Uint8Array(data), body.byteLength);
+      body = b.buffer;
+    };
   };
   
   /** http: {
@@ -59,10 +90,10 @@ simpl.add('http', function(modules) {
   /** RequestCallback: function(request:Request, response:Response, socket:ClientSocket) -> function(data:ArrayBuffer)|null
       
       If a function is returned, it is called with data received in the body of the request. To buffer the request
-      body, use `request.slurp` instead. */
+      body, call `request.slurp` to generate this function. */
   
   /** Request: {
-        slurp: function(callback:function(body:ArrayBuffer|string|object|json), format=null:string, maxSize=4096:number),
+        slurp: function(callback:function(body:ArrayBuffer|string|object|json), format=null:string, maxSize=4096:number) -> function(data:ArrayBuffer),
         protocol: string,
         method: string,
         uri: string,
@@ -75,10 +106,10 @@ simpl.add('http', function(modules) {
       `query` is the result of `parseQuery` run on `uri`'s query string, if any. `headers` and `cookie` store only the
       last string value for a given key.
       
-      `slurp` buffers the request body (up to `maxSize` bytes) and issues `callback` when complete. It must be called
-      synchronously inside `RequestCallback`. If `format` is `'utf8'`, `'url'`, or `'json'`, the body is converted to a
-      string, `parseQuery` object, or json structure, respectively. Otherwise, `body` is an `ArrayBuffer`. If the max
-      size is exceeded, `callback` is not issued and the server responds with a generic `413 Request Entity Too Large`. */
+      `slurp` returns a function for buffering the request body (up to `maxSize` bytes) that issues `callback` when
+      complete. If `format` is `'utf8'`, `'url'`, or `'json'`, the body is converted to a string, `parseQuery` object,
+      or json structure, respectively. Otherwise, `body` is an `ArrayBuffer`. If the max size is exceeded, `callback`
+      is not issued and the server responds with a generic `413 Request Entity Too Large`. */
   
   /** Response: {
         send: function(body='':ArrayBuffer|string, headers=`{}`:object|string, status=200:number, callback:function(error:string|undefined)),
@@ -128,28 +159,7 @@ simpl.add('http', function(modules) {
             headers: {},
             cookie: {},
             slurp: function(callback, format, maxSize) {
-              var body = new Uint8Array(0);
-              o.receive = function(data) {
-                if (!data) {
-                  if (format == 'utf8' || format == 'url' || format == 'json')
-                    body = modules.string.fromUTF8Buffer(body);
-                  if (format == 'url')
-                    return callback(self.parseQuery(body));
-                  if (format == 'json')
-                    try { body = JSON.parse(body); }
-                    catch (e) { body = undefined; }
-                  return callback(body);
-                }
-                var length = body.byteLength + data.byteLength;
-                if (length > (maxSize || 4096)) {
-                  o.receive = null;
-                  return response.generic(413);
-                }
-                var b = new Uint8Array(length);
-                b.set(new Uint8Array(body), 0);
-                b.set(new Uint8Array(data), body.byteLength);
-                body = b.buffer;
-              };
+              return slurp(callback, format, maxSize || 4096, function() { response.generic(413); });
             }
           };
           headers.forEach(function(line) {
@@ -164,7 +174,7 @@ simpl.add('http', function(modules) {
           });
           var o = {length: parseInt(request.headers['Content-Length'], 10) || 0},
               r = onRequest(request, response, socket);
-          if (!o.receive && typeof r == 'function') o.receive = r;
+          if (typeof r == 'function') o.receive = r;
           return o;
         };
         var request, remaining, headers = '';
@@ -176,7 +186,7 @@ simpl.add('http', function(modules) {
               remaining -= end;
             } else {
               var offset = headers.length;
-              headers += modules.string.fromLatin1Buffer(buffer);
+              headers += latin1decode(buffer);
               var split = headers.indexOf('\r\n\r\n', offset-3);
               if (split == -1 && headers.length-3 > maxHeaderSize || split > maxHeaderSize)
                 return socket.send(message(413, null, self.statusMessage(413), false, false, true), socket.disconnect);
