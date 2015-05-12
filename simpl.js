@@ -59,7 +59,7 @@ if (location.protocol != 'http:') simpl = function(s) {
   if (inWorker) {
     var console = function(level) {
       return function() {
-        var loc = new Error().stack.split('\n')[2].match(/at [^\(]*\(?(.+):(\d+):(\d+)\)?$/);
+        var loc = new Error().stack.split('\n')[2].match(/at (?:[^\(]*\()?(.+):(\d+):(\d+)\)?$/);
         proxy('log', {
           level: level,
           args: Array.prototype.slice.call(arguments),
