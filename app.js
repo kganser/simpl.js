@@ -23,11 +23,6 @@ simpl.add('app', function(o) {
           .setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#'+icon.id);
       };
     });
-    var popup = function(e) {
-      e.preventDefault();
-      var size = {facebook: [500, 508], twitter: [500, 255], google: [512, 607]}[this.id];
-      open(this.getAttribute('href'), this.id, size ? 'width='+size[0]+',height='+size[1] : undefined);
-    };
     var connect = function(host) {
       if (!window.EventSource) return status('failure', 'EventSource is not supported in this browser', true);
       if (feed) feed.close();
@@ -406,9 +401,9 @@ simpl.add('app', function(o) {
           {p: 'Browse the core modules and run the included demo apps to get started.'},
           {div: [
             {a: {target: '_blank', href: 'https://groups.google.com/d/forum/simpljs', children: [icons.megaphone, {span: 'Simpl.js Forum'}]}},
-            {a: {id: 'facebook', onclick: popup, href: 'https://www.facebook.com/sharer/sharer.php?u=http://simpljs.com', children: icons.facebook}},
-            {a: {id: 'twitter', onclick: popup, href: 'https://twitter.com/intent/tweet?text=Develop%20your%20next%20app%20using%20Simpl.js!&url=http://simpljs.com&via=simpljs&source=webclient', children: icons.twitter}},
-            {a: {id: 'google', onclick: popup, href: 'https://plus.google.com/share?url=http://simpljs.com', children: icons.google}}
+            {a: {id: 'facebook', target: '_blank', href: 'https://www.facebook.com/simpljs', children: icons.facebook}},
+            {a: {id: 'twitter', target: '_blank', href: 'https://twitter.com/simpljs', children: icons.twitter}},
+            {a: {id: 'google', target: '_blank', href: 'https://www.google.com/+Simpljs', children: icons.google}}
           ]},
           !user && {form: {method: 'post', action: '/restore', children: [
             {button: {className: 'revert', type: 'submit', name: 'scope', value: 'modules', children: [icons.revert, 'Restore Modules'], onclick: function(e) {
