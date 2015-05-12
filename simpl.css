@@ -70,6 +70,7 @@ h1 {
 } 
 #home h1 {
   background: url(/icon.png) left/32px no-repeat;
+  image-rendering: pixelated;
   padding-left: 40px;
 }
 nav h2, #settings h2 {
@@ -85,6 +86,7 @@ nav h2, #settings h2 {
 .home {
   font: 500 15px/25px "Segoe UI", ArialMT, sans-serif;
   background: url(/icon.png) 10px/16px no-repeat;
+  image-rendering: pixelated;
   padding-left: 30px;
   height: 25px;
   margin-bottom: 1px;
@@ -335,7 +337,7 @@ nav .selected button {
 #code .CodeMirror-matchingbracket,
 #code .CodeMirror-nonmatchingbracket {
   color: black;
-  background: #f22;
+  background: red;
   padding: 0 0 2px;
   box-shadow: 0 0 3px rgba(0, 0, 0, .6);
   border-radius: 3px;
