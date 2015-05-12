@@ -193,7 +193,7 @@ function(modules) {
         'html markup escaped');
       
       var i = 1, large = new Array(1000).join('yabadabadoo');
-      modules.http.serve({port: 9123, address: '127.0.0.1'}, function(request, response, socket) {
+      modules.http.serve({port: 9123, address: '127.0.0.1'}, function(request, response) {
         if (i == 1 && i++) {
           assert(request.method === 'GET' && request.path === '/', 'http get request');
           return response.end('hello');
@@ -354,18 +354,19 @@ function(modules) {
         assert(!e.message.indexOf('Reduce-reduce conflict'), 'parser reduce-reduce error detection');
       }
       
-      var i = 1, server;
+      var i = 1;
       modules.socket.listen({port: 9123}, function(socket) {
         socket.send(modules.string.toUTF8Buffer('ping').buffer);
         return function(data) {
           assert(i++ == 2 && modules.string.fromUTF8Buffer(data) == 'pong', 'socket receive from client');
-          if (server) server.disconnect();
+          server.disconnect();
           next();
         };
-      }, function(error) {
+      }, function(error, s) {
+        server = s;
         assert(!error, 'socket listen on port 9123');
         modules.socket.connect({port: 9123}, function(error, socket) {
-          assert(!error && (server = socket), 'socket connect');
+          assert(!error && socket, 'socket connect');
           return function(data) {
             assert(i++ == 1 && modules.string.fromUTF8Buffer(data) == 'ping', 'socket receive from server');
             socket.send(modules.string.toUTF8Buffer('pong').buffer);
@@ -402,12 +403,49 @@ function(modules) {
               assert(info, 'system network info');
               modules.system.storage.getInfo(function(info) {
                 assert(info, 'system storage info');
-                assert(passed == 78, 'tests complete ('+passed+'/78 in '+(Date.now()-start)+'ms)');
+                next();
               });
             });
           });
         });
       });
+    },
+    function(next) {
+      var i = 0;
+      modules.http.serve({port: 9123, address: '127.0.0.1'}, function(request, response) {
+        return modules.websocket.server(request, response, function(connection, protocol, extensions) {
+          assert(i++ == 1 && protocol === 'myprotocol', 'websocket request');
+          connection.send('hello');
+          return function(message) {
+            assert(i++ == 3 && message === 'goodbye', 'websocket message from client');
+            connection.send(modules.string.toUTF8Buffer('binary').buffer).close();
+          };
+        }, {protocols: ['myprotocol']});
+      }, function(error, server) {
+        if (error) return next();
+        var ws = new WebSocket('ws://localhost:9123', 'myprotocol');
+        ws.binaryType = 'arraybuffer';
+        ws.onopen = function() {
+          assert(!i++, 'websocket handshake');
+        };
+        ws.onmessage = function(e) {
+          if (i == 2 && i++) {
+            assert(e.data == 'hello', 'websocket message from server');
+            return ws.send('goodbye');
+          }
+          if (i++ == 4)
+            assert(e.data instanceof ArrayBuffer && modules.string.fromUTF8Buffer(e.data) === 'binary', 'websocket binary message');
+        };
+        ws.onclose = function() {
+          assert(i++ == 5, 'websocket close');
+          server.disconnect();
+          next();
+        };
+        ws.onerror = function() { i++; };
+      });
+    },
+    function() {
+      assert(passed == 84, 'tests complete ('+passed+'/84 in '+(Date.now()-start)+'ms)');
     }
   );
 }

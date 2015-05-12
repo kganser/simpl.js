@@ -41,10 +41,25 @@ simpl.add('http', function(modules) {
   };
   
   var slurp = function(callback, format, maxSize, error) {
-    var done, body = new Uint8Array(0);
-    return function(data) {
+    var done, body;
+    return function(data, remaining) {
       if (done) return;
-      if (!data) {
+      var length = data.byteLength + (body ? body.length : 0);
+      if (length + remaining > maxSize) {
+        done = true;
+        return error();
+      }
+      if (body) {
+        var b = new Uint8Array(length);
+        b.set(body);
+        b.set(new Uint8Array(data), body.length);
+        body = b;
+      } else {
+        body = new Uint8Array(data);
+      }
+      if (!remaining) {
+        done = true;
+        body = body.buffer;
         if (format == 'utf8' || format == 'url' || format == 'json')
           body = utf8decode(body);
         if (format == 'url')
@@ -54,15 +69,6 @@ simpl.add('http', function(modules) {
           catch (e) { body = undefined; }
         return callback(body);
       }
-      var length = body.byteLength + data.byteLength;
-      if (length > maxSize) {
-        done = true;
-        return error();
-      }
-      var b = new Uint8Array(length);
-      b.set(new Uint8Array(body), 0);
-      b.set(new Uint8Array(data), body.byteLength);
-      body = b.buffer;
     };
   };
   
@@ -87,13 +93,14 @@ simpl.add('http', function(modules) {
       If a request's header exceeds `maxHeaderSize` bytes, the server responds with a generic `413 Request Entity Too
       Large` and disconnects the client socket. */
   
-  /** RequestCallback: function(request:Request, response:Response, socket:ClientSocket) -> function(data:ArrayBuffer)|null
+  /** RequestCallback: function(request:Request, response:Response) -> function(data:ArrayBuffer, remaining:number)|null
       
-      If a function is returned, it is called with data received in the body of the request. To buffer the request
-      body, call `request.slurp` to generate this function. */
+      If a function is returned, it is called with `data` received in the body of the request and the `remaining`
+      number of bytes based on the request's `Content-Length` header. To buffer the request body, call `request.slurp`
+      to generate this function. */
   
   /** Request: {
-        slurp: function(callback:function(body:ArrayBuffer|string|object|json), format=null:string, maxSize=4096:number) -> function(data:ArrayBuffer),
+        slurp: function(callback:function(body:ArrayBuffer|string|object|json), format=null:string, maxSize=4096:number) -> function(data:ArrayBuffer, remaining:number),
         protocol: string,
         method: string,
         uri: string,
@@ -116,7 +123,8 @@ simpl.add('http', function(modules) {
         end: function(body='':ArrayBuffer|string, headers=`{}`:object|string, status=200:number, callback:function(error:string|undefined)),
         generic: function(status=200:number, headers=`{}`:object|string),
         ok: function,
-        error: function
+        error: function,
+        socket: ClientSocket
       }
       
       The first call to `send` will send headers and initiate a chunked HTTP response (adding a `Transfer-Encoding:
@@ -146,7 +154,8 @@ simpl.add('http', function(modules) {
               response.end(self.statusMessage(status), headers, status || 200);
             },
             ok: function() { response.generic(); },
-            error: function() { response.generic(400); }
+            error: function() { response.generic(400); },
+            socket: socket
           };
           // TODO: sanity check headers
           // TODO: decode chunks if chunk-encoded (or emit 411 Length Required)
@@ -173,7 +182,7 @@ simpl.add('http', function(modules) {
             request.cookie[pair[0]] = decodeURIComponent(value[0] == '"' ? value.slice(1, -1) : value);
           });
           var o = {length: parseInt(request.headers['Content-Length'], 10) || 0},
-              r = onRequest(request, response, socket);
+              r = onRequest(request, response);
           if (typeof r == 'function') o.receive = r;
           return o;
         };
@@ -181,7 +190,7 @@ simpl.add('http', function(modules) {
         return function(buffer) {
           do {
             var start = 0, end = buffer.byteLength;
-            if (request) {
+            if (remaining) {
               if (end > remaining) end = remaining;
               remaining -= end;
             } else {
@@ -199,11 +208,8 @@ simpl.add('http', function(modules) {
                 headers = '';
               } 
             }
-            if (request && request.receive) {
-              request.receive(buffer.slice(start, end));
-              if (!remaining) request.receive();
-            }
-            if (!remaining) request = null;
+            if (request && request.receive)
+              request.receive(buffer.slice(start, end), remaining);
             buffer = buffer.slice(end);
           } while (buffer.byteLength);
         };

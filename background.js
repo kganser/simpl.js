@@ -139,7 +139,7 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, system: 0, crypto: 
       
       ping = setInterval(broadcast, 15000);
       
-      o.http.serve({port: command.port}, function(request, response, socket) {
+      o.http.serve({port: command.port}, function(request, response) {
         
         var match, sid;
         var logout = function(sid) {
@@ -286,13 +286,13 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, system: 0, crypto: 
               if (!session) return response.error();
               var feed = new EventSource('http://api.simpljs.com/servers/'+match+'/activity?access_token='+session.accessToken);
               feed.onmessage = function(e) {
-                socket.send(o.string.toUTF8Buffer('data: '+e.data+'\n\n').buffer, function(info) {
+                response.socket.send(o.string.toUTF8Buffer('data: '+e.data+'\n\n').buffer, function(info) {
                   if (info.resultCode) feed.close();
                 });
               };
               feed.onerror = function() {
                 feed.close();
-                socket.disconnect();
+                response.socket.disconnect();
               };
               var data = '';
             } else {
@@ -310,9 +310,9 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, system: 0, crypto: 
               var data = 'data: '+JSON.stringify({state: state})+'\n\n'+log.map(function(message) {
                 return 'data: '+JSON.stringify({event: 'log', data: message})+'\n\n';
               }).join('');
-              clients[socket.socketId] = {user: session && session.username, socket: socket};
+              clients[response.socket.socketId] = {user: session && session.username, socket: response.socket};
             }
-            socket.setNoDelay(true);
+            response.socket.setNoDelay(true);
             response.end(data, {
               'Content-Type': 'text/event-stream',
               'Cache-Control': 'no-cache',
@@ -545,6 +545,7 @@ chrome.app.runtime.onLaunched.addListener(function(source) {
     });
     if (headless) launcher.contentWindow.onload = function(e) {
       e.target.getElementById('action').click();
+      // TODO: connect to simpljs.com
     };
   });
 });
