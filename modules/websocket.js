@@ -80,7 +80,7 @@ simpl.add('websocket', function(modules) {
             });
             if (options.onError) options.onError(code, connection);
           };
-      if (!key || request.headers.Upgrade != 'websocket' || request.headers['Sec-WebSocket-Version'] != '13')
+      if (!key || !/websocket/i.test(request.headers.Upgrade) || request.headers['Sec-WebSocket-Version'] != '13')
         return error(400);
       if (origin && options.origin && origin !== options.origin && !(options.origin instanceof RegExp && origin.match(options.origin)))
         return error(403);
@@ -230,10 +230,10 @@ simpl.add('websocket', function(modules) {
         1003: 'Unsupported Data',
         1005: 'No Status Received',
         1006: 'Abnormal Closure',
-        1007: 'Invalid frame payload data',
+        1007: 'Invalid Frame Payload Data',
         1008: 'Policy Violation',
         1009: 'Message Too Big',
-        1010: 'Mandatory Ext.',
+        1010: 'Mandatory Extension',
         1011: 'Internal Server Error',
         1015: 'TLS Handshake'
       }[code];
