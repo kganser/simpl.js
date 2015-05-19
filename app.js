@@ -1,4 +1,11 @@
 simpl.add('app', function(o) {
+
+  (function(list, rm) {
+    list.add('a', 'b');
+    if (!list.contains('b'))
+      DOMTokenList.prototype.remove = function() { Array.prototype.forEach.call(arguments, rm.bind(this)); };
+  }(document.createElement('div').classList, DOMTokenList.prototype.remove));
+  
   return function(apps, modules, offset, user, body) {
     Object.keys(apps).forEach(function(name) {
       apps[name].forEach(function(version, i, app) {
@@ -10,7 +17,7 @@ simpl.add('app', function(o) {
         module[i] = {minor: version};
       });
     });
-    var appList, moduleList, selected, code, config, major, minor, del, dependencies, search, suggest, timeline, history, log, docs, status, feed, server, unload,
+    var appList, moduleList, selected, code, config, major, minor, del, dependencies, search, suggest, timeline, history, log, docs, status, feed, servers, server, unload,
         icons = {}, dom = o.html.dom, boilerplate = 'function(modules) {\n  \n}';
     // Entypo pictograms by Daniel Bruce — www.entypo.com
     Array.prototype.slice.call(document.getElementById('icons').childNodes).forEach(function(icon) {
@@ -23,9 +30,15 @@ simpl.add('app', function(o) {
           .setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#'+icon.id);
       };
     });
+    var send = function(command, data) {
+      // TODO: attempt to reconnect
+      if (!feed || feed.readyState != 1) return;
+      if (!data) data = {};
+      data.command = command;
+      data.server = server;
+      feed.send(JSON.stringify(data));
+    };
     var connect = function(host) {
-      if (!window.EventSource) return status('failure', 'EventSource is not supported in this browser', true);
-      if (feed) feed.close();
       status();
       server = host || undefined;
       appList.classList.add('disabled');
@@ -36,29 +49,39 @@ simpl.add('app', function(o) {
           entry.log = [];
         });
       });
-      if (selected && selected.app)
-        log.innerHTML = '';
-      feed = new EventSource(host ? '/servers/'+encodeURIComponent(host)+'/activity' : '/activity');
+      if (selected && selected.app) log.textContent = '';
+      if (feed) return send('connect');
+      if (!window.WebSocket) return status('failure', 'WebSockets are not supported in this browser', true);
+      feed = new WebSocket('ws://'+location.host);
+      feed.onopen = function() { send('connect'); };
       feed.onmessage = function(e) {
         try { var message = JSON.parse(e.data); } catch (e) { return; }
-        if (message.state) {
-          Object.keys(message.state).forEach(function(app) {
-            if (!apps[app]) return;
-            message.state[app].forEach(function(version) {
-              if (app = apps[app][version]) {
-                app.tab.classList.add('running');
-                app.running = true;
-              }
-            });
-          });
-          if (selected && selected.app)
-            toggle(selected.name, selected.version, true, selected.panel == 'log' && !selected.entry.running ? 'code' : selected.panel);
-          return appList.classList.remove('disabled');
-        }
-        var data = message.data || {},
+        var event = message.event,
+            data = message.data || {},
             entry = (apps[data.app] || {})[data.version];
-        if (!entry) return;
-        switch (message.event) {
+        if (message.server != server || event in {error: 1, log: 1, run: 1, stop: 1} && !entry) return;
+        switch (event) {
+          case 'servers':
+            if (!servers || !Array.isArray(data)) return;
+            servers.disabled = false;
+            data.unshift({id: '', name: 'Localhost'});
+            dom(data.map(function(server) {
+              return {option: {value: server.id, children: server.name || server.id+'@'+server.ip}};
+            }), servers, true);
+            break;
+          case 'state':
+            Object.keys(data).forEach(function(app) {
+              if (apps[app]) data[app].forEach(function(version) {
+                if (app = apps[app][version]) {
+                  app.tab.classList.add('running');
+                  app.running = true;
+                }
+              });
+            });
+            if (selected && selected.app)
+              toggle(selected.name, selected.version, true, selected.panel == 'log' && !selected.entry.running ? 'code' : selected.panel);
+            appList.classList.remove('disabled');
+            break;
           case 'error':
             entry.running = false;
             entry.tab.classList.add(data.level = 'error');
@@ -73,20 +96,22 @@ simpl.add('app', function(o) {
               line: data.module ? data.line : data.line > offset ? data.line-offset : null
             }) > 1000) entry.log.shift();
             if (selected && selected.entry == entry) {
-              var scroll = body.classList.contains('show-log') && body.scrollHeight - body.scrollTop == document.documentElement.clientHeight;
+              var scroll = body.classList.contains('show-log') && (body.scrollTop || document.documentElement.scrollTop) + document.documentElement.clientHeight >= body.scrollHeight;
               dom(logLine(message), log);
-              if (scroll) body.scrollTop = body.scrollHeight;
+              if (scroll) document.documentElement.scrollTop = body.scrollTop = body.scrollHeight;
             }
             break;
           case 'run':
           case 'stop':
-            entry.running = message.event == 'run';
+            entry.running = event == 'run';
             entry.tab.classList[entry.running ? 'add' : 'remove']('running');
             entry.tab.classList.remove('error');
             if (entry.running) {
               entry.log = [];
-              if (selected && selected.entry == entry)
+              if (selected && selected.entry == entry) {
                 log.textContent = '';
+                toggle(data.app, data.version, true, 'log');
+              }
             }
             break;
         }
@@ -124,33 +149,6 @@ simpl.add('app', function(o) {
         }}},
         {div: {className: 'message', children: message}}
       ]}};
-    };
-    var handler = function(action, name, version) {
-      var entry = apps[name][version];
-      return function(e) {
-        e.stopPropagation();
-        var button = this;
-        button.disabled = true;
-        if (feed && feed.readyState == 2)
-          connect(server);
-        o.xhr('/', {
-          method: 'POST',
-          json: {action: action, app: name, version: version, server: server}
-        }, function(e) {
-          button.disabled = false;
-          if (e.target.status != 200)
-            return status('failure', 'Command failed');
-          entry.running = action != 'stop';
-          entry.tab.classList[entry.running ? 'add' : 'remove']('running');
-          if (entry.running) {
-            entry.log = [];
-            if (selected && selected.entry == entry) {
-              log.textContent = '';
-              toggle(name, version, true, 'log');
-            }
-          }
-        });
-      };
     };
     var toggle = function(name, version, app, panel, ln, refresh) {
       var versions = (app ? apps : modules)[name],
@@ -281,9 +279,12 @@ simpl.add('app', function(o) {
               entry.view = e;
               return [app || icons.info, icons.code, icons.settings, app && icons.log];
             }}},
-            app && {button: {className: 'run', title: 'Run', onclick: handler('run', name, major), children: icons.run}},
-            app && {button: {className: 'restart', title: 'Restart', onclick: handler('restart', name, major), children: icons.restart}},
-            app && {button: {className: 'stop', title: 'Stop', onclick: handler('stop', name, major), children: icons.stop}}
+            app && ['run', 'restart', 'stop'].map(function(command) {
+              return {button: {className: command, title: command[0].toUpperCase()+command.slice(1), children: icons[command], onclick: function(e) {
+                e.stopPropagation();
+                send(command, {app: name, version: major});
+              }}};
+            })
           ]}},
           {span: {
             className: 'name',
@@ -302,25 +303,13 @@ simpl.add('app', function(o) {
             ]}},
             {div: {className: 'servers localhost', children: [
               {span: [icons.laptop, icons.network]},
-              {select: function(elem) {
-                elem.disabled = true;
-                elem.onchange = function() {
-                  this.parentNode.className = this.value ? 'servers' : 'servers localhost';
-                  connect(this.value);
-                };
-                o.xhr('/servers', {responseType: 'json'}, function(e) {
-                  elem.disabled = false;
-                  e = e.target.response;
-                  if (!e || !e.length) return;
-                  dom(e.map(function(server) {
-                    return {option: {value: server.id, children: server.id+'@'+server.ip}};
-                  }), elem);
-                });
-                return [
-                  {option: {value: '', children: 'Localhost'}},
-                  {option: {value: 'test', children: 'Test Server'}}
-                ];
-              }}
+              {select: {disabled: true, onchange: function() {
+                this.parentNode.className = this.value ? 'servers' : 'servers localhost';
+                connect(this.value);
+              }, children: function(e) {
+                servers = e;
+                return {option: {value: '', children: 'Localhost'}};
+              }}}
             ]}}]
         : {div: {className: 'home', onclick: function() {
             if (!selected) return;

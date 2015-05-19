@@ -22,14 +22,15 @@
     "background": {
       "scripts": [
         "simpl.js",
-        "modules/string.js",
-        "modules/socket.js",
-        "modules/http.js",
-        "modules/html.js",
-        "modules/xhr.js",
-        "modules/database.js",
-        "modules/system.js",
         "modules/crypto.js",
+        "modules/database.js",
+        "modules/html.js",
+        "modules/http.js",
+        "modules/socket.js",
+        "modules/string.js",
+        "modules/system.js",
+        "modules/websocket.js",
+        "modules/xhr.js",
         "background.js"
       ]
     }

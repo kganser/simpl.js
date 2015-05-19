@@ -1,6 +1,6 @@
-simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, system: 0, crypto: 0}, function(o, proxy) {
+simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, websocket: 0, xhr: 0}, function(o, proxy) {
 
-  var server, ping, loader, lines, icons, workspace,
+  var server, loader, lines, icons, workspace,
       db = o.database.open('simpl', {sessions: {}}),
       key = new Uint8Array(24),
       encode = o.string.base64FromBuffer;
@@ -116,7 +116,6 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, system: 0, crypto: 
     launcher.onMessage.addListener(function(command) {
       if (command.action == 'stop') {
         if (server) {
-          clearInterval(ping);
           server.disconnect();
           server = port = null;
         }
@@ -127,17 +126,18 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, system: 0, crypto: 
       var wrap = function(name, code, version, dependencies) {
         return 'simpl.add('+[JSON.stringify(name), code, version, JSON.stringify(dependencies)]+');';
       };
+      var send = function(event, data, client) {
+        client.send(JSON.stringify({event: event, data: data}));
+      };
       var broadcast = function(event, data, user) {
         Object.keys(clients).forEach(function(socketId) {
           var client = clients[socketId];
-          if (data && client.user != user) return;
-          client.socket.send(o.string.toUTF8Buffer((event ? 'data: '+JSON.stringify({event: event, data: data}) : ':ping')+'\n\n').buffer, function(info) {
-            if (info.resultCode) delete clients[socketId];
+          if (client.user != user) return;
+          client.connection.send(JSON.stringify({event: event, data: data}), function(info) {
+            if (info.error) delete clients[socketId];
           });
         });
       };
-      
-      ping = setInterval(broadcast, 15000);
       
       o.http.serve({port: command.port}, function(request, response) {
         
@@ -280,54 +280,6 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, system: 0, crypto: 
               }, response.ok, method);
           }
         }
-        if (match = request.path.match(/^(\/servers\/([^\/]+))?\/activity$/)) {
-          return authenticate(request.cookie.sid, function(session) {
-            if (match = match[2]) {
-              if (!session) return response.error();
-              var feed = new EventSource('http://api.simpljs.com/servers/'+match+'/activity?access_token='+session.accessToken);
-              feed.onmessage = function(e) {
-                response.socket.send(o.string.toUTF8Buffer('data: '+e.data+'\n\n').buffer, function(info) {
-                  if (info.resultCode) feed.close();
-                });
-              };
-              feed.onerror = function() {
-                feed.close();
-                response.socket.disconnect();
-              };
-              var data = '';
-            } else {
-              var user = session ? session.username : '',
-                  state = {}, log = [];
-              Object.keys(apps).forEach(function(id) {
-                var parts = id.split('/').map(decodeURIComponent);
-                if (parts[0] == user) {
-                  var version = parseInt(parts[2], 10);
-                  if (!state[parts[1]]) state[parts[1]] = [version];
-                  else state[parts[1]].push(version);
-                  log = log.concat(logs[id]);
-                }
-              });
-              var data = 'data: '+JSON.stringify({state: state})+'\n\n'+log.map(function(message) {
-                return 'data: '+JSON.stringify({event: 'log', data: message})+'\n\n';
-              }).join('');
-              clients[response.socket.socketId] = {user: session && session.username, socket: response.socket};
-            }
-            response.socket.setNoDelay(true);
-            response.end(data, {
-              'Content-Type': 'text/event-stream',
-              'Cache-Control': 'no-cache',
-              'Content-Length': null
-            });
-          }, request.query.access_token);
-        }
-        if (request.path == '/servers')
-          return authenticate(request.cookie.sid, function(session) {
-            if (!session) return response.generic(404);
-            api('servers', session.accessToken, function(status, data) {
-              if (!Array.isArray(data)) return response.generic(500);
-              response.end(JSON.stringify(data), 'json');
-            });
-          });
         if (request.path == '/auth')
           return authenticate(sid = request.cookie.sid, function(session) {
             var code = request.query.authorization_code;
@@ -371,44 +323,74 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, system: 0, crypto: 
             }, full ? 'both' : 'modules', !full);
           }, 'url');
         if (request.path == '/') {
-          if (request.method == 'POST')
-            return request.slurp(function(body) {
-              if (body === undefined) return response.generic(415);
-              if (body.app == null || typeof body.version != 'number') return response.error();
-              authenticate(request.cookie.sid, function(session, local) {
-                if (!local && !session) return response.error();
-                var name = body.app,
-                    version = body.version,
-                    action = body.action;
-                if (session && body.server) return api('servers/'+encodeURIComponent(body.server), session.accessToken, function(status) {
-                  response.generic(status);
-                }, 'POST', {app: name, version: version, action: action});
-                var user = session && session.username,
-                    id = [user || '', name, version].map(encodeURIComponent).join('/');
-                if ((action == 'stop' || action == 'restart') && apps[id]) {
+          if (/websocket/i.test(request.headers.Upgrade))
+            return o.websocket.server(request, response, function(client) {
+              var socketId = client.socket.socketId,
+                  feed, user, token;
+              authenticate(request.cookie.sid, function(session) { // TODO: use arg local?
+                user = session ? session.username : '';
+                clients[socketId] = {user: user, connection: client};
+                if (session) {
+                  token = session.accessToken;
+                  feed = new WebSocket('ws://api.simpljs.com/?access_token='+token);
+                  feed.onmessage = function(e) {
+                    if (typeof e.data == 'string')
+                      client.send(e.data);
+                  };
+                  feed.onclose = function() {
+                    client.disconnect(1001); // TODO: disconnect from server message instead of closing?
+                    delete clients[socketId];
+                  };
+                }
+              }, request.query.access_token);
+              return function(data) {
+                if (user == null) return;
+                try { var message = JSON.parse(data); } catch (e) { return; }
+                if (message.server) return feed && feed.send(data);
+                if (message.command == 'connect') {
+                  var state = {}, log = [];
+                  Object.keys(apps).forEach(function(id) {
+                    var parts = id.split('/').map(decodeURIComponent);
+                    if (parts[0] == user) {
+                      var app = parts[1],
+                          version = parseInt(parts[2], 10);
+                      if (!state[app]) state[app] = [version];
+                      else state[app].push(version);
+                      log = log.concat(logs[id]);
+                    }
+                  });
+                  send('state', state, client);
+                  return log.forEach(function(log) {
+                    send('log', log, client);
+                  });
+                }
+                var name = message.app,
+                    version = message.version,
+                    id = [user, name, version].map(encodeURIComponent).join('/');
+                if (apps[id] && message.command in {stop: 1, restart: 1}) {
                   apps[id].terminate();
                   broadcast('stop', {app: name, version: version}, user);
                   delete apps[id];
-                  if (action == 'stop') return response.ok();
                 }
-                if ((action == 'run' || action == 'restart') && !apps[id])
-                  return function(callback) {
-                    if (local) return db.get('apps/'+encodeURIComponent(name)+'/versions/'+version).then(callback);
-                    api('apps/'+encodeURIComponent(name)+'/'+version, session.accessToken, function(status, data) {
-                      if (status != 200) return response.error();
-                      callback(data);
+                if (!apps[id] && message.command in {run: 1, restart: 1}) {
+                  (function(callback) {
+                    var path = 'apps/'+encodeURIComponent(name);
+                    if (!token) return db.get(path+'/versions/'+version).then(callback);
+                    api(path+'/'+version, token, function(status, data) {
+                      callback(status == 200 && data);
                     });
                   }(function(app) {
-                    if (!app) return response.error();
+                    if (!app) return; // TODO: broadcast error?
                     logs[id] = [];
                     apps[id] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\nsimpl.use('+JSON.stringify(app.dependencies)+','+app.code+');', function(module, callback) {
-                      var v = module.version,
+                      var path = 'modules/'+encodeURIComponent(module.name),
+                          v = module.version,
                           current = v < 0;
                       if (current) v = -v-1;
                       (function(callback) {
-                        if (local) return db.get('modules/'+encodeURIComponent(module.name)+'/versions/'+v).then(callback);
-                        api('modules/'+encodeURIComponent(module.name)+'/'+v, session.accessToken, function(status, data) {
-                          callback(data);
+                        if (!token) return db.get(path+'/versions/'+v).then(callback);
+                        api(path+'/'+v, token, function(status, data) {
+                          callback(status == 200 && data);
                         });
                       }(function(record) {
                         if (record && !current) record = record.published.pop();
@@ -428,11 +410,10 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, system: 0, crypto: 
                       broadcast('error', {app: name, version: version, message: message, module: module, line: line}, user);
                     });
                     broadcast('run', {app: name, version: version}, user);
-                    response.ok();
-                  });
-                response.error();
-              }, request.query.access_token);
-            }, 'json');
+                  }));
+                }
+              };
+            });
           return forward('workspace', function(callback) {
             db.get('', false, function(path) {
               // apps,modules,sessions/<name>/versions/<#>/code,config,dependencies,published/<#>
@@ -513,8 +494,8 @@ simpl.use({http: 0, html: 0, database: 0, xhr: 0, string: 0, system: 0, crypto: 
   
   chrome.runtime.onSuspend.addListener(function() {
     if (server) {
-      clearInterval(ping);
       server.disconnect();
+      server = port = null;
     }
   });
 });
