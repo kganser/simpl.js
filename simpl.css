@@ -227,10 +227,36 @@ nav button, #actions button {
   vertical-align: top;
   margin: 0 0 1px 1px;
 }
+#connection {
+  background: yellow;
+  padding: 3px 3px 3px 10px;
+  margin-bottom: 1px;
+  display: none;
+}
+#connection button {
+  float: right;
+  width: auto;
+  height: auto;
+  padding: 2px 4px;
+  font-size: 10px;
+  background: white;
+  color: black;
+  box-shadow: 0 0 3px rgba(0, 0, 0, .3);
+}
+#connection.info, #connection.connecting {
+  display: block;
+}
+#connection.error, #connection.fatal {
+  display: block;
+  color: white;
+}
+#connection.fatal button, #connection.connecting button {
+  display: none;
+}
 .run:hover, .restart:hover, #status.success {
   background: #3c3;
 }
-.logout, #actions .delete:hover, #dependencies .delete:hover, .stop:hover, .revert:hover, #status.failure {
+.logout, #actions .delete:hover, #dependencies .delete:hover, .stop:hover, .revert:hover, #status.failure, #connection.error, #connection.fatal {
   background: #c33;
 }
 .code:hover, .settings:hover, .log:hover, .docs:hover, .home .settings, #status.info {
@@ -283,7 +309,7 @@ nav .selected button {
   box-shadow: 0 0 3px rgba(0, 0, 0, .3);
   z-index: 1;
 }
-.collapsed .home, .collapsed .user, .collapsed .servers, .collapsed nav h2, .collapsed .form, .collapsed nav li, .collapsed nav .selected:after {
+.collapsed .home, .collapsed .user, .collapsed .servers, .collapsed #connection, .collapsed nav h2, .collapsed .form, .collapsed nav li, .collapsed nav .selected:after {
   display: none;
 }
 .collapsed nav {
