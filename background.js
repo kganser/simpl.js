@@ -401,7 +401,8 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                         broadcast('error', {app: name, version: version, message: 'Required module not found: '+module.name}, user);
                       }));
                     }, function(level, args, module, line, column) {
-                      var data = {app: name, version: version, level: level, message: args, module: module, line: line, column: column};
+                      var data = {app: name, version: version, level: level, message: args, module: module, column: column};
+                      if (module || line > lines) data.line = module ? line : line-lines;
                       if (logs[id].push(data) > 100) logs[id].unshift();
                       broadcast('log', data, user);
                     }, function(message, module, line) {
@@ -460,10 +461,10 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                   {script: {src: '/jsonv.js'}},
                   {script: {src: '/md5.js'}},
                   {script: {src: '/app.js'}},
-                  {script: function(apps, modules, offset, user) {
-                    if (!apps) return [data.apps, data.modules, lines, session];
+                  {script: function(apps, modules, user) {
+                    if (!apps) return [data.apps, data.modules, session];
                     simpl.use({app: 0}, function(o) {
-                      o.app(apps, modules, offset, user, document.body);
+                      o.app(apps, modules, user, document.body);
                     });
                   }}
                 ]}

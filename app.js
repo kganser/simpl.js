@@ -6,7 +6,7 @@ simpl.add('app', function(o) {
       DOMTokenList.prototype.remove = function() { Array.prototype.forEach.call(arguments, rm.bind(this)); };
   }(document.createElement('div').classList, DOMTokenList.prototype.remove));
   
-  return function(apps, modules, offset, user, body) {
+  return function(apps, modules, user, body) {
     Object.keys(apps).forEach(function(name) {
       apps[name].forEach(function(version, i, app) {
         app[i] = {minor: version, log: []};
@@ -250,7 +250,6 @@ simpl.add('app', function(o) {
                 entry.log = [];
               });
             });
-            if (selected && selected.app) log.textContent = '';
             if (socket) return send('connect');
             if (!window.WebSocket) return status('WebSockets are not supported in this browser.', 'fatal');
             clearInterval(timer);
@@ -284,8 +283,10 @@ simpl.add('app', function(o) {
                       }
                     });
                   });
-                  if (selected && selected.app)
+                  if (selected && selected.app) {
+                    log.textContent = '';
                     toggle(selected.name, selected.version, true, selected.panel == 'log' && !selected.entry.running ? 'code' : selected.panel);
+                  }
                   appList.classList.remove('disabled');
                   break;
                 case 'error':
@@ -299,7 +300,7 @@ simpl.add('app', function(o) {
                     message: data.message,
                     module: data.module ? data.module.name : '',
                     version: data.module ? data.module.version : '',
-                    line: data.module ? data.line : data.line > offset ? data.line-offset : null
+                    line: data.line
                   }) > 1000) entry.log.shift();
                   if (selected && selected.entry == entry) {
                     var scroll = body.classList.contains('show-log') && (body.scrollTop || document.documentElement.scrollTop) + document.documentElement.clientHeight >= body.scrollHeight;
