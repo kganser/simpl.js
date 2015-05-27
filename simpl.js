@@ -116,6 +116,7 @@ if (location.protocol != 'http:') simpl = function(s) {
           command = e.data.command,
           args = e.data.args;
       if (e.data.simpl) {
+        if (!worker) return;
         if (command == 'load') {
           if (worker.load) worker.load(args, function(code) {
             var url = code && URL.createObjectURL(new Blob([code], {type: 'text/javascript'}));
