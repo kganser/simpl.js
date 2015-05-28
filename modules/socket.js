@@ -55,9 +55,10 @@ simpl.add('socket', function(modules, proxy) {
         send: function(data, callback) {
           proxy('send', [clientSocketId, data], callback, [data]);
         },
-        secure: function(options, callback) {
-          proxy('secure', [clientSocketId, options], callback);
-        },
+// TODO: Enable when socket.setPaused issue is resolved: https://code.google.com/p/chromium/issues/detail?id=467677
+//        secure: function(options, callback) {
+//          proxy('secure', [clientSocketId, options], callback);
+//        },
         disconnect: function() {
           proxy('disconnect', [clientSocketId]);
         },
@@ -166,9 +167,9 @@ simpl.add('socket', function(modules, proxy) {
           send: function(data, callback) {
             proxy('send', [socketId, data], callback, [data]);
           },
-          secure: function(options, callback) {
-            proxy('secure', [socketId, options], callback);
-          },
+//          secure: function(options, callback) {
+//            proxy('secure', [socketId, options], callback);
+//          },
           disconnect: function() {
             proxy('disconnect', [socketId]);
           },
@@ -274,9 +275,9 @@ simpl.add('socket', function(modules, proxy) {
     sockets.tcp.create({name: options.name}, function(info) {
       var socketId = info.socketId;
       sockets.tcp.connect(socketId, options.address || '127.0.0.1', options.port, function(resultCode) {
-        if (resultCode) sockets.tcp.close(socketId);
         callback = callback(resultCode && chrome.runtime.lastError.message, socketId);
-        if (!resultCode) clients[socketId] = {receive: callback, error: error, disconnect: disconnect};
+        if (resultCode) return sockets.tcp.close(socketId);
+        clients[socketId] = {receive: callback, error: error, disconnect: disconnect};
       });
     });
   };
@@ -290,20 +291,21 @@ simpl.add('socket', function(modules, proxy) {
   var secure = function(socketId, options, callback) {
     sockets.tcp.setPaused(socketId, true, function() {
       sockets.tcp.secure(socketId, options, function(error) {
+        if (error || error === undefined) error = chrome.runtime.lastError.message;
         sockets.tcp.setPaused(socketId, false, function() {
-          if (callback) callback(error ? chrome.runtime.lastError.message : false);
+          if (callback) callback(error || false);
         });
       });
     });
   };
   var setKeepAlive = function(socketId, enabled, delay, callback) {
     sockets.tcp.setKeepAlive(socketId, enabled, delay, function(error) {
-      if (callback) callback(error ? chrome.runtime.lastError.message : false);
+      if (callback) callback(error || error === undefined ? chrome.runtime.lastError.message : false);
     });
   };
   var setNoDelay = function(socketId, enabled, callback) {
     sockets.tcp.setNoDelay(socketId, enabled, function(error) {
-      if (callback) callback(error ? chrome.runtime.lastError.message : false);
+      if (callback) callback(error || error === undefined ? chrome.runtime.lastError.message : false);
     });
   };
   var getInfo = function(socketId, callback) {
@@ -353,7 +355,6 @@ simpl.add('socket', function(modules, proxy) {
       } */
   /** ClientSocket: {
         send: function(data:ArrayBuffer, callback:function(info:SendInfo)),
-        secure: function(options=undefined:SecureOptions, callback:function(error:string|false)),
         disconnect: function,
         setKeepAlive: function(enabled:boolean, delay:number, callback:function(error:string|false)),
         setNoDelay: function(enabled:boolean, callback:function(error:string|false)),
@@ -362,13 +363,15 @@ simpl.add('socket', function(modules, proxy) {
         onReceive: function(data:ArrayBuffer),
         onError: function(error:number),
         onDisconnect: function
-      } */
+      }
+
+      `setKeepAlive` accepts a `delay` in seconds since the socket's last transmission. */
   /** SendInfo: {
         resultCode: number,
         error: string|undefined,
         bytesSent: number|undefined
       } */
-  /** SecureOptions: {
+  /*  SecureOptions: {
         tlsVersion: {min: undefined|string, max:undefined|string}
       }
 
@@ -422,9 +425,9 @@ simpl.add('socket', function(modules, proxy) {
           send: function(data, callback) {
             send(socketId, data, callback);
           },
-          secure: function(options, callback) {
-            secure(socketId, options, callback);
-          },
+//          secure: function(options, callback) {
+//            secure(socketId, options, callback);
+//          },
           disconnect: function() {
             disconnect(socketId);
           },
