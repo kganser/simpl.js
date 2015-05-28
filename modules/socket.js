@@ -5,7 +5,12 @@ simpl.add('socket', function(modules, proxy) {
     listen: function(args, callback, proxy) {
       var destroy, socketId;
       listen(args[0], function(client) {
-        servers[socketId].clients[client.socketId] = true;
+        client.onError = function(error) {
+          proxy('clientError', [client.socketId, error]);
+        };
+        client.onDisconnect = function() {
+          proxy('clientDisconnect', [client.socketId]);
+        };
         proxy('accept', [socketId, client.socketId]);
         return function(data) {
           proxy('receive', [client.socketId, data], null, [data]);
@@ -108,6 +113,8 @@ simpl.add('socket', function(modules, proxy) {
       if (client) client.error(args[1]);
     },
     clientDisconnect: function(args) {
+      var client = clients[args[0]];
+      if (client) client.disconnect();
       delete clients[args[0]];
     },
     serverError: function(args) {
@@ -115,6 +122,8 @@ simpl.add('socket', function(modules, proxy) {
       if (server) server.error(args[1]);
     },
     serverDisconnect: function(args) {
+      var server = servers[args[0]];
+      if (server) server.disconnect();
       delete servers[args[0]];
     }
   });
@@ -129,7 +138,8 @@ simpl.add('socket', function(modules, proxy) {
           },
           getInfo: function(callback) {
             proxy('getServerInfo', [socketId], callback);
-          }
+          },
+          socketId: socketId
         };
         servers[socketId] = {
           accept: accept,
@@ -263,6 +273,7 @@ simpl.add('socket', function(modules, proxy) {
   };
   var send = function(socketId, data, callback) {
     sockets.tcp.send(socketId, data, function(info) {
+      if (!info) info = {resultCode: -2};
       if (info.resultCode) info.error = chrome.runtime.lastError.message;
       if (callback) callback(info);
     });
@@ -371,15 +382,17 @@ simpl.add('socket', function(modules, proxy) {
       } */
   return {
     listen: function(options, accept, callback) {
-      var socket = {
-        disconnect: function() {
-          disconnectServer(socketId);
-        },
-        getInfo: function(callback) {
-          getServerInfo(socketId, callback);
-        }
-      };
+      var socket;
       listen(options, accept, function(error, socketId) {
+        socket = {
+          disconnect: function() {
+            disconnectServer(socketId);
+          },
+          getInfo: function(callback) {
+            getServerInfo(socketId, callback);
+          },
+          socketId: socketId
+        };
         if (callback) callback(error, !error && socket);
       }, function(error) {
         if (socket.onError) socket.onError(error);
@@ -388,26 +401,32 @@ simpl.add('socket', function(modules, proxy) {
       });
     },
     connect: function(options, callback) {
-      var socket = {
-        send: function(data, callback) {
-          send(socketId, data, callback);
-        },
-        secure: function(options, callback) {
-          secure(socketId, options, callback);
-        },
-        disconnect: function() {
-          disconnect(socketId);
-        },
-        setNoDelay: function(noDelay, callback) {
-          setNoDelay(socketId, noDelay, callback);
-        },
-        getInfo: function(callback) {
-          getInfo(socketId, callback);
-        },
-        socketId: socketId
-      };
+      var socket;
       connect(options, function(error, socketId) {
-        callback(error, !error && socket);
+        socket = {
+          send: function(data, callback) {
+            send(socketId, data, callback);
+          },
+          secure: function(options, callback) {
+            secure(socketId, options, callback);
+          },
+          disconnect: function() {
+            disconnect(socketId);
+          },
+          setNoDelay: function(noDelay, callback) {
+            setNoDelay(socketId, noDelay, callback);
+          },
+          getInfo: function(callback) {
+            getInfo(socketId, callback);
+          },
+          socketId: socketId
+        };
+        var receive = callback(error, !error && socket);
+        if (typeof socket.onReceive != 'function')
+          socket.onReceive = receive;
+        return function(data) {
+          if (socket.onReceive) socket.onReceive(data);
+        };
       }, function(error) {
         if (socket.onError) socket.onError(error);
       }, function() {
