@@ -2,10 +2,9 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
 
   var server, loader, lines, icons, workspace,
       db = o.database.open('simpl', {sessions: {}}),
-      key = new Uint8Array(24),
-      encode = o.string.base64FromBuffer;
-  
-  crypto.getRandomValues(key); // TODO: store in database
+      key = crypto.getRandomValues(new Uint8Array(24)), // TODO: store in database
+      encode = o.string.base64FromBuffer,
+      apps = {}, logs = {}, clients = {};
   
   var signature = function(value) {
     value = value || '';
@@ -96,6 +95,90 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       });
     });
   };
+  var wrap = function(name, code, version, dependencies) {
+    return 'simpl.add('+[JSON.stringify(name), code, version, JSON.stringify(dependencies)]+');';
+  };
+  var broadcast = function(event, data, user) {
+    Object.keys(clients).forEach(function(socketId) {
+      var client = clients[socketId];
+      if (client.user != user) return;
+      client.connection.send(JSON.stringify({event: event, data: data}), function(info) {
+        if (info.error) delete clients[socketId];
+      });
+    });
+  };
+  var state = function(user, client) {
+    var state = {}, log = [];
+    Object.keys(apps).forEach(function(id) {
+      var parts = id.split('/').map(decodeURIComponent);
+      if (parts[0] == user) {
+        var app = parts[1],
+            version = parseInt(parts[2], 10);
+        if (!state[app]) state[app] = [version];
+        else state[app].push(version);
+        log = log.concat(logs[id]);
+      }
+    });
+    client.send(JSON.stringify({event: 'state', data: state}));
+    log.forEach(function(log) {
+      client.send(JSON.stringify({event: 'log', data: log}));
+    });
+  };
+  var run = function(user, name, version, token, instance) { // TODO: use instance token
+    var id = [user, name, version].map(encodeURIComponent).join('/');
+    if (apps[id]) return;
+    (function(callback) {
+      var path = 'apps/'+encodeURIComponent(name);
+      if (!token) return db.get(path+'/versions/'+version).then(callback);
+      api(path+'/'+version, token, function(status, data) {
+        callback(status == 200 && data);
+      });
+    }(function(app) {
+      if (!app) return broadcast('error', {app: name, version: version, message: 'App not found'}, user);
+      logs[id] = [];
+      apps[id] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\nsimpl.use('+JSON.stringify(app.dependencies)+','+app.code+');', function(module, callback) {
+        var path = 'modules/'+encodeURIComponent(module.name),
+            v = module.version,
+            current = v < 0;
+        if (current) v = -v-1;
+        (function(callback) {
+          if (!token) return db.get(path+'/versions/'+v).then(callback);
+          api(path+'/'+v, token, function(status, data) {
+            callback(status == 200 && data);
+          });
+        }(function(record) {
+          if (record && !current) record = record.published.pop();
+          if (record) return callback(wrap(module.name, record.code, module.version, record.dependencies));
+          apps[id].terminate();
+          delete logs[id];
+          delete apps[id];
+          broadcast('error', {app: name, version: version, message: 'Required module not found: '+module.name}, user);
+        }));
+      }, function(level, args, module, line, column) {
+        var data = {app: name, version: version, level: level, message: args, module: module, line: module ? line : line > lines ? line-lines : undefined, column: column};
+        if (logs[id].push(data) > 100) logs[id].unshift();
+        broadcast('log', data, user);
+      }, function(message, module, line) {
+        delete logs[id];
+        delete apps[id];
+        broadcast('error', {app: name, version: version, message: message, module: module, line: module ? line : line > lines ? line-lines : undefined}, user);
+      });
+      broadcast('run', {app: name, version: version}, user);
+    }));
+  };
+  var stop = function(user, name, version) {
+    var id = [user, name, version].map(encodeURIComponent).join('/');
+    if (!apps[id]) return;
+    apps[id].terminate();
+    broadcast('stop', {app: name, version: version}, user);
+    delete apps[id];
+  };
+  var shutdown = function() {
+    if (!server) return;
+    server.disconnect();
+    server = port = null;
+    if (typeof ws == 'object') ws.close();
+  };
   
   o.xhr('/simpl.js', function(e) {
     loader = e.target.responseText;
@@ -112,32 +195,14 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     restore(function() {});
   });
   
+  chrome.runtime.onSuspend.addListener(shutdown);
+  
   chrome.runtime.onConnect.addListener(function(launcher) {
     launcher.onMessage.addListener(function(command) {
       if (command.action == 'stop') {
-        if (server) {
-          server.disconnect();
-          server = port = null;
-        }
+        shutdown();
         return launcher.postMessage({action: 'stop'});
       }
-      
-      var apps = {}, logs = {}, clients = {};
-      var wrap = function(name, code, version, dependencies) {
-        return 'simpl.add('+[JSON.stringify(name), code, version, JSON.stringify(dependencies)]+');';
-      };
-      var send = function(event, data, client) {
-        client.send(JSON.stringify({event: event, data: data}));
-      };
-      var broadcast = function(event, data, user) {
-        Object.keys(clients).forEach(function(socketId) {
-          var client = clients[socketId];
-          if (client.user != user) return;
-          client.connection.send(JSON.stringify({event: event, data: data}), function(info) {
-            if (info.error) delete clients[socketId];
-          });
-        });
-      };
       
       o.http.serve({port: command.port}, function(request, response) {
         
@@ -332,7 +397,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                 clients[socketId] = {user: user, connection: client};
                 if (session) {
                   token = session.accessToken;
-                  feed = new WebSocket('ws://api.simpljs.com/?access_token='+token);
+                  feed = new WebSocket('ws://api.simpljs.com/connect?access_token='+token);
                   feed.onmessage = function(e) {
                     if (typeof e.data == 'string')
                       client.send(e.data);
@@ -346,73 +411,15 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
               return function(data) {
                 if (user == null) return;
                 try { var message = JSON.parse(data); } catch (e) { return; }
-                if (message.server) return feed && feed.send(data);
-                if (message.command == 'connect') {
-                  var state = {}, log = [];
-                  Object.keys(apps).forEach(function(id) {
-                    var parts = id.split('/').map(decodeURIComponent);
-                    if (parts[0] == user) {
-                      var app = parts[1],
-                          version = parseInt(parts[2], 10);
-                      if (!state[app]) state[app] = [version];
-                      else state[app].push(version);
-                      log = log.concat(logs[id]);
-                    }
-                  });
-                  send('state', state, client);
-                  return log.forEach(function(log) {
-                    send('log', log, client);
-                  });
-                }
-                var name = message.app,
-                    version = message.version,
-                    id = [user, name, version].map(encodeURIComponent).join('/');
-                if (apps[id] && message.command in {stop: 1, restart: 1}) {
-                  apps[id].terminate();
-                  broadcast('stop', {app: name, version: version}, user);
-                  delete apps[id];
-                }
-                if (!apps[id] && message.command in {run: 1, restart: 1}) {
-                  (function(callback) {
-                    var path = 'apps/'+encodeURIComponent(name);
-                    if (!token) return db.get(path+'/versions/'+version).then(callback);
-                    api(path+'/'+version, token, function(status, data) {
-                      callback(status == 200 && data);
-                    });
-                  }(function(app) {
-                    if (!app) return; // TODO: broadcast error?
-                    logs[id] = [];
-                    apps[id] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\nsimpl.use('+JSON.stringify(app.dependencies)+','+app.code+');', function(module, callback) {
-                      var path = 'modules/'+encodeURIComponent(module.name),
-                          v = module.version,
-                          current = v < 0;
-                      if (current) v = -v-1;
-                      (function(callback) {
-                        if (!token) return db.get(path+'/versions/'+v).then(callback);
-                        api(path+'/'+v, token, function(status, data) {
-                          callback(status == 200 && data);
-                        });
-                      }(function(record) {
-                        if (record && !current) record = record.published.pop();
-                        if (record) return callback(wrap(module.name, record.code, module.version, record.dependencies));
-                        apps[id].terminate();
-                        delete logs[id];
-                        delete apps[id];
-                        broadcast('error', {app: name, version: version, message: 'Required module not found: '+module.name}, user);
-                      }));
-                    }, function(level, args, module, line, column) {
-                      var data = {app: name, version: version, level: level, message: args, module: module, column: column};
-                      if (module || line > lines) data.line = module ? line : line-lines;
-                      if (logs[id].push(data) > 100) logs[id].unshift();
-                      broadcast('log', data, user);
-                    }, function(message, module, line) {
-                      delete logs[id];
-                      delete apps[id];
-                      broadcast('error', {app: name, version: version, message: message, module: module, line: line}, user);
-                    });
-                    broadcast('run', {app: name, version: version}, user);
-                  }));
-                }
+                var server = message.server,
+                    command = message.command;
+                if (server) return feed && feed.send(data);
+                if (command == 'connect')
+                  return state(user, client);
+                if (command == 'stop' || command == 'restart')
+                  stop(user, message.app, message.version);
+                if (command == 'run' || command == 'restart')
+                  run(user, message.app, message.version, token);
               };
             });
           return forward('workspace', function(callback) {
@@ -493,41 +500,72 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     }
   });
   
-  chrome.runtime.onSuspend.addListener(function() {
-    if (server) {
-      server.disconnect();
-      server = port = null;
-    }
-  });
-});
+  var ws, port, path = '', launcher = false;
 
-var port, path = '', launcher = false;
-
-chrome.app.runtime.onLaunched.addListener(function(source) {
-  var token = source && source.url && source.url.substr(26),
-      headless = token == 'headless';
-  path = token && !headless ? '/login?token='+token : '';
-  if (launcher.focus) {
-    // TODO: use chrome.browser.openTab() to navigate in existing tab
-    if (port) {
-      var link = launcher.contentWindow.document.getElementById('link');
-      link.setAttribute('href', 'http://localhost:'+port+path);
-      return link.click();
+  chrome.app.runtime.onLaunched.addListener(function(source) {
+    var token = source && source.url && source.url.substr(26),
+        headless = token == 'headless';
+    path = token && !headless ? '/login?token='+token : '';
+    if (launcher.focus) {
+      // TODO: use chrome.browser.openTab() to navigate in existing tab
+      if (port) {
+        var link = launcher.contentWindow.document.getElementById('link');
+        link.setAttribute('href', 'http://localhost:'+port+path);
+        return link.click();
+      }
+      return launcher.focus();
     }
-    return launcher.focus();
-  }
-  launcher = true;
-  chrome.app.window.create('simpl.html', {
-    id: 'simpl',
-    resizable: false,
-    innerBounds: {width: 300, height: 100}
-  }, function(window) {
-    (launcher = window).onClosed.addListener(function() {
-      launcher = false;
+    launcher = true;
+    chrome.app.window.create('simpl.html', {
+      id: 'simpl',
+      resizable: false,
+      innerBounds: {width: 300, height: 100}
+    }, function(window) {
+      (launcher = window).onClosed.addListener(function() {
+        launcher = false;
+      });
+      if (headless) launcher.contentWindow.onload = function(e) {
+        e.target.getElementById('action').click();
+        if (ws) return;
+        ws = true;
+        o.xhr('http://169.254.169.254/latest/user-data', function(e) {
+          var connections, client, retries = 0,
+              user = '', token = '';
+          // get token, user from user-data
+          var connect = function() {
+            ws = new WebSocket('ws://api.simpljs.com/connect?instance_token='+token);
+            ws.onopen = function() {
+              connections = 0;
+              client = {user: user, connection: ws};
+            };
+            ws.onmessage = function(e) {
+              try { var message = JSON.parse(e.data); } catch (e) { return; }
+              var command = message.command;
+              if (command == 'connect') {
+                if (!connections++)
+                  clients[-1] = client;
+                return state(user, ws);
+              }
+              if (command == 'disconnect') {
+                if (!--connections)
+                  delete clients[-1];
+                return;
+              }
+              if (command == 'stop' || command == 'restart')
+                stop(user, message.app, message.version);
+              if (command == 'run' || command == 'restart')
+                run(user, message.app, message.version, token, true);
+            };
+            ws.onclose = function() {
+              delete clients[-1];
+              if (!server) return ws = null;
+              if (retries < 6) retries++;
+              setTimeout(connect, (1 << retries) * 1000);
+            };
+          };
+          connect();
+        });
+      };
     });
-    if (headless) launcher.contentWindow.onload = function(e) {
-      e.target.getElementById('action').click();
-      // TODO: connect to simpljs.com
-    };
   });
 });
