@@ -61,8 +61,11 @@ simpl.add('socket', function(modules, proxy) {
         disconnect: function() {
           proxy('disconnect', [clientSocketId]);
         },
-        setNoDelay: function(noDelay, callback) {
-          proxy('setNoDelay', [clientSocketId, noDelay], callback);
+        setKeepAlive: function(enabled, delay, callback) {
+          proxy('setKeepAlive', [clientSocketId, enabled, delay], callback);
+        },
+        setNoDelay: function(enabled, callback) {
+          proxy('setNoDelay', [clientSocketId, enabled], callback);
         },
         getInfo: function(callback) {
           proxy('getInfo', [clientSocketId], callback);
@@ -92,6 +95,9 @@ simpl.add('socket', function(modules, proxy) {
     },
     secure: function(args, callback) {
       secure(args[0], args[1], callback);
+    },
+    setKeepAlive: function(args, callback) {
+      setKeepAlive(args[0], args[1], args[2], callback);
     },
     setNoDelay: function(args, callback) {
       setNoDelay(args[0], args[1], callback);
@@ -211,8 +217,11 @@ simpl.add('socket', function(modules, proxy) {
       disconnect: function() {
         disconnect(clientSocketId);
       },
-      setNoDelay: function(noDelay, callback) {
-        setNoDelay(clientSocketId, noDelay, callback);
+      setKeepAlive: function(enabled, delay, callback) {
+        setKeepAlive(clientSocketId, enabled, delay, callback);
+      },
+      setNoDelay: function(enabled, callback) {
+        setNoDelay(clientSocketId, enabled, callback);
       },
       getInfo: function(callback) {
         getInfo(clientSocketId, callback);
@@ -282,14 +291,19 @@ simpl.add('socket', function(modules, proxy) {
     sockets.tcp.setPaused(socketId, true, function() {
       sockets.tcp.secure(socketId, options, function(error) {
         sockets.tcp.setPaused(socketId, false, function() {
-          if (callback) callback(error && chrome.runtime.lastError.message);
+          if (callback) callback(error ? chrome.runtime.lastError.message : false);
         });
       });
     });
   };
-  var setNoDelay = function(socketId, noDelay, callback) {
-    sockets.tcp.setNoDelay(socketId, noDelay, function(error) {
-      if (callback) callback(error && chrome.runtime.lastError.message);
+  var setKeepAlive = function(socketId, enabled, delay, callback) {
+    sockets.tcp.setKeepAlive(socketId, enabled, delay, function(error) {
+      if (callback) callback(error ? chrome.runtime.lastError.message : false);
+    });
+  };
+  var setNoDelay = function(socketId, enabled, callback) {
+    sockets.tcp.setNoDelay(socketId, enabled, function(error) {
+      if (callback) callback(error ? chrome.runtime.lastError.message : false);
     });
   };
   var getInfo = function(socketId, callback) {
@@ -341,7 +355,8 @@ simpl.add('socket', function(modules, proxy) {
         send: function(data:ArrayBuffer, callback:function(info:SendInfo)),
         secure: function(options=undefined:SecureOptions, callback:function(error:string|false)),
         disconnect: function,
-        setNoDelay: function(noDelay:boolean, callback:function(error:string|false)),
+        setKeepAlive: function(enabled:boolean, delay:number, callback:function(error:string|false)),
+        setNoDelay: function(enabled:boolean, callback:function(error:string|false)),
         getInfo: function(callback:function(ClientSocketInfo)),
         socketId: number,
         onReceive: function(data:ArrayBuffer),
@@ -412,6 +427,9 @@ simpl.add('socket', function(modules, proxy) {
           },
           disconnect: function() {
             disconnect(socketId);
+          },
+          setKeepAlive: function(enabled, delay, callback) {
+            setKeepAlive(socketId, enabled, delay, callback);
           },
           setNoDelay: function(noDelay, callback) {
             setNoDelay(socketId, noDelay, callback);
