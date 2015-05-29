@@ -33,10 +33,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       callback(t.status, t.response);
     });
   };
-  var authenticate = function(sid, callback, token) {
-    if (token) return api('user', token, function(status, data) {
-      callback(status == 200 && {username: data.username, accessToken: token});
-    });
+  var authenticate = function(sid, callback) {
     if (!verify(sid)) return callback(null, true);
     db.get('sessions/'+sid).then(callback);
   };
@@ -387,33 +384,30 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
               return response.generic(303, {Location: '/'});
             }, full ? 'both' : 'modules', !full);
           }, 'url');
-        if (request.path == '/') {
-          if (/websocket/i.test(request.headers.Upgrade))
-            return o.websocket.server(request, response, function(client) {
-              var socketId = client.socket.socketId,
-                  feed, user, token;
-              authenticate(request.cookie.sid, function(session) { // TODO: use arg local?
-                user = session ? session.username : '';
-                clients[socketId] = {user: user, connection: client};
-                if (session) {
-                  token = session.accessToken;
-                  feed = new WebSocket('ws://api.simpljs.com/connect?access_token='+token);
-                  feed.onmessage = function(e) {
-                    if (typeof e.data == 'string')
-                      client.send(e.data);
-                  };
-                  feed.onclose = function() {
-                    client.disconnect(1001); // TODO: disconnect from server message instead of closing?
-                    delete clients[socketId];
-                  };
-                }
-              }, request.query.access_token);
+        if (request.path == '/connect')
+          return authenticate(request.cookie.sid, function(session, local) {
+            if (!session && !local) return response.generic(401);
+            var socketId = response.socket.socketId,
+                user = session ? session.username : '',
+                token = session && session.accessToken;
+            o.websocket.accept(request, response, function(client) {
+              clients[socketId] = {user: user, connection: client};
+              if (session) {
+                var ws = new WebSocket('ws://api.simpljs.com/connect?access_token='+token);
+                ws.onmessage = function(e) {
+                  if (typeof e.data == 'string')
+                    client.send(e.data);
+                };
+                ws.onclose = function() {
+                  client.disconnect(1001); // TODO: disconnect if active server is remote
+                  delete clients[socketId];
+                };
+              }
               return function(data) {
-                if (user == null) return;
                 try { var message = JSON.parse(data); } catch (e) { return; }
                 var server = message.server,
                     command = message.command;
-                if (server) return feed && feed.send(data);
+                if (server) return session && ws.send(data);
                 if (command == 'connect')
                   return state(user, client);
                 if (command == 'stop' || command == 'restart')
@@ -422,6 +416,8 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                   run(user, message.app, message.version, token);
               };
             });
+          });
+        if (request.path == '/')
           return forward('workspace', function(callback) {
             db.get('', false, function(path) {
               // apps,modules,sessions/<name>/versions/<#>/code,config,dependencies,published/<#>
@@ -478,7 +474,6 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
               ]}
             ]), 'html');
           });
-        }
         o.xhr(request.path, {responseType: 'arraybuffer'}, function(e) {
           if (e.target.status != 200)
             return response.generic(404);

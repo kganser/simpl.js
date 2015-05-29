@@ -413,7 +413,7 @@ function(modules) {
     function(next) {
       var i = 0;
       modules.http.serve({port: 9123, address: '127.0.0.1'}, function(request, response) {
-        return modules.websocket.server(request, response, function(connection, protocol, extensions) {
+        modules.websocket.accept(request, response, function(connection, protocol, extensions) {
           assert(i++ == 1 && protocol === 'myprotocol', 'websocket request');
           connection.send('hello');
           return function(message) {

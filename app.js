@@ -253,7 +253,7 @@ simpl.add('app', function(o) {
             if (socket) return send('connect');
             if (!window.WebSocket) return status('WebSockets are not supported in this browser.', 'fatal');
             clearInterval(timer);
-            socket = new WebSocket('ws://'+location.host);
+            socket = new WebSocket('ws://'+location.host+'/connect');
             socket.onopen = function() {
               retries = 0;
               status();
