@@ -5,6 +5,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       key = crypto.getRandomValues(new Uint8Array(24)), // TODO: store in database
       encode = o.string.base64FromBuffer,
       decode = o.string.base64ToBuffer,
+      utf8 = o.string.fromUTF8Buffer,
       apps = {}, logs = {}, clients = {};
   
   var signature = function(value) {
@@ -525,9 +526,9 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         if (ws) return;
         ws = true;
         o.xhr('http://169.254.169.254/latest/user-data', function(e) {
-          try { var key = JSON.parse(o.string.fromUTF8Buffer(decode(e.target.responseText))).key; }
+          try { var key = JSON.parse(utf8(decode(e.target.responseText.trim()))).key; }
           catch (e) { return; }
-          var user = decodeURIComponent(decode(key.split('.')[0], true).split('/')[0]),
+          var user = decodeURIComponent(utf8(decode(key.split('.')[0], true)).split('/')[0]),
               connections, client, retries = 0;
           var connect = function() {
             ws = new WebSocket('ws://api.simpljs.com/connect?key='+key);
