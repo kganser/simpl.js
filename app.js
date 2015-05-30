@@ -210,9 +210,12 @@ simpl.add('app', function(o) {
             ]}},
             {div: {className: 'servers localhost', children: [
               {span: [icons.laptop, icons.network]},
-              {select: {disabled: true, onchange: function() {
+              {select: {onchange: function() {
+                for (var i = this.firstChild; i; i = i.nextSibling)
+                  if (i.disabled) { this.removeChild(i); break; }
                 this.parentNode.className = this.value ? 'servers' : 'servers localhost';
                 connect(this.value);
+                status();
               }, children: function(e) {
                 servers = e;
                 return {option: {value: '', children: 'Localhost'}};
@@ -226,122 +229,133 @@ simpl.add('app', function(o) {
             {div: {className: 'controls', children: {button: {className: 'settings', title: 'Settings', children: icons.settings}}}},
             'Simpl.js'
           ]}},
-        {div: {id: 'connection', children: [{span: function(e) {
-          var socket, server, unload, timer, countdown, retries = 0;
-          var status = function(message, className) {
-            e.parentNode.className = message ? className || 'info' : null;
-            e.textContent = message;
-          };
-          send = function(command, data) {
-            if (!socket || socket.readyState != 1) return;
-            if (!data) data = {};
-            data.command = command;
-            data.server = server;
-            socket.send(JSON.stringify(data));
-          };
-          connect = function(host) {
-            status('Connecting...', 'connecting');
-            server = host || undefined;
-            appList.classList.add('disabled');
-            Object.keys(apps).forEach(function(app) {
-              apps[app].forEach(function(entry) {
-                entry.tab.classList.remove('running', 'error');
-                entry.running = false;
-                entry.log = [];
-              });
-            });
-            if (socket) return send('connect');
-            if (!window.WebSocket) return status('WebSockets are not supported in this browser.', 'fatal');
-            clearInterval(timer);
-            socket = new WebSocket('ws://'+location.host+'/connect');
-            socket.onopen = function() {
-              retries = 0;
-              status();
-              send('connect');
+        {div: {id: 'connection', children: [
+          {span: function(e) {
+            var socket, server, unload, timer, countdown, retries = 0;
+            var status = function(message, className) {
+              e.parentNode.className = message ? className || 'info' : null;
+              e.textContent = message;
             };
-            socket.onmessage = function(e) {
-              try { var message = JSON.parse(e.data); } catch (e) { return; }
-              var event = message.event,
-                  data = message.data || {},
-                  entry = {servers: 1, state: 1}[event] || (apps[data.app] || {})[data.version];
-              if (message.server != server || !entry) return;
-              switch (event) {
-                case 'servers':
-                  if (!servers || !Array.isArray(data)) return;
-                  servers.disabled = false;
-                  data.unshift({id: '', name: 'Localhost'});
-                  dom(data.map(function(server) {
-                    return {option: {value: server.id, children: server.name || server.id+'@'+server.ip}};
-                  }), servers, true);
-                  break;
-                case 'state':
-                  Object.keys(data).forEach(function(app) {
-                    if (apps[app]) data[app].forEach(function(version) {
-                      if (app = apps[app][version]) {
-                        app.tab.classList.add('running');
-                        app.running = true;
-                      }
-                    });
-                  });
-                  if (selected && selected.app) {
-                    log.textContent = '';
-                    toggle(selected.name, selected.version, true, selected.panel == 'log' && !selected.entry.running ? 'code' : selected.panel);
-                  }
-                  appList.classList.remove('disabled');
-                  break;
-                case 'error':
-                  entry.running = false;
-                  entry.tab.classList.add(data.level = 'error');
-                  entry.tab.classList.remove('running');
-                  data.message = [data.message];
-                case 'log':
-                  if (entry.log.push(message = {
-                    level: data.level == 'log' ? 'debug' : data.level,
-                    message: data.message,
-                    module: data.module ? data.module.name : '',
-                    version: data.module ? data.module.version : '',
-                    line: data.line
-                  }) > 1000) entry.log.shift();
-                  if (selected && selected.entry == entry) {
-                    var scroll = body.classList.contains('show-log') && (body.scrollTop || document.documentElement.scrollTop) + document.documentElement.clientHeight >= body.scrollHeight;
-                    dom(logLine(message), log);
-                    if (scroll) document.documentElement.scrollTop = body.scrollTop = body.scrollHeight;
-                  }
-                  break;
-                case 'run':
-                case 'stop':
-                  entry.running = event == 'run';
-                  entry.tab.classList[entry.running ? 'add' : 'remove']('running');
-                  entry.tab.classList.remove('error');
-                  if (entry.running) {
-                    entry.log = [];
-                    if (selected && selected.entry == entry) {
-                      log.textContent = '';
-                      toggle(data.app, data.version, true, 'log');
-                    }
-                  }
-                  break;
-              }
+            send = function(command, data) {
+              if (!socket || socket.readyState != 1) return;
+              if (!data) data = {};
+              data.command = command;
+              data.instance = server;
+              socket.send(JSON.stringify(data));
             };
-            socket.onclose = function() {
+            connect = function(host) {
+              status('Connecting...', 'connecting');
+              server = host || undefined;
               appList.classList.add('disabled');
-              socket = null;
-              if (unload) return;
-              if (retries == 6) return status('Disconnected', 'error');
-              countdown = 1 << retries++;
-              status('Reconnecting in '+countdown);
-              timer = setInterval(function() {
-                if (--countdown) return status('Reconnecting in '+countdown);
-                connect(server);
-              }, 1000);
+              Object.keys(apps).forEach(function(app) {
+                apps[app].forEach(function(entry) {
+                  entry.tab.classList.remove('running', 'error');
+                  entry.running = false;
+                  entry.log = [];
+                });
+              });
+              if (socket) return send('connect');
+              if (!window.WebSocket) return status('WebSockets are not supported in this browser.', 'fatal');
+              clearInterval(timer);
+              socket = new WebSocket('ws://'+location.host+'/connect');
+              socket.onopen = function() {
+                retries = 0;
+                status();
+                send('connect');
+              };
+              socket.onmessage = function(e) {
+                try { var message = JSON.parse(e.data); } catch (e) { return; }
+                var event = message.event,
+                    instance = message.instance,
+                    data = message.data || {},
+                    entry = (apps[data.app] || {})[data.version];
+                if (event in {error: 1, log: 1, run: 1, stop: 1} && (instance != server || !entry)) return;
+                switch (event) {
+                  case 'connect':
+                    for (var i = servers.firstChild; i && i.value.localeCompare(instance) < 0; i = i.nextSibling);
+                    servers.insertBefore(dom({option: {value: instance, children: message.name}}), i);
+                    break;
+                  case 'disconnect':
+                    for (var i = servers.firstChild; i; i = i.nextSibling) {
+                      if (i.value == instance) {
+                        if (instance == server) {
+                          i.disabled = true;
+                          appList.classList.add('disabled');
+                          status('Instance is offline', 'fatal');
+                        } else {
+                          servers.removeChild(i);
+                        }
+                        break;
+                      }
+                    }
+                    break;
+                  case 'state':
+                    Object.keys(data).forEach(function(app) {
+                      if (apps[app]) data[app].forEach(function(version) {
+                        if (app = apps[app][version]) {
+                          app.tab.classList.add('running');
+                          app.running = true;
+                        }
+                      });
+                    });
+                    if (selected && selected.app) {
+                      log.textContent = '';
+                      toggle(selected.name, selected.version, true, selected.panel == 'log' && !selected.entry.running ? 'code' : selected.panel);
+                    }
+                    appList.classList.remove('disabled');
+                    break;
+                  case 'error':
+                    entry.running = false;
+                    entry.tab.classList.add(data.level = 'error');
+                    entry.tab.classList.remove('running');
+                    data.message = [data.message];
+                  case 'log':
+                    if (entry.log.push(message = {
+                      level: data.level == 'log' ? 'debug' : data.level,
+                      message: data.message,
+                      module: data.module ? data.module.name : '',
+                      version: data.module ? data.module.version : '',
+                      line: data.line
+                    }) > 1000) entry.log.shift();
+                    if (selected && selected.entry == entry) {
+                      var scroll = body.classList.contains('show-log') && (body.scrollTop || document.documentElement.scrollTop) + document.documentElement.clientHeight >= body.scrollHeight;
+                      dom(logLine(message), log);
+                      if (scroll) document.documentElement.scrollTop = body.scrollTop = body.scrollHeight;
+                    }
+                    break;
+                  case 'run':
+                  case 'stop':
+                    entry.running = event == 'run';
+                    entry.tab.classList[entry.running ? 'add' : 'remove']('running');
+                    entry.tab.classList.remove('error');
+                    if (entry.running) {
+                      entry.log = [];
+                      if (selected && selected.entry == entry) {
+                        log.textContent = '';
+                        toggle(data.app, data.version, true, 'log');
+                      }
+                    }
+                    break;
+                }
+              };
+              socket.onclose = function() {
+                appList.classList.add('disabled');
+                dom({option: {value: '', children: 'Localhost'}}, servers, true);
+                server = socket = null;
+                if (unload) return;
+                if (retries == 6) return status('Disconnected', 'error');
+                countdown = 1 << retries++;
+                status('Reconnecting in '+countdown);
+                timer = setInterval(function() {
+                  if (--countdown) status('Reconnecting in '+countdown);
+                  else connect();
+                }, 1000);
+              };
             };
-          };
-          window.onbeforeunload = function() {
-            unload = true;
-          };
-        }}, {button: {children: 'Try Now', onclick: function() {
-          connect(servers && servers.value);
-        }}}]}},
+            window.onbeforeunload = function() { unload = true; };
+          }},
+          {button: {children: 'Try Now', onclick: function() { connect(); }}}
+        ]}},
         {h2: 'Apps'},
         {div: {className: 'form', children: [
           {input: {type: 'text', placeholder: 'New App', onkeyup: function(e) {

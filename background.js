@@ -4,6 +4,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       db = o.database.open('simpl', {sessions: {}}),
       key = crypto.getRandomValues(new Uint8Array(24)), // TODO: store in database
       encode = o.string.base64FromBuffer,
+      decode = o.string.base64ToBuffer,
       apps = {}, logs = {}, clients = {};
   
   var signature = function(value) {
@@ -21,11 +22,11 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     var parts = signed.split('.');
     return signature(parts[0]) == parts[1] && signed;
   };
-  var api = function(path, token, callback, method, data, text) {
+  var api = function(path, token, callback, instance, method, data, text) {
     o.xhr('http://api.simpljs.com/'+path, {
       method: method,
       responseType: 'json',
-      headers: {Authorization: token ? 'Bearer '+token : null},
+      headers: {Authorization: token ? (instance ? 'Instance ' : 'Bearer ')+token : null},
       json: text ? undefined : data,
       data: text ? data : undefined
     }, function(e) {
@@ -129,7 +130,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       if (!token) return db.get(path+'/versions/'+version).then(callback);
       api(path+'/'+version, token, function(status, data) {
         callback(status == 200 && data);
-      });
+      }, instance);
     }(function(app) {
       if (!app) return broadcast('error', {app: name, version: version, message: 'App not found'}, user);
       logs[id] = [];
@@ -142,7 +143,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           if (!token) return db.get(path+'/versions/'+v).then(callback);
           api(path+'/'+v, token, function(status, data) {
             callback(status == 200 && data);
-          });
+          }, instance);
         }(function(record) {
           if (record && !current) record = record.published.pop();
           if (record) return callback(wrap(module.name, record.code, module.version, record.dependencies));
@@ -215,7 +216,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             api(path, session.accessToken, function(status, data) {
               if (status != 200) return logout(sid); // TODO: handle certain error statuses
               callback(data, {username: session.username, name: session.name, email: session.email});
-            }, method, data, text);
+            }, false, method, data, text);
           });
         };
         
@@ -399,15 +400,15 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                     client.send(e.data);
                 };
                 ws.onclose = function() {
-                  client.disconnect(1001); // TODO: disconnect if active server is remote
+                  client.close(1001);
                   delete clients[socketId];
                 };
               }
               return function(data) {
                 try { var message = JSON.parse(data); } catch (e) { return; }
-                var server = message.server,
+                var instance = message.instance,
                     command = message.command;
-                if (server) return session && ws.send(data);
+                if (instance) return session && ws.send(data);
                 if (command == 'connect')
                   return state(user, client);
                 if (command == 'stop' || command == 'restart')
@@ -524,11 +525,12 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         if (ws) return;
         ws = true;
         o.xhr('http://169.254.169.254/latest/user-data', function(e) {
-          var connections, client, retries = 0,
-              user = '', token = '';
-          // get token, user from user-data
+          try { var key = JSON.parse(o.string.fromUTF8Buffer(decode(e.target.responseText))).key; }
+          catch (e) { return; }
+          var user = decodeURIComponent(decode(key.split('.')[0], true).split('/')[0]),
+              connections, client, retries = 0;
           var connect = function() {
-            ws = new WebSocket('ws://api.simpljs.com/connect?instance_token='+token);
+            ws = new WebSocket('ws://api.simpljs.com/connect?key='+key);
             ws.onopen = function() {
               connections = 0;
               client = {user: user, connection: ws};
@@ -549,7 +551,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
               if (command == 'stop' || command == 'restart')
                 stop(user, message.app, message.version);
               if (command == 'run' || command == 'restart')
-                run(user, message.app, message.version, token, true);
+                run(user, message.app, message.version, key, true);
             };
             ws.onclose = function() {
               delete clients[-1];
