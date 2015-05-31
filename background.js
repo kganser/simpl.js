@@ -2,20 +2,20 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
 
   var server, loader, lines, icons, workspace,
       db = o.database.open('simpl', {sessions: {}}),
-      key = crypto.getRandomValues(new Uint8Array(24)), // TODO: store in database
+      mac = o.crypto.hmac(crypto.getRandomValues(new Uint8Array(24))), // TODO: store in database
       encode = o.string.base64FromBuffer,
       decode = o.string.base64ToBuffer,
       utf8 = o.string.fromUTF8Buffer,
       apps = {}, logs = {}, clients = {};
   
   var signature = function(value) {
-    value = value || '';
-    if (typeof value == 'string') value = o.string.base64ToBuffer(value.split('.')[0], true);
-    return encode(o.crypto.hmac(key, value), true);
+    try {
+      if (typeof value == 'string') value = decode(value.split('.')[0], true);
+      return encode(mac(value), true);
+    } catch (e) {}
   };
   var token = function() {
-    var rand = new Uint8Array(24);
-    crypto.getRandomValues(rand);
+    var rand = crypto.getRandomValues(new Uint8Array(24));
     return encode(rand, true)+'.'+signature(rand);
   };
   var verify = function(signed) {
@@ -347,11 +347,11 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         if (request.path == '/auth')
           return authenticate(sid = request.cookie.sid, function(session) {
             var code = request.query.authorization_code;
-            if (!session || !code || signature(sid) != request.query.state) return response.error();
+            if (!session || !code || signature(sid) != request.query.state) return response.end(code ? session ? 'Bad state in request' : 'No session' : 'No authorization code', null, 400);
             api('token?authorization_code='+code+'&client_secret='+session.secret, null, function(status, data) {
-              if (status != 200) return response.error();
+              if (status != 200) return response.end('Could not get access token', null, 502);
               api('user', code = data.accessToken, function(status, data) {
-                if (status != 200) return response.error();
+                if (status != 200) return response.end('Could not get user info', null, 502);
                 db.put('sessions/'+sid, {
                   accessToken: code,
                   username: data.username,
@@ -505,12 +505,12 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     path = token && !headless ? '/login?token='+token : '';
     if (launcher.focus) {
       // TODO: use chrome.browser.openTab() to navigate in existing tab
-      if (port) {
-        var link = launcher.contentWindow.document.getElementById('link');
-        link.setAttribute('href', 'http://localhost:'+port+path);
-        return link.click();
-      }
-      return launcher.focus();
+      if (!port) return launcher.focus();
+      var link = launcher.contentWindow.document.getElementById('link');
+      link.setAttribute('href', 'http://localhost:'+port+path);
+      link.click();
+      link.setAttribute('href', 'http://localhost:'+port);
+      return;
     }
     launcher = true;
     chrome.app.window.create('simpl.html', {
@@ -526,10 +526,11 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         if (ws) return;
         ws = true;
         o.xhr('http://169.254.169.254/latest/user-data', function(e) {
-          try { var key = JSON.parse(utf8(decode(e.target.responseText.trim()))).key; }
-          catch (e) { return; }
-          var user = decodeURIComponent(utf8(decode(key.split('.')[0], true)).split('/')[0]),
-              connections, client, retries = 0;
+          try {
+            var key = JSON.parse(utf8(decode(e.target.responseText.trim()))).key,
+                user = decodeURIComponent(utf8(decode(key.split('.')[0], true)).split('/')[0]);
+          } catch (e) { return; }
+          var connections, client, retries = 0;
           var connect = function() {
             ws = new WebSocket('ws://api.simpljs.com/connect?key='+key);
             ws.onopen = function() {

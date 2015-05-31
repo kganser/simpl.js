@@ -355,7 +355,7 @@ simpl.add('app', function(o) {
             };
             window.onbeforeunload = function() { unload = true; };
           }},
-          {button: {children: 'Try Now', onclick: function() { connect(); }}}
+          {button: {children: 'Connect Now', onclick: function() { connect(); }}}
         ]}},
         {h2: 'Apps'},
         {div: {className: 'form', children: [
