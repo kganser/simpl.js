@@ -11,9 +11,10 @@ function(modules) {
     return encode(rand, true)+'.'+encode(mac(rand), true);
   };
   var verify = function(signed) {
-    if (typeof signed != 'string') return;
-    var parts = signed.split('.');
-    return encode(mac(decode(parts[0], true)), true) == parts[1] && signed;
+    try {
+      var parts = signed.split('.');
+      return encode(mac(decode(parts[0], true)), true) == parts[1] && signed;
+    } catch (e) {}
   };
   var pbkdf2 = function(password, salt) {
     return encode(modules.crypto.pbkdf2(utf8(password), salt));
