@@ -303,6 +303,7 @@ simpl.add('app', function(o) {
                       toggle(selected.name, selected.version, true, selected.panel == 'log' && !selected.entry.running ? 'code' : selected.panel);
                     }
                     appList.classList.remove('disabled');
+                    status();
                     break;
                   case 'error':
                     entry.running = false;
