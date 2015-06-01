@@ -273,7 +273,8 @@ simpl.add('app', function(o) {
                 switch (event) {
                   case 'connect':
                     for (var i = servers.firstChild; i && i.value.localeCompare(instance) < 0; i = i.nextSibling);
-                    servers.insertBefore(dom({option: {value: instance, children: message.name}}), i);
+                    if (i.value == instance) i.disabled = false;
+                    else servers.insertBefore(dom({option: {value: instance, children: message.name}}), i);
                     break;
                   case 'disconnect':
                     for (var i = servers.firstChild; i; i = i.nextSibling) {
