@@ -206,17 +206,16 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       o.http.serve({port: command.port}, function(request, response) {
         
         var match, sid;
-        var logout = function(sid) {
-          if (sid) return db.delete('sessions/'+sid).then(function() { logout(); });
+        var logout = function() {
           response.generic(303, {'Set-Cookie': 'sid=; Expires='+new Date().toUTCString(), Location: '/'});
         };
         var forward = function(path, fallback, callback, method, data, text) {
           sid = path == 'workspace' ? request.cookie.sid : request.query.sid;
           authenticate(sid, function(session, local) {
             if (local) return fallback(callback);
-            if (!session) return logout(sid);
+            if (!session) return logout();
             api(path, session.accessToken, function(status, data) {
-              if (status != 200) return logout(sid); // TODO: handle certain error statuses
+              if (status != 200) return logout(); // TODO: handle certain error statuses
               callback(data, {username: session.username, name: session.name, email: session.email});
             }, false, method, data, text);
           });
@@ -379,7 +378,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           });
         }
         if (request.path == '/logout')
-          return logout(verify(request.cookie.sid));
+          return logout();
         if (request.path == '/restore' && request.method == 'POST')
           return request.slurp(function(body) {
             var full = body.scope == 'full';
