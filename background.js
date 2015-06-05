@@ -511,7 +511,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       link.setAttribute('href', 'http://localhost:'+port+path);
       link.click();
       link.setAttribute('href', 'http://localhost:'+port);
-      return;
+      return path = '';
     }
     launcher = true;
     chrome.app.window.create('simpl.html', {
