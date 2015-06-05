@@ -6,7 +6,7 @@ simpl.add('app', function(o) {
       DOMTokenList.prototype.remove = function() { Array.prototype.forEach.call(arguments, rm.bind(this)); };
   }(document.createElement('div').classList, DOMTokenList.prototype.remove));
   
-  return function(apps, modules, user, body) {
+  return function(apps, modules, user, token, body) {
     Object.keys(apps).forEach(function(name) {
       apps[name].forEach(function(version, i, app) {
         app[i] = {minor: version, log: []};
@@ -30,13 +30,17 @@ simpl.add('app', function(o) {
           .setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#'+icon.id);
       };
     });
-    var url = function(app, name, version) {
-      if (!arguments.length && selected) {
-        app = selected.app;
-        name = selected.name;
-        version = selected.version;
+    var url = function(e, source) {
+      return (e.app ? '/apps/' : '/modules/')+encodeURIComponent(e.name)+(source ? '?source=' : '/')+e.version;
+    };
+    var request = function(path, options, callback) {
+      if (typeof options == 'function') {
+        callback = options;
+        options = {};
       }
-      return [app ? '/apps' : '/modules', encodeURIComponent(name), version].join('/');
+      if (token) path += (~path.indexOf('?') ? '&sid=' : '?sid=')+token;
+      options.responseType = 'json';
+      o.xhr(path, options, callback);
     };
     var logLine = function(entry) {
       var string = entry.message.join(', '),
@@ -68,6 +72,8 @@ simpl.add('app', function(o) {
           body.classList.remove(selected.app ? 'show-app' : 'show-module');
         }
         body.classList.add(app ? 'show-app' : 'show-module');
+        entry.tab.classList.add('selected');
+        selected = {name: name, version: version, app: app, entry: entry};
         if ('code' in entry) {
           code.swapDoc(entry.doc);
           config.update(entry.config || null);
@@ -83,7 +89,7 @@ simpl.add('app', function(o) {
           else docs(name, entry.code);
         } else if (!refresh) {
           entry.tab.classList.add(panel = 'loading');
-          o.xhr(url(app, name, version), {responseType: 'json'}, function(e) {
+          request(url(selected), function(e) {
             try {
               if (e.target.status != 200) throw 'error';
               var response = e.target.response;
@@ -109,8 +115,6 @@ simpl.add('app', function(o) {
               toggle(name, version, app, origPanel, ln, true);
           });
         }
-        entry.tab.classList.add('selected');
-        selected = {name: name, version: version, app: app, entry: entry};
       }
       var first = app ? entry.running ? 'log' : 'code' : 'docs',
           next = {loading: first, settings: first, code: 'settings', log: 'code', docs: 'code'}[selected.panel = panel = panel || first];
@@ -143,7 +147,7 @@ simpl.add('app', function(o) {
           JSON.stringify(entry.dependencies) == JSON.stringify(published.dependencies))
         return alert('No changes to publish');
       status('info', 'Publishing...');
-      o.xhr(upgrade ? (current.app ? '/apps/' : '/modules/')+encodeURIComponent(current.name)+'?source='+current.version : url(), {method: 'POST'}, function(e) {
+      request(url(current, upgrade), {method: 'POST'}, function(e) {
         if (e.target.status != 200)
           return status('failure', 'Error publishing new version');
         status('success', 'Published');
@@ -257,7 +261,7 @@ simpl.add('app', function(o) {
               if (socket) return send('connect');
               if (!window.WebSocket) return status('WebSockets are not supported in this browser.', 'fatal');
               clearInterval(timer);
-              socket = new WebSocket('ws://'+location.host+'/connect');
+              socket = new WebSocket('ws://'+location.host+'/connect'+(token ? '?sid='+token : ''));
               socket.onopen = function() {
                 retries = 0;
                 status();
@@ -462,7 +466,7 @@ simpl.add('app', function(o) {
             var entry = selected.entry,
                 code = entry.doc.getValue();
             status('info', 'Saving...');
-            o.xhr(url(), {method: 'PUT', data: code}, function(e) {
+            request(url(selected), {method: 'PUT', data: code}, function(e) {
               if (e.target.status != 200)
                 return status('failure', 'Error saving document');
               status('success', 'Saved');
@@ -485,7 +489,7 @@ simpl.add('app', function(o) {
               if (!confirm('Are you sure you want to delete this '+type+'?')) return;
               button.disabled = true;
               status('info', 'Deleting '+type+'...');
-              o.xhr(url(), {method: 'DELETE'}, function(e) {
+              request(url(current), {method: 'DELETE'}, function(e) {
                 button.disabled = false;
                 if (e.target.status != 200)
                   return status('failure', 'Error deleting '+type);
@@ -535,7 +539,7 @@ simpl.add('app', function(o) {
                       var entry = selected.entry;
                       search.value = '';
                       suggest();
-                      o.xhr(url()+'/dependencies', {method: 'POST', json: match}, function(e) {
+                      request(url(selected)+'/dependencies', {method: 'POST', json: match}, function(e) {
                         if (e.target.status != 200)
                           return status('failure', 'Error updating dependencies');
                         entry.dependencies[match.name] = match.version;
@@ -552,13 +556,13 @@ simpl.add('app', function(o) {
                 dom(Object.keys(values).map(function(name) {
                   var v = values[name]+1,
                       module = modules[name];
-                  if (v < 1 && module[0] && module[0].minor) v--;
+                  if (v < 1 && module && module[0] && module[0].minor) v--;
                   return {li: {className: 'module', children: [
                     {button: {className: 'delete', title: 'Remove', children: '×', onclick: function() {
                       var button = this,
                           entry = selected.entry;
                       button.disabled = true;
-                      o.xhr(url()+'/dependencies/'+encodeURIComponent(name), {method: 'DELETE'}, function(e) {
+                      request(url(selected)+'/dependencies/'+encodeURIComponent(name), {method: 'DELETE'}, function(e) {
                         button.disabled = false;
                         if (e.target.status != 200)
                           return status('failure', 'Error updating dependencies');
@@ -587,7 +591,7 @@ simpl.add('app', function(o) {
                   else if (typeof key == 'number') config.splice(key, 1);
                   else delete config[key];
                 });
-                o.xhr(url()+'/config', {method: 'PUT', json: entry.config}, function(e) {
+                request(url(selected)+'/config', {method: 'PUT', json: entry.config}, function(e) {
                   if (e.target.status != 200)
                     status('failure', 'Error updating configuration');
                 });

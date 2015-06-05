@@ -211,7 +211,8 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           response.generic(303, {'Set-Cookie': 'sid=; Expires='+new Date().toUTCString(), Location: '/'});
         };
         var forward = function(path, fallback, callback, method, data, text) {
-          authenticate(request.cookie.sid, function(session, local) {
+          sid = path == 'workspace' ? request.cookie.sid : request.query.sid;
+          authenticate(sid, function(session, local) {
             if (local) return fallback(callback);
             if (!session) return logout(sid);
             api(path, session.accessToken, function(status, data) {
@@ -387,7 +388,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             }, full ? 'both' : 'modules', !full);
           }, 'url');
         if (request.path == '/connect')
-          return authenticate(request.cookie.sid, function(session, local) {
+          return authenticate(request.query.sid, function(session, local) {
             if (!session && !local) return response.generic(401);
             var socketId = response.socket.socketId,
                 user = session ? session.username : '',
@@ -466,10 +467,10 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                   {script: {src: '/jsonv.js'}},
                   {script: {src: '/md5.js'}},
                   {script: {src: '/app.js'}},
-                  {script: function(apps, modules, user) {
-                    if (!apps) return [data.apps, data.modules, session];
+                  {script: function(apps, modules, user, token) {
+                    if (!apps) return [data.apps, data.modules, session, sid || null];
                     simpl.use({app: 0}, function(o) {
-                      o.app(apps, modules, user, document.body);
+                      o.app(apps, modules, user, token, document.body);
                     });
                   }}
                 ]}
