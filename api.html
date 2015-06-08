@@ -1,0 +1,53 @@
+---
+layout: default
+title: API
+---
+<ol class="toc">
+  <li><a href="#authorization">Authorization</a></li>
+  <li><a href="#account">Account Info</a></li>
+  <li><a href="#apps">Apps &amp; Modules</a></li>
+  <li><a href="#versioning">Versioning</a></li>
+  <li><a href="#dependencies">Dependencies</a></li>
+  <li><a href="#configuration">Configuration</a></li>
+  <li><a href="#servers">Servers</a></li>
+</ol>
+<h1>API</h1>
+<p>The Simpl.js API is accessible to registered client apps via HTTP/1.1 at <code>https://api.simpljs.com</code>.</p>
+<p><a class="button green" href="/client"><svg><use xlink:href="#icon-plug"></use></svg>Register a Client App</a></p>
+<h2 id="authorization">Authorization</h2>
+<pre><span class="method">Redirect</span> https://simpljs.com/authorize?client_id=<em>:id</em>&amp;redirect_uri=<em>:uri</em>&amp;state=<em>:state</em></pre>
+<pre><span class="method get">GET</span> /token?authorization_code=<em>:code</em>&amp;client_secret=<em>:secret</em></pre>
+<p>Authorization via OAuth2 begins by redirecting the user to the authorization page using a registered client app's <code>client_id</code>. After authorizing your app, the user is redirected to <code>redirect_uri</code> with <code>authorization_code</code> and <code>state</code> as query string parameters.</p>
+<p>The <code>authorization_code</code> is then exchanged for an access token, which must be included in all API requests as an <code>Authorization: Bearer</code> request header.</p>
+<h2 id="account">Account Info</h2>
+<pre><span class="method get">GET</span> /user</pre>
+<pre><span class="method get">GET</span> /workspace</pre>
+<h2 id="apps">Apps &amp; Modules</h2>
+<pre><span class="method get">GET</span> /apps/<em>:name</em>/<em>:version</em></pre>
+<pre><span class="method get">GET</span> /modules/<em>:name</em>/<em>:version</em></pre>
+<pre><span class="method put">PUT</span> /apps/<em>:name</em>/<em>:version</em></pre>
+<pre><span class="method put">PUT</span> /modules/<em>:name</em>/<em>:version</em></pre>
+<pre><span class="method delete">DELETE</span> /apps/<em>:name</em></pre>
+<pre><span class="method delete">DELETE</span> /modules/<em>:name</em></pre>
+<p><code>PUT</code> to an app or module saves over the working copy, but does not modify published versions.</p>
+<p>Only unpublished apps and modules can be deleted.</p>
+<h2 id="versioning">Versioning</h2>
+<pre><span class="method post">POST</span> /apps/<em>:name</em>?source=<em>:version</em></pre>
+<pre><span class="method post">POST</span> /modules/<em>:name</em>?source=<em>:version</em></pre>
+<pre><span class="method post">POST</span> /apps/<em>:name</em>/<em>:version</em></pre>
+<pre><span class="method post">POST</span> /modules/<em>:name</em>/<em>:version</em></pre>
+<p><code>POST</code> to an unversioned app or module resource publishes an upgraded major version from the working copy in the <code>source</code> version.</p>
+<p><code>POST</code> to a versioned app or module resource publishes an upgraded minor version using the working copy of the same major version.</p>
+<h2 id="dependencies">Dependencies</h2>
+<pre><span class="method post">POST</span> /apps/<em>:name</em>/<em>:version</em>/dependencies</pre>
+<pre><span class="method post">POST</span> /modules/<em>:name</em>/<em>:version</em>/dependencies</pre>
+<pre><span class="method delete">DELETE</span> /apps/<em>:name</em>/<em>:version</em>/dependencies/<em>:module</em></pre>
+<pre><span class="method delete">DELETE</span> /modules/<em>:name</em>/<em>:version</em>/dependencies/<em>:module</em></pre>
+<h2 id="configuration">Configuration</h2>
+<pre><span class="method put">PUT</span> /apps/<em>:name</em>/<em>:version</em>/config</pre>
+<pre><span class="method put">PUT</span> /modules/<em>:name</em>/<em>:version</em>/config</pre>
+<h2 id="servers">Servers</h2>
+<pre><span class="method get">GET</span> /servers</pre>
+<pre><span class="method post">POST</span> /servers/<em>:id</em></pre>
+<pre><span class="method get">GET</span> <span class="method">Stream</span> /servers/<em>:id</em>/activity?access_token=<em>:token</em></pre>
+<p>A server's activity stream is available in <code>text/event-stream</code> format. Its access token is provided as a query string parameter instead of an <code>Authorization</code> header.</p>
