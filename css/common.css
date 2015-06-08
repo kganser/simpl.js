@@ -1,0 +1,450 @@
+body {
+  margin: 0;
+  font: 13px arial, sans-serif;
+  -webkit-text-size-adjust: none;
+}
+h1, h2 {
+  font: normal 28px "Segoe UI", ArialMT, sans-serif;
+  color: #999;
+}
+h2 {
+  color: black;
+  font-weight: 500;
+  font-size: 20px;
+}
+p {
+  line-height: 1.5em;
+}
+svg {
+  width: 15px;
+  height: 15px;
+  margin-right: 8px;
+  vertical-align: bottom;
+  fill: currentColor;
+}
+ul, ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+button, input, textarea {
+  font: 13px arial, sans-serif;
+  border-radius: 0;
+  border: none;
+  padding: 3px;
+  margin-top: -3px;
+}
+textarea {
+  vertical-align: bottom;
+}
+button, input[type=submit] {
+  padding: 5px 10px;
+  background: #666;
+  color: white;
+  cursor: pointer;
+  -webkit-appearance: none;
+}
+button[type=submit], input[type=submit] {
+  margin-top: 10px;
+}
+button[disabled], input[disabled] {
+  cursor: auto;
+}
+#icons {
+  display: none;
+}
+.success, .error {
+  color: white;
+  padding: 5px 8px;
+  margin-bottom: 10px;
+  text-align: left;
+}
+.success a, .error a {
+  color: white;
+}
+a.button {
+  display: inline-block;
+  padding: 5px 8px;
+  line-height: 15px;
+  text-align: center;
+  text-decoration: none;
+  color: #666;
+  background: #f7f7f7;
+}
+button:hover, a.button:hover {
+  color: white;
+  background: #666;
+}
+a.button.red:hover, button.red:hover, .error {
+  color: white;
+  background: #c33;
+}
+a.button.green:hover, button.green:hover, .success {
+  color: white;
+  background: #3c3;
+}
+header, main, .column {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 10px;
+}
+header {
+  margin-bottom: 20px;
+  padding: 20px 10px 10px;
+}
+header nav {
+  margin-bottom: 10px;
+}
+header ul {
+  margin-left: 22px;
+  display: inline-block;
+  vertical-align: top;
+}
+header li {
+  display: inline-block;
+}
+header li a {
+  display: block;
+  padding: 10px 15px;
+  font-size: 15px;
+  color: #999;
+  text-decoration: none;
+}
+header li a:hover {
+  color: black;
+}
+.logo {
+  display: inline-block;
+  vertical-align: top;
+  height: 32px;
+  padding-left: 37px;
+  background: url(/img/icon.png) left/32px no-repeat;
+  font: 500 24px/32px "Segoe UI", ArialMT, sans-serif;
+  color: black;
+  text-decoration: none;
+}
+.account {
+  float: right;
+  text-align: right;
+  margin: 5px 0 2px 0;
+}
+.account .button {
+  margin-left: 5px;
+}
+#user {
+  position: relative;
+  color: black;
+  padding: 5px 2px 5px 37px;
+  background-color: transparent;
+  background-position: left;
+  background-repeat: no-repeat;
+  background-size: 31px;
+}
+#user svg {
+  visibility: hidden;
+  position: relative;
+  margin: 0 14px 0 -29px;
+  fill: white;
+}
+#user:hover svg {
+  visibility: visible;
+}
+#user:hover:before {
+  content: "";
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 31px;
+  height: 100%;
+  background: #33c;
+}
+#page-home main {
+  margin-top: -20px;
+  max-width: none;
+  font-size: 16px;
+  padding: 0;
+}
+#page-home h1 {
+  color: black;
+  font-size: 42px;
+  font-weight: 500;
+  margin: 0;
+}
+#page-home h2 {
+  font-size: 24px;
+}
+.stage {
+  background: #f7f7f7;
+  padding: 0;
+  position: relative;
+}
+.stage div {
+  font-size: 20px;
+  margin: 0 auto;
+  padding: 30px 20px;
+}
+.stage p {
+  color: #666;
+}
+#screens {
+  background: rgba(100, 100, 100, .9);
+  list-style: none;
+  padding: 5px 0;
+  margin: 0;
+  text-align: center;
+  overflow: hidden;
+}
+#screens li {
+  display: inline-block;
+  vertical-align: bottom;
+  margin: 5px;
+}
+#screens a {
+  display: block;
+  width: 150px;
+  height: 100px;
+  transition: all .5s;
+}
+#screen-code {
+  background: url(/img/code.png) -227px -100px;
+}
+#screen-docs {
+  background: url(/img/docs.png) -8px -81px;
+}
+#screen-settings {
+  background: url(/img/settings.png) -122px -240px;
+}
+#screen-logs {
+  background: url(/img/logs.png) -8px -81px;
+}
+.features {
+  padding: 50px 10px;
+}
+#page-login main {
+  text-align: center;
+  padding: 0;
+}
+#page-login p .button {
+  margin: 2px 5px;
+  padding: 7px 10px;
+  color: white;
+}
+#page-login em {
+  font: italic 16px georgia, serif;
+}
+#page-login form {
+  margin: 0 20px 20px;
+}
+#github {
+  background: black;
+}
+#facebook {
+  background: #3b5998;
+}
+#twitter {
+  background: #55acee;
+}
+#google {
+  background: #d73d32;
+}
+form {
+  display: inline-block;
+  vertical-align: top;
+  text-align: left;
+  background: #f7f7f7;
+  margin: 0 0 20px 0;
+  padding: 20px 50px 20px 120px;
+}
+label, form div {
+  display: block;
+  margin-bottom: 5px;
+  padding-top: 3px;
+}
+label label {
+  display: inline;
+  margin: 0;
+  padding: 0;
+}
+label span, form div label {
+  display: inline-block;
+  vertical-align: top;
+  text-align: right;
+  margin: 0 10px 0 -100px;
+  padding: 0;
+  width: 90px;
+}
+#exp-month {
+  margin-right: 5px;
+  width: 2em;
+}
+form p {
+  margin: 0 -30px 0 -100px;
+}
+form .error {
+  margin: -20px -50px 20px -120px;
+  display: none;
+}
+.g-recaptcha {
+  margin: 15px -30px 0 -100px;
+}
+.servers {
+  background: transparent;
+  margin: 0;
+  padding: 0;
+}
+.servers button {
+  color: #666;
+  background: #f7f7f7;
+  margin: 0;
+}
+.servers button[name=add] {
+  margin-top: 5px;
+}
+.servers li button, .servers li a.button {
+  margin: 0 0 5px 5px;
+}
+#workspace {
+  font-size: 15px;
+  line-height: 22px;
+  padding: 10px 20px 10px 75px;
+  margin: 0 30px 20px 0;
+  text-align: left;
+}
+#workspace svg {
+  margin: 4px 15px 0 -55px;
+  width: 40px;
+  height: 40px;
+  float: left;
+}
+.method {
+  padding: 2px 4px;
+  background: #666;
+  color: white;
+}
+.method.get {
+  background: #3c3;
+}
+.method.delete {
+  background: #c33;
+}
+.method.put {
+  background: #33c;
+}
+.method.post {
+  background: #a3a;
+}
+pre {
+  margin: 8px 0;
+}
+pre em, code {
+  padding: 0 2px;
+  background: #f7f7f7;
+}
+pre em {
+  margin: 0 2px;
+}
+.toc {
+  background: #f7f7f7;
+  float: right;
+  position: relative;
+  width: 150px;
+}
+.toc a {
+  display: block;
+  padding: 3px 20px;
+  color: #666;
+  text-decoration: none;
+}
+.toc li:first-child a {
+  padding-top: 10px;
+}
+.toc li:last-child a {
+  padding-bottom: 10px;
+}
+.toc a:hover {
+  color: black;
+}
+#pricing {
+  border-spacing: 5px;
+}
+#pricing th {
+  font: 500 22px "Segoe UI", ArialMT, sans-serif;
+  padding: 25px 0;
+  background: #f7f7f7;
+  position: relative;
+  overflow: hidden;
+}
+#pricing th span {
+  position: relative;
+}
+#pricing th svg {
+  width: 80px;
+  height: 80px;
+  position: absolute;
+  top: -10px;
+  left: 5px;
+  fill: #f0f0f0;
+}
+#pricing td {
+  width: 30%;
+  text-align: center;
+}
+#pricing .price td {
+  font-size: 15px;
+  padding: 5px 0;
+}
+#pricing td:first-child {
+  text-align: left;
+}
+#pricing td svg {
+  width: 40px;
+  height: 40px;
+  fill: #3c3;
+}
+#page-account h2 {
+  display: inline-block;
+  vertical-align: top;
+  width: 120px;
+  margin: 0 20px 10px 0;
+}
+#page-account form {
+  min-width: 250px
+}
+#accounts button {
+  margin-top: -5px;
+}
+#cancel {
+  background: #c33;
+  color: white;
+  margin-left: 10px;
+}
+@media only screen and (min-width: 800px) {
+  .stage div {
+    height: 340px;
+    max-width: 300px;
+    padding: 80px 30px 0 560px;
+    background: url(/img/code-large.png) no-repeat left 40px/520px;
+  }
+  #screens {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    white-space: nowrap;
+  }
+  #screens a:hover {
+    height: 400px;
+    width: 640px;
+    box-shadow: 0 0 15px rgba(0, 0, 0, .3);
+    background-position: top left;
+  }
+  .features {
+    text-align: center;
+  }
+  .features div {
+    display: inline-block;
+    width: 30%;
+    margin: 0 1.5%;
+    vertical-align: top;
+  }
+}
