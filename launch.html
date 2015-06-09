@@ -1,0 +1,12 @@
+---
+layout: default
+---
+<p id="message">Please install <a id="link" href="https://chrome.google.com/webstore/detail/simpljs/kdkheiopehanfbajkkopimfppjmclgbp">Simpl.js for Chrome</a>.</p>
+<script>
+  if (!window.chrome || !chrome.app)
+    return document.getElementById('message').innerHTML = 'You must be running Google Chrome to launch your Simpl.js Console. <a href="http://www.google.com/chrome/">Download</a> or open Chrome and navigate to <code>http://simpljs.com/launch</code>.';
+  document.getElementById('link').onclick = function(e) {
+    e.preventDefault();
+    chrome.webstore.install(undefined, function() { location.href = '/launch'; });
+  };
+</script>

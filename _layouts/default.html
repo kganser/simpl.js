@@ -1,7 +1,7 @@
 <!doctype html>
 <html>
   <head>
-    <title>{{ page.title }} - Simpl.js</title>
+    <title>{% if page.title %}{{ page.title }} - {% endif %}Simpl.js</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <meta name="description" content="Simpl.js lets you write and run full-stack javascript apps in your browser.">
@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="/css/common.css">
     <link rel="chrome-webstore-item" href="https://chrome.google.com/webstore/detail/kdkheiopehanfbajkkopimfppjmclgbp">
   </head>
-  <body>
+  <body{% if page.id %} id="page-{{ page.id }}"{% endif %}>
     <svg id="icons">
       <symbol id="icon-left" viewBox="0 0 20 20"><path d="M14,5v10l-9-5L14,5z"></path></symbol>
       <symbol id="icon-right" viewBox="0 0 20 20"><path d="M15,10l-9,5V5L15,10z"></path></symbol>
