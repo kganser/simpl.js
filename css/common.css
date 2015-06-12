@@ -463,10 +463,10 @@ pre em {
 }
 @media only screen and (min-width: 800px) {
   .stage div {
-    height: 340px;
-    max-width: 300px;
-    padding: 80px 30px 0 560px;
-    background: url(/img/code-large.png) no-repeat left 40px/520px;
+    height: 360px;
+    max-width: 260px;
+    padding: 100px 90px 0 650px;
+    background: url(/img/code-large.png) no-repeat left 40px/600px;
   }
   #screens {
     position: absolute;
@@ -477,6 +477,7 @@ pre em {
   #screens a:hover {
     height: 400px;
     width: 640px;
+    margin-top: 40px;
     box-shadow: 0 0 15px rgba(0, 0, 0, .3);
     background-position: top left;
   }
