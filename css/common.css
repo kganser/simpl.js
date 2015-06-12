@@ -429,6 +429,9 @@ pre em {
   height: 40px;
   fill: #3c3;
 }
+#pricing p {
+  margin: 0;
+}
 #page-account h2 {
   display: inline-block;
   vertical-align: top;
