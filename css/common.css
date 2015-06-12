@@ -3,17 +3,26 @@ body {
   font: 13px arial, sans-serif;
   -webkit-text-size-adjust: none;
 }
-h1, h2 {
-  font: normal 28px "Segoe UI", ArialMT, sans-serif;
+h1, h2, h3 {
+  font: 500 28px "Segoe UI", ArialMT, sans-serif;
+}
+h1 {
   color: #999;
+  font-weight: normal;
 }
 h2 {
-  color: black;
-  font-weight: 500;
   font-size: 20px;
 }
+h3 {
+  font-size: 17px;
+}
 p {
+  font-size: 14px;
   line-height: 1.5em;
+}
+a {
+  text-decoration: none;
+  color: black;
 }
 svg {
   width: 15px;
@@ -65,6 +74,7 @@ button[disabled], input[disabled] {
 a.button {
   display: inline-block;
   padding: 5px 8px;
+  font-size: 13px;
   line-height: 15px;
   text-align: center;
   text-decoration: none;
@@ -84,6 +94,7 @@ a.button.green:hover, button.green:hover, .success {
   background: #3c3;
 }
 header, main, .column {
+  display: block;
   max-width: 900px;
   margin: 0 auto;
   padding: 0 10px;
@@ -162,7 +173,6 @@ header li a:hover {
 #page-home main {
   margin-top: -20px;
   max-width: none;
-  font-size: 16px;
   padding: 0;
 }
 #page-home h1 {
@@ -180,12 +190,15 @@ header li a:hover {
   position: relative;
 }
 .stage div {
-  font-size: 20px;
   margin: 0 auto;
   padding: 30px 20px;
 }
 .stage p {
+  font-size: 20px;
   color: #666;
+}
+.features p {
+  font-size: 16px;
 }
 #screens {
   background: rgba(100, 100, 100, .9);
@@ -193,6 +206,7 @@ header li a:hover {
   padding: 5px 0;
   margin: 0;
   text-align: center;
+  font-size: 0;
   overflow: hidden;
 }
 #screens li {
@@ -317,29 +331,20 @@ form .error {
   height: 40px;
   float: left;
 }
-.method {
-  padding: 2px 4px;
-  background: #666;
-  color: white;
-}
-.method.get {
-  background: #3c3;
-}
-.method.delete {
-  background: #c33;
-}
-.method.put {
-  background: #33c;
-}
-.method.post {
-  background: #a3a;
-}
 pre {
   margin: 8px 0;
+  padding: 2px 5px;
+  background: #f7f7f7;
+  border: solid 1px #ddd;
+  overflow: auto;
 }
 pre em, code {
-  padding: 0 2px;
+  padding: 1px 2px;
+  border: solid 1px #ddd;
   background: #f7f7f7;
+}
+code {
+  font-size: 13px;
 }
 pre em {
   margin: 0 2px;
@@ -364,6 +369,28 @@ pre em {
 }
 .toc a:hover {
   color: black;
+}
+.endpoint {
+  border: none;
+  background: transparent;
+  padding-left: 0;
+}
+.endpoint span {
+  color: white;
+  background: #666;
+  padding: 2px 4px;
+}
+.endpoint .get {
+  background: #3c3;
+}
+.endpoint .delete {
+  background: #c33;
+}
+.endpoint .put {
+  background: #33c;
+}
+.endpoint .post {
+  background: #a3a;
 }
 #pricing {
   border-spacing: 5px;
@@ -418,6 +445,21 @@ pre em {
   background: #c33;
   color: white;
   margin-left: 10px;
+}
+.byline {
+  margin-top: -12px;
+  font-size: 12px;
+  color: #33c;
+}
+.list {
+  list-style: disc;
+  margin: 1em 0;
+  padding-left: 2em;
+  font-size: 14px;
+  line-height: 1.5em;
+}
+.list li {
+  margin: .5em 0;
 }
 @media only screen and (min-width: 800px) {
   .stage div {

@@ -1,0 +1,73 @@
+---
+layout: default
+title: Isomorphic Javascript in Simpl.js
+---
+<h1>Blog</h1>
+<h2>Isomorphic Javascript in Simpl.js</h2>
+<div class="byline">posted June 9, 2015, by Klaus</div>
+<p>Isomorphic javascript is code that runs on both the server and the client in a web application. Because it is reusable, isomorphic code can greatly reduce you application's code footprint, and the complexity and maintenance costs associated with it. Simpl.js was designed to realize the potential of isomorphic javascript without introducing unnecessary abstractions. It does so by leveraging features of the modern web platform, and through the use of markup generation techniques discussed here.</p>
+<h3>Web Platform</h3>
+<p>Simpl.js is built on Chromium, so its APIs prefer the web platform over OS-level abstractions. Simpl.js apps run in WebWorkers rather than processes. Data is stored in indexedDB or cloud storage rather than the filesystem directly. Simpl.js has no shell; user and machine interfaces operate over sockets and web protocols. All of this means that Simpl.js levels the playing field between the server and client runtime environments, creating the ideal conditions for isomorphic javascript, and seamlessly evolving with the web.</p>
+<h3>Javascript in HTML</h3>
+<p>The core <code>html</code> module included with Simpl.js addresses some of the practical considerations for bridging the gap between server and client code in web apps. Here is a simple web app built using this module:</p>
+<pre>
+modules.http.serve({port: 1080}, function(request, response) {
+  var data = 'hello world!';
+  response.end(modules.html.markup([
+    {html: [
+      {head: [
+        {title: 'My Isomorphic App'}
+      ]},
+      {body: [
+        {script: function(message) {
+          if (!message) return data;
+          alert(message);
+        }}
+      ]}
+    ]}
+  ]));
+});
+</pre>
+<p>Below is the generated markup (formatted for clarity):</p>
+<pre>
+&lt;html>
+  &lt;head>
+    &lt;title>My Isomorphic App&lt;/title>
+  &lt;/head>
+  &lt;body>
+    &lt;script>
+      (function(message) {
+        if (!message) return data;
+        alert(message);
+      }("hello world!"));
+    &lt;/script>
+  &lt;/body>
+&lt;/html>
+</pre>
+<p>When <code>html.markup</code> encounters a function in the input structure that accepts arguments, it calls it (server-side) with no arguments. Any data returned by the call is JSON-serialized and printed as arguments to a self-executing version of the same function, stringified, for the client web page. This technique keeps your code clean and declarative while relaying data from server to client javascript as needed.</p>
+<h3>Isomorphic Javascript Modules</h3>
+<p>The Simpl.js module loader, along with several core modules, are designed to work on a web page as well as in a Simpl.js WebWorker. To include them or any of your own modules, simply proxy them through your server from the Simpl.js web interface:</p>
+<pre>
+modules.http.serve({port: 1080}, function(request, response) {
+  switch (request.path) {
+    case '/':
+      return response.end(modules.html.markup([
+        {script: {src: '/simpl.js'}},
+        {script: {src: '/mymodule.js'}}
+        {script: function() {
+          simpl.use({mymodule: 0}, function(modules) {
+            modules.mymodule.doSomething();
+          });
+        }}
+      ]));
+    case '/simpl.js':
+    case '/mymodule.js':
+      return modules.xhr('http://localhost:8000'+request.path, function(e) {
+        response.end(e.target.responseText, 'js');
+      });
+    default:
+      return response.generic(404);
+  }
+});
+</pre>
+<p>Simpl.js modules are served for use in web pages at <code>/<em>name</em>.<em>version</em>.js</code>, where <code><em>name</em></code> is the URL-encoded module name and <code><em>version</em></code> is the published major version number (at its latest minor version), or simply <code>/<em>name</em>.js</code> for the current working copy. Call <code>simple.use</code> to generate the <code>modules</code> object with instances of the modules you've imported.</p>

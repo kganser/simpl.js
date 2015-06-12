@@ -1,0 +1,29 @@
+---
+layout: default
+title: Hosting Your App's Static Content on GitHub
+---
+<h1>Blog</h1>
+<h2>Hosting Your App's Static Content on GitHub</h2>
+<div class="byline">posted June 11, 2015, by Klaus</div>
+<p>Simpl.js is designed for single-document javascript applications and modules. While this is all you need to create rich applications of any size using modern web APIs, you'll likely be looking for a cleaner way to incorporate static content into your apps. Whether you link to css, js, images, and other static assets, or proxy them through your Simpl.js application, they will need to live on some file server in the cloud.</p>
+<p>For most applications, GitHub is a great place to host static assets. Here are some of the benefits:</p>
+<ul class="list">
+  <li><strong>Free Hosting</strong> - GitHub offers free, reliable hosting for public repositories. Even if your app itself needs to be private, your static assets likely don't.</li>
+  <li><strong>Version Controlled</strong> - Already a good development practice, version control for static content helps in the deployment of web applications. GitHub serves all files in your repository's history via versioned URLs, making it easy to implement far-future caching, and to upgrade your app in lock-step with its static assets.</li>
+  <li><strong>Static Site Generator</strong> - GitHub can automatically compose documents from templates or generate full static sites as necessary to supplement or back up your Simpl.js web application.</li>
+</ul>
+<p>Setting all of this up is relatively straightforward. Here is one possible configuration:</p>
+<p>This configuration proxies static content rather than linking directly to it on GitHub. Proxying allows full control over the URL and headers delivered with the content, which is necessary to override GitHub's cache-control and content-type headers, and because certain files may need to be served from the same domain. To proxy static content requests, use something like the following code inside your request callback:</p>
+<pre>
+if (/^\/(css\/|js\/|img\/|favicon.ico$)/.test(request.path)) {
+  return modules.xhr(config.staticRoot+request.path, {responseType: 'arraybuffer'}, function(e) {
+    if (e.target.status != 200)
+      return response.generic(404);
+    response.end(e.target.response, (request.path.match(/\.([^.]*)$/) || [])[1]);
+  });
+}
+</pre>
+<p>In development, <code>staticRoot</code> (e.g., <code>http://localhost/repo</code>) would point to working content from a local HTTP server (e.g. nginx). Make sure to configure your file server to add a <code>Cache-Control: no-cache</code> header, since Chromium aggressively caches certain files without it. When it's time to release, simply push your static files to GitHub and set <code>staticRoot</code> to the new commit URL path (e.g., <code>https://raw.githubusercontent.com/me/repo/fc973b2</code>) before restarting your app in Simpl.js.</p>
+<p>At last check, GitHub cached versioned files for 5 minutes:</p>
+<pre>Cache-Control: max-age=300</pre>
+<p>If you want a far-future expires header, you can specify it in the call to <code>response.end</code> above. You can also configure a reverse proxy to enforce the cache between your users and your Simpl.js server, particularly if you're planning for high traffic.</p>
