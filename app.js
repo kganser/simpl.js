@@ -522,7 +522,7 @@ simpl.add('app', function(o) {
                     if (~name.indexOf(value) && (selected.app || name != selected.name))
                       modules[name].forEach(function(version, i) {
                         results.push({name: name, version: -i}); // current
-                        if (version.minor) results.push({name: name, version: i}); // published
+                        if (version.minor) results.push({name: name, version: i+1}); // published
                       });
                   });
                   suggest(results);
