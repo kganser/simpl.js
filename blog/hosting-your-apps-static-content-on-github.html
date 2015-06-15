@@ -13,6 +13,7 @@ title: Hosting Your App's Static Content on GitHub
   <li><strong>Static Site Generator</strong> - GitHub can automatically compose documents from templates or generate full static sites as necessary to supplement or back up your Simpl.js web application.</li>
 </ul>
 <p>Setting all of this up is relatively straightforward. Here is one possible configuration:</p>
+<p><img src="/img/static-content.png"></p>
 <p>This configuration proxies static content rather than linking directly to it on GitHub. Proxying allows full control over the URL and headers delivered with the content, which is necessary to override GitHub's cache-control and content-type headers, and because certain files may need to be served from the same domain. To proxy static content requests, use something like the following code inside your request callback:</p>
 <pre>
 if (/^\/(css\/|js\/|img\/|favicon.ico$)/.test(request.path)) {
