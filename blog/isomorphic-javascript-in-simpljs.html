@@ -53,7 +53,7 @@ modules.http.serve({port: 1080}, function(request, response) {
     case '/':
       return response.end(modules.html.markup([
         {script: {src: '/simpl.js'}},
-        {script: {src: '/mymodule.js'}},
+        {script: {src: '/mymodule.1.js'}},
         {script: function() {
           simpl.use({mymodule: 0}, function(modules) {
             modules.mymodule.doSomething();
@@ -61,7 +61,7 @@ modules.http.serve({port: 1080}, function(request, response) {
         }}
       ]));
     case '/simpl.js':
-    case '/mymodule.js':
+    case '/mymodule.1.js':
       return modules.xhr('http://localhost:8000'+request.path, function(e) {
         response.end(e.target.responseText, 'js');
       });
