@@ -139,9 +139,9 @@ simpl.add('app', function(o) {
           published = entry.published;
       if (!published || entry.dirty)
         return alert('Please save your code before publishing. Use Ctrl-s in the code editor.');
-      published = published.slice(-1).pop();
       if (Object.keys(entry.dependencies).some(function(name) { return entry.dependencies[name] < 1; }))
         return alert('All dependencies must be published module versions');
+      published = published.slice(-1).pop();
       if (published && entry.code == published.code &&
           JSON.stringify(entry.config) == JSON.stringify(published.config) &&
           JSON.stringify(entry.dependencies) == JSON.stringify(published.dependencies))
@@ -376,7 +376,7 @@ simpl.add('app', function(o) {
               alert(name ? 'App name taken' : 'Please enter app name');
             } else {
               apps[name] = [{minor: 0, code: boilerplate, config: {}, dependencies: {}, doc: CodeMirror.Doc(boilerplate, {name: 'javascript'}), log: []}];
-              dom(li(name, 1, null, true), appList);
+              dom(li(name, 1, null, true), appList).className = 'changed';
               toggle(name, 1, true);
               code.setCursor(1, 2);
               code.focus();
@@ -405,7 +405,7 @@ simpl.add('app', function(o) {
               alert(name ? 'Module name taken' : 'Please enter module name');
             } else {
               modules[name] = [{minor: 0, code: boilerplate, dependencies: {}, doc: CodeMirror.Doc(boilerplate, {name: 'javascript'})}];
-              dom(li(name, 1), moduleList);
+              dom(li(name, 1), moduleList).className = 'changed';
               toggle(name, 1, false, 'code');
               code.setCursor(1, 2);
               code.focus();
@@ -472,6 +472,7 @@ simpl.add('app', function(o) {
               status('success', 'Saved');
               entry.tab.classList.remove('changed');
               entry.code = code;
+              entry.dirty = false;
               if (!entry.published) entry.published = [];
               if (selected && !selected.app && selected.entry == entry)
                 docs(selected.name, entry.code);
