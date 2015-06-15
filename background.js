@@ -221,10 +221,11 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           });
         };
         
-        if (match = request.path.match(/^\/([^\/]*)\.(\d+)\.js$/))
+        if (match = request.path.match(/^\/([^\/]*)\.(\d+)(\.current)?\.js$/))
           return db.get('modules/'+match[1]+'/versions/'+(match[2]-1)).then(function(module) {
-            if (!module) return response.generic(404);
-            response.end(wrap(decodeURIComponent(match[1]), module.code, match[2], module.dependencies), 'js');
+            if (module && !match[3]) module = module.published.pop();
+            if (module) return response.end(wrap(decodeURIComponent(match[1]), module.code, match[2], module.dependencies), 'js');
+            response.generic(404);
           });
         if (/^\/(apps|modules)\/[^\/]*(\/\d+(\/|$)|$)/.test(request.path)) {
           var uri = request.path.substr(1),
