@@ -7,7 +7,7 @@ title: Isomorphic Javascript in Simpl.js
 <div class="byline">posted June 9, 2015, by Klaus</div>
 <p>Isomorphic javascript is code that runs on both the server and the client in a web application. Because it is reusable, isomorphic code can greatly reduce you application's code footprint, and the complexity and maintenance costs associated with it. Simpl.js was designed to realize the potential of isomorphic javascript without introducing unnecessary abstractions. It does so by leveraging features of the modern web platform, and through the use of markup generation techniques discussed here.</p>
 <h3>Web Platform</h3>
-<p>Simpl.js is built on Chromium, so its APIs prefer the web platform over OS-level abstractions. Simpl.js apps run in WebWorkers rather than processes. Data is stored in indexedDB or cloud storage rather than the filesystem directly. Simpl.js has no shell; user and machine interfaces operate over sockets and web protocols. All of this means that Simpl.js levels the playing field between the server and client runtime environments, creating the ideal conditions for isomorphic javascript, and seamlessly evolving with the web.</p>
+<p>Simpl.js is built on Chromium, so its APIs prefer the web platform over OS-level abstractions. Simpl.js apps run as WebWorkers rather than processes. Their data is stored using indexedDB or cloud storage APIs rather than the filesystem directly. Simpl.js has no shell; user and machine interfaces operate over sockets and web protocols. All of this means that Simpl.js levels the playing field between the server and client runtime environments, creating the ideal conditions for isomorphic javascript, and seamlessly evolving with the web.</p>
 <h3>Javascript in HTML</h3>
 <p>The core <code>html</code> module included with Simpl.js addresses some of the practical considerations for bridging the gap between server and client code in web apps. Here is a simple web app built using this module:</p>
 <pre>
@@ -53,7 +53,7 @@ modules.http.serve({port: 1080}, function(request, response) {
     case '/':
       return response.end(modules.html.markup([
         {script: {src: '/simpl.js'}},
-        {script: {src: '/mymodule.js'}}
+        {script: {src: '/mymodule.js'}},
         {script: function() {
           simpl.use({mymodule: 0}, function(modules) {
             modules.mymodule.doSomething();
@@ -70,4 +70,4 @@ modules.http.serve({port: 1080}, function(request, response) {
   }
 });
 </pre>
-<p>Simpl.js modules are served for use in web pages at <code>/<em>name</em>.<em>version</em>.js</code>, where <code><em>name</em></code> is the URL-encoded module name and <code><em>version</em></code> is the published major version number (at its latest minor version), or simply <code>/<em>name</em>.js</code> for the current working copy. Call <code>simple.use</code> to generate the <code>modules</code> object with instances of the modules you've imported.</p>
+<p>Simpl.js modules are served for use in web pages at <code>/<em>name</em>.<em>version</em>.js</code>, where <code><em>name</em></code> is the URL-encoded module name and <code><em>version</em></code> is the published major version number (at its latest minor version), or <code>/<em>name</em>.<em>version</em>.current.js</code> for the current working copy. Call <code>simple.use</code> to generate the <code>modules</code> object with instances of the modules you've imported.</p>
