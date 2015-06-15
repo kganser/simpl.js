@@ -128,7 +128,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     if (apps[id]) return;
     (function(callback) {
       var path = 'apps/'+encodeURIComponent(name);
-      if (!token) return db.get(path+'/versions/'+version).then(callback);
+      if (!token) return db.get(path+'/versions/'+(version-1)).then(callback);
       api(path+'/'+version, token, function(status, data) {
         callback(status == 200 && data);
       }, instance);
@@ -138,10 +138,10 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       apps[id] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\nsimpl.use('+JSON.stringify(app.dependencies)+','+app.code+');', function(module, callback) {
         var path = 'modules/'+encodeURIComponent(module.name),
             v = module.version,
-            current = v < 0;
-        if (current) v = -v-1;
+            current = v < 1;
+        if (current) v = 1-v;
         (function(callback) {
-          if (!token) return db.get(path+'/versions/'+v).then(callback);
+          if (!token) return db.get(path+'/versions/'+(v-1)).then(callback);
           api(path+'/'+v, token, function(status, data) {
             callback(status == 200 && data);
           }, instance);
@@ -222,7 +222,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         };
         
         if (match = request.path.match(/^\/([^\/]*)\.(\d+)\.js$/))
-          return db.get('modules/'+match[1]+'/versions/'+match[2]).then(function(module) {
+          return db.get('modules/'+match[1]+'/versions/'+(match[2]-1)).then(function(module) {
             if (!module) return response.generic(404);
             response.end(wrap(decodeURIComponent(match[1]), module.code, match[2], module.dependencies), 'js');
           });
@@ -232,6 +232,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
               app = parts[0] == 'apps',
               method = request.method;
           
+          if (parts.length > 2) parts[2]--;
           parts.splice(2, 0, 'versions');
           var path = parts.join('/');
           
@@ -249,9 +250,9 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             var upgrade = parts.length == 3;
             if (upgrade && !/\d+/.test(request.query.source)) return response.error();
             return forward(request.uri.substr(1), function(callback) {
-              db.get(upgrade ? path+'/'+request.query.source : path, true).then(function(version) {
+              db.get(upgrade ? path+'/'+(request.query.source-1) : path, true).then(function(version) {
                 if (!version) return response.error();
-                if (Object.keys(version.dependencies).some(function(name) { return version.dependencies[name] < 0; }))
+                if (Object.keys(version.dependencies).some(function(name) { return version.dependencies[name] < 1; }))
                   return response.error();
                 var published = version.published.pop();
                 if (published && version.code == published.code &&
@@ -291,7 +292,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                 forward(uri, function(callback) {
                   db.put(path+'/code', code).then(function(error) { // TODO: check If-Match header
                     if (!error) return callback();
-                    if (parts[3] != '0') return response.error();
+                    if (parts[3]) return response.error();
                     create(this, code).then(callback);
                   });
                 }, response.ok, method, code, true);
@@ -299,7 +300,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             if (method == 'DELETE')
               return forward(uri, function(callback) {
                 db.delete(path).then(function() {
-                  parts[3] = '0';
+                  parts[3] = 0;
                   this.get(parts.join('/'), false).then(function(exists) {
                     if (exists) return callback();
                     this.delete(parts[0]+'/'+parts[1]).then(callback);
@@ -314,7 +315,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                   if (!app) return response.error();
                   db.put(path, body).then(function(error) {
                     if (!error) return callback();
-                    if (parts[3] != '0') return response.error();
+                    if (parts[3]) return response.error();
                     create(this, null, body).then(callback);
                   });
                 }, response.ok, method, body);
@@ -331,7 +332,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                 forward(uri, function(callback) {
                   db.put(path+'/'+encodeURIComponent(body.name), body.version).then(function(error) {
                     if (!error) return callback();
-                    if (parts[3] != '0') return response.error();
+                    if (parts[3]) return response.error();
                     var dependency = {};
                     dependency[body.name] = body.version;
                     create(this, null, null, dependency).then(callback);
