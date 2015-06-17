@@ -3,6 +3,48 @@ title: Hosting Your App's Static Content on GitHub
 styles: [default.css, prettify.css]
 scripts: [prettify.js]
 ---
+<style>
+  #diagram {
+    margin: 0 auto;
+    border-spacing: 15px;
+  }
+  #diagram code {
+    background: transparent;
+    border: none;
+  }
+  #diagram td {
+    text-align: center;
+  }
+  #diagram td[rowspan] {
+    width: 5em;
+    padding: 1em 0;
+    background: #f7f7f7;
+    border: solid 1px black;
+  }
+  #diagram code {
+    display: block;
+    position: relative;
+    border-bottom: solid 2px black;
+    padding-bottom: .5em;
+    margin-bottom: 1em;
+  }
+  #diagram code:before, #diagram code:after {
+    content: "";
+    position: absolute;
+    bottom: -6px;
+    border-style: solid;
+    border-width: 5px 10px;
+    border-color: transparent black;
+  }
+  #diagram code:before {
+    left: -10px;
+    border-left: none;
+  }
+  #diagram code:after {
+    right: -10px;
+    border-right: none;
+  }
+</style>
 <h1>Blog</h1>
 <h2>Hosting Your App's Static Content on GitHub</h2>
 <div class="byline">posted June 11, 2015, by Klaus</div>
@@ -14,7 +56,19 @@ scripts: [prettify.js]
   <li><strong>Static Site Generator</strong> - GitHub can automatically compose documents from templates or generate full static sites as necessary to supplement or back up your Simpl.js web application.</li>
 </ul>
 <p>Setting all of this up is relatively straightforward. Here is one possible configuration:</p>
-<p><img src="/img/static-content.png"></p>
+<table id="diagram">
+  <tr>
+    <td rowspan="2">Browser</td>
+    <td><code>GET /</code></td>
+    <td rowspan="2">Simpl.js Server</td>
+    <td></td>
+    <td rowspan="2">GitHub</td>
+  </tr>
+  <tr>
+    <td><code>GET /styles.css</code></td>
+    <td><code>GET /styles.css</code></td>
+  </tr>
+</table>
 <p>This configuration proxies static content rather than linking directly to it on GitHub. Proxying allows full control over the URL and headers delivered with the content, which is necessary to override GitHub's cache-control and content-type headers, and because certain files may need to be served from the same domain. To proxy static content requests, use something like the following code inside your request callback:</p>
 <pre class="prettyprint">
 if (/^\/(css\/|js\/|img\/|favicon.ico$)/.test(request.path)) {
