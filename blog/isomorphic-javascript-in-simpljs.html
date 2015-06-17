@@ -1,5 +1,7 @@
 ---
 title: Isomorphic Javascript in Simpl.js
+styles: [default.css, prettify.css]
+scripts: [prettify.js]
 ---
 <h1>Blog</h1>
 <h2>Isomorphic Javascript in Simpl.js</h2>
@@ -9,7 +11,7 @@ title: Isomorphic Javascript in Simpl.js
 <p>Simpl.js is built on Chromium, so its APIs prefer the web platform over OS-level abstractions. Simpl.js apps run as WebWorkers rather than processes. Their data is stored using indexedDB or cloud storage APIs rather than the filesystem directly. Simpl.js has no shell; user and machine interfaces operate over sockets and web protocols. All of this means that Simpl.js levels the playing field between the server and client runtime environments, creating the ideal conditions for isomorphic javascript, and seamlessly evolving with the web.</p>
 <h3>Javascript in HTML</h3>
 <p>The core <code>html</code> module included with Simpl.js addresses some of the practical considerations for bridging the gap between server and client code in web apps. Here is a simple web app built using this module:</p>
-<pre>
+<pre class="prettyprint">
 modules.http.serve({port: 1080}, function(request, response) {
   var data = 'hello world!';
   response.end(modules.html.markup([
@@ -28,7 +30,7 @@ modules.http.serve({port: 1080}, function(request, response) {
 });
 </pre>
 <p>Below is the generated markup (formatted for clarity):</p>
-<pre>
+<pre class="prettyprint">
 &lt;html>
   &lt;head>
     &lt;title>My Isomorphic App&lt;/title>
@@ -46,7 +48,7 @@ modules.http.serve({port: 1080}, function(request, response) {
 <p>When <code>html.markup</code> encounters a function in the input structure that accepts arguments, it calls it (server-side) with no arguments. Any data returned by the call is JSON-serialized and printed as arguments to a self-executing version of the same function, stringified, for the client web page. This technique keeps your code clean and declarative while relaying data from server to client javascript as needed.</p>
 <h3>Isomorphic Javascript Modules</h3>
 <p>The Simpl.js module loader, along with several core modules, are designed to work on a web page as well as in a Simpl.js WebWorker. To include them or any of your own modules, simply proxy them through your server from the Simpl.js web interface:</p>
-<pre>
+<pre class="prettyprint">
 modules.http.serve({port: 1080}, function(request, response) {
   switch (request.path) {
     case '/':
