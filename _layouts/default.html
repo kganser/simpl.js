@@ -8,7 +8,7 @@
     <meta name="og:type" content="website">
     <meta name="og:title" content="{{ page.title }}">
     <meta name="og:site_name" content="simpljs.com">
-    <meta name="og:image" content="{{ page.image }}">{% for stylesheet in page.styles %}
+    <meta name="og:image" content="http://simpljs.com/img/{{ page.image }}">{% for stylesheet in page.styles %}
     <link rel="stylesheet" href="/css/{{ stylesheet }}">{% endfor %}
     <link rel="chrome-webstore-item" href="https://chrome.google.com/webstore/detail/kdkheiopehanfbajkkopimfppjmclgbp">
     <script>
@@ -35,6 +35,7 @@
     </header>
     <main>
 {{ content }}
-    </main>
+    </main>{% for script in page.scripts %}
+    <script src="/js/{{ script }}">{% endfor %}
   </body>
 </html>

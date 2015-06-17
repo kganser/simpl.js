@@ -6,6 +6,6 @@ defaults:
     values:
       layout: default
       description: Simpl.js lets you write and run full-stack javascript apps in your browser.
-      image: http://simpljs.com/img/promo.png
-      styles: [common.css]
+      image: promo.png
+      styles: [default.css]
       scripts: []
