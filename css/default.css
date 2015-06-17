@@ -373,7 +373,7 @@ pre em {
 .endpoint {
   border: none;
   background: transparent;
-  padding-left: 0;
+  padding: 2px 4px 2px 0;
 }
 .endpoint span {
   color: white;
