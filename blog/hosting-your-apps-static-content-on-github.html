@@ -6,7 +6,7 @@ scripts: [prettify.js]
 <style>
   #diagram {
     margin: 0 auto;
-    border-spacing: 15px;
+    border-spacing: 10px;
   }
   #diagram code {
     background: transparent;
@@ -28,21 +28,14 @@ scripts: [prettify.js]
     padding-bottom: .5em;
     margin-bottom: 1em;
   }
-  #diagram code:before, #diagram code:after {
+  #diagram code:after {
     content: "";
     position: absolute;
     bottom: -6px;
+    right: -5px;
     border-style: solid;
-    border-width: 5px 10px;
+    border-width: 5px 0 5px 10px;
     border-color: transparent black;
-  }
-  #diagram code:before {
-    left: -10px;
-    border-left: none;
-  }
-  #diagram code:after {
-    right: -10px;
-    border-right: none;
   }
 </style>
 <h1>Blog</h1>
