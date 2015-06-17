@@ -56,7 +56,7 @@ modules.http.serve({port: 1080}, function(request, response) {
         {script: {src: '/simpl.js'}},
         {script: {src: '/mymodule.1.js'}},
         {script: function() {
-          simpl.use({mymodule: 0}, function(modules) {
+          simpl.use({mymodule: 1}, function(modules) {
             modules.mymodule.doSomething();
           });
         }}
