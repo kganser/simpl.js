@@ -464,7 +464,7 @@ pre em {
 .list li {
   margin: .5em 0;
 }
-@media only screen and (min-width: 800px) {
+@media only screen and (min-width: 900px) {
   .stage div {
     height: 360px;
     max-width: 260px;
