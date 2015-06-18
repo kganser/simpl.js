@@ -93,6 +93,10 @@ a.button.green:hover, button.green:hover, .success {
   color: white;
   background: #3c3;
 }
+a.button.blue:hover, button.blue:hover {
+  color: white;
+  background: #33c;
+}
 header, main, .column {
   display: block;
   max-width: 900px;
@@ -307,13 +311,13 @@ form .error {
   margin: 0;
   padding: 0;
 }
+.servers ul {
+  margin-bottom: 5px;
+}
 .servers button {
   color: #666;
   background: #f7f7f7;
   margin: 0;
-}
-.servers button[name=add] {
-  margin-top: 5px;
 }
 .servers li button, .servers li a.button {
   margin: 0 0 5px 5px;
