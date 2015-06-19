@@ -134,6 +134,7 @@ header li a:hover {
   height: 32px;
   padding-left: 37px;
   background: url(/img/icon.png) left/32px no-repeat;
+  image-rendering: pixelated;
   font: 500 24px/32px "Segoe UI", ArialMT, sans-serif;
   color: black;
   text-decoration: none;
@@ -473,6 +474,40 @@ pre em {
 }
 .list li {
   margin: .5em 0;
+}
+#page-user main {
+  padding-left: 200px;
+  max-width: 700px;
+}
+#page-user aside {
+  float: left;
+  width: 200px;
+  margin-left: -200px;
+  font-size: 14px;
+}
+#page-user aside a {
+  display: block;
+  color: #33c;
+}
+#page-user section {
+  display: inline-block;
+  vertical-align: top;
+  width: 50%;
+  min-width: 250px;
+}
+#page-user h1 {
+  margin: 0 0 5px 0;
+  font-size: 25px;
+  font-weight: 500;
+  color: black;
+}
+#page-user h2 {
+  margin: 0 0 5px 30px;
+}
+#page-user p {
+  margin: 0 0 1em 30px;
+  line-height: 1;
+  color: #666;
 }
 @media only screen and (min-width: 900px) {
   .stage div {
