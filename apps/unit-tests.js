@@ -45,6 +45,14 @@ function(modules) {
           hex = modules.string.hexToBuffer,
           toHex = modules.string.hexFromBuffer;
       assert(![
+        ['', 'd41d8cd98f00b204e9800998ecf8427e'],
+        ['abc', '900150983cd24fb0d6963f7d28e17f72'],
+        ['The quick brown fox jumps over the lazy dog', '9e107d9d372bb6826bd81d3542a419d6'],
+        ['c\'\u00e8', '8ef7c2941d78fe89f31e614437c9db59']
+      ].some(function(test) {
+        return toHex(modules.crypto.md5(utf8(test[0]))) !== test[1];
+      }), 'crypto md5');
+      assert(![
         ['', 'da39a3ee5e6b4b0d3255bfef95601890afd80709'],
         ['abc', 'a9993e364706816aba3e25717850c26c9cd0d89d'],
         ['The quick brown fox jumps over the lazy dog', '2fd4e1c67a2d28fced849ee1bb76e7391b93eb12'],
@@ -445,7 +453,7 @@ function(modules) {
       });
     },
     function() {
-      assert(passed == 84, 'tests complete ('+passed+'/84 in '+(Date.now()-start)+'ms)');
+      assert(passed == 85, 'tests complete ('+passed+'/85 in '+(Date.now()-start)+'ms)');
     }
   );
 }
