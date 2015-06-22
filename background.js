@@ -443,6 +443,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             });
           }, function(data, session) {
             if (!data) return response.generic(500);
+            if (session) session.image = 'http://www.gravatar.com/avatar/'+o.string.hexFromBuffer(o.crypto.md5(o.string.toUTF8Buffer(session.email.toLowerCase())));
             Object.keys(data.apps).forEach(function(name) { data.apps[name] = data.apps[name].versions; });
             Object.keys(data.modules).forEach(function(name) { data.modules[name] = data.modules[name].versions; });
             response.end(o.html.markup([
@@ -466,7 +467,6 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                   {script: {src: '/codemirror.js'}},
                   {script: {src: '/diff_match_patch.js'}},
                   {script: {src: '/jsonv.js'}},
-                  {script: {src: '/md5.js'}},
                   {script: {src: '/app.js'}},
                   {script: function(apps, modules, user, token) {
                     if (!apps) return [data.apps, data.modules, session, sid || null];

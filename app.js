@@ -208,7 +208,7 @@ simpl.add('app', function(o) {
     dom([
       {nav: [user
         ? [ {div: {className: 'user', children: [
-              {img: {src: 'http://www.gravatar.com/avatar/'+md5(user.email.toLowerCase())}},
+              {img: {src: user.image}},
               {a: {className: 'logout', href: '/logout', title: 'Log Out', children: icons.logout}},
               user.name
             ]}},
@@ -481,8 +481,8 @@ simpl.add('app', function(o) {
         }}},
         {div: {id: 'settings', children: [
           {section: {id: 'actions', children: [
-            {button: {className: 'publish', children: [user ? icons.publish : icons.upgrade, {span: function(e) { major = e; }}], onclick: function() { publish(true); }}}, {br: null},
-            {button: {className: 'publish', children: [user ? icons.publish : icons.upgrade, {span: function(e) { minor = e; }}], onclick: function() { publish(); }}}, {br: null},
+            {button: {className: 'publish', children: [icons.upgrade, {span: function(e) { major = e; }}], onclick: function() { publish(true); }}}, {br: null},
+            {button: {className: 'publish', children: [icons.upgrade, {span: function(e) { minor = e; }}], onclick: function() { publish(); }}}, {br: null},
             {button: {className: 'delete', children: function(e) { del = e; return [icons.delete, 'Delete']; }, onclick: function() {
               var button = this,
                   current = selected,
