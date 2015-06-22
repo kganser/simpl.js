@@ -737,8 +737,8 @@ simpl.add('app', function(o) {
           if (e.target.className == 'location') {
             var ref = e.target.dataset,
                 name = ref.module || selected.name,
-                version = ref.version ? -parseInt(ref.version, 10)-1 : selected.version;
-            if (version >= 0)
+                version = ref.version ? 1-ref.version : selected.version;
+            if (version > 0)
               toggle(name, version, !ref.module, 'code', ref.line);
           }
         }}},
