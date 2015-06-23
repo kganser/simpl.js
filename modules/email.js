@@ -117,11 +117,8 @@ simpl.add('email', function(modules) {
                 send('DATA', 354, function() {
                   if (headers.Date === undefined) headers.Date = new Date().toUTCString();
                   if (headers['Content-Type'] === undefined) headers['Content-Type'] = 'text/plain; charset=utf-8';
-                  if (headers['Message-ID'] === undefined) {
-                    var id = new Uint8Array(16);
-                    crypto.getRandomValues(id);
-                    headers['Message-ID'] = '<'+modules.string.hexFromBuffer(id)+'@'+config.smtpClient+'>';
-                  }
+                  if (headers['Message-ID'] === undefined)
+                    headers['Message-ID'] = '<'+modules.string.hexFromBuffer(crypto.getRandomValues(new Uint8Array(16)))+'@'+config.smtpClient+'>';
                   headers.From = format(from);
                   if (to.length || !cc.length) headers.To = to.length ? to.map(format).join(', ') : 'undisclosed-recipients:;';
                   if (cc.length) headers.Cc = cc.map(format).join(', ');
