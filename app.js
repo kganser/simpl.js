@@ -65,9 +65,12 @@ simpl.add('app', function(o) {
       var entry = ((app ? apps : modules)[name] || [])[version-1],
           target = entry && {name: name, version: version, app: app, entry: entry};
       if (entry && !panel) panel = app ? entry.running ? 'log' : 'code' : 'docs';
-      var path = target ? url(target)+'/'+panel : '/';
-      if (!name == !entry && location.pathname != path) window.history.pushState(null, null, path);
       view(target, panel, ln);
+      var path = target ? url(target)+'/'+panel : '/';
+      if (!name == !entry && location.pathname != path) {
+        window.history.pushState(null, null, path);
+        document.title = name ? name : 'Simpl.js';
+      }
     };
     var view = function(target, panel, ln, refresh) {
       if (target) {
