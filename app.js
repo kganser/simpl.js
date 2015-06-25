@@ -67,8 +67,8 @@ simpl.add('app', function(o) {
       if (entry && !panel) panel = app ? entry.running ? 'log' : 'code' : 'docs';
       view(target, panel, ln);
       var path = target ? url(target)+'/'+panel : '/';
-      if (!name == !entry && location.pathname != path) {
-        window.history.pushState(null, null, path);
+      if (!name == !entry) {
+        if (location.pathname != path) window.history.pushState(null, null, path);
         document.title = name ? name : 'Simpl.js';
       }
     };
@@ -510,7 +510,7 @@ simpl.add('app', function(o) {
                 status('success', 'Deleted');
                 delete (current.app ? apps : modules)[current.name];
                 current.entry.tab.parentNode.removeChild(current.entry.tab);
-                if (selected && selected.entry == current.entry) navigate(); // TODO: remove history entries?
+                if (selected && selected.entry == current.entry) navigate();
               });
             }}}
           ]}},
