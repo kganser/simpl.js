@@ -61,76 +61,90 @@ simpl.add('app', function(o) {
         {div: {className: 'message', children: message}}
       ]}};
     };
-    var toggle = function(name, version, app, panel, ln, refresh) {
-      var versions = (app ? apps : modules)[name],
-          entry = versions[version-1],
-          origPanel = panel;
-      if (selected) body.classList.remove('show-'+selected.panel);
-      if (!selected || selected.entry != entry || refresh) {
-        if (selected) {
-          selected.entry.tab.classList.remove('selected');
-          body.classList.remove(selected.app ? 'show-app' : 'show-module');
-        }
-        body.classList.add(app ? 'show-app' : 'show-module');
-        entry.tab.classList.add('selected');
-        selected = {name: name, version: version, app: app, entry: entry};
-        if ('code' in entry) {
-          code.swapDoc(entry.doc);
-          config.update(entry.config || null);
-          dependencies(entry.dependencies);
-          search.value = '';
-          suggest();
-          del.style.display = entry.minor || version > 1 ? 'none' : 'inline-block';
-          major.parentNode.style.display = entry.minor ? 'inline-block' : 'none';
-          major.textContent = 'Publish v'+(versions.length+1)+'.0';
-          minor.textContent = 'Publish v'+version+'.'+entry.minor;
-          timeline(name, version, app);
-          if (app) dom(entry.log.map(logLine), log, true);
-          else docs(name, entry.code);
-        } else if (!refresh) {
-          entry.tab.classList.add(panel = 'loading');
-          request(url(selected), function(e) {
-            try {
-              if (e.target.status != 200) throw 'error';
-              var response = e.target.response;
-              if (typeof response != 'object')
-                response = JSON.parse(response);
-              entry.doc = CodeMirror.Doc(response.code, {name: 'javascript'});
-              entry.code = response.code;
-              entry.config = response.config;
-              entry.dependencies = response.dependencies;
-              entry.published = response.published;
-              entry.tab.classList.remove('error', 'loading');
-            } catch (e) {
-              entry.tab.classList.remove('loading');
-              entry.tab.classList.add('error');
-              if (selected && entry == selected.entry) {
-                entry.tab.classList.remove('selected');
-                body.classList.remove('show-'+panel);
-                selected = null;
+    var navigate = function(name, version, app, panel, ln) {
+      var entry = ((app ? apps : modules)[name] || [])[version-1],
+          target = entry && {name: name, version: version, app: app, entry: entry};
+      if (entry && !panel) panel = app ? entry.running ? 'log' : 'code' : 'docs';
+      var path = target ? url(target)+'/'+panel : '/';
+      if (!name == !entry && location.pathname != path) window.history.pushState(null, null, path);
+      view(target, panel, ln);
+    };
+    var view = function(target, panel, ln, refresh) {
+      if (target) {
+        var name = target.name,
+            version = target.version,
+            app = target.app,
+            entry = target.entry,
+            origPanel = panel;
+        if (selected) body.classList.remove('show-'+selected.panel);
+        if (!selected || selected.entry != entry || refresh) {
+          if (selected) {
+            selected.entry.tab.classList.remove('selected');
+            body.classList.remove(selected.app ? 'show-app' : 'show-module');
+          }
+          selected = target;
+          body.classList.add(app ? 'show-app' : 'show-module');
+          entry.tab.classList.add('selected');
+          if ('code' in entry) {
+            code.swapDoc(entry.doc);
+            config.update(entry.config || null);
+            dependencies(entry.dependencies);
+            search.value = '';
+            suggest();
+            del.style.display = entry.minor || version > 1 ? 'none' : 'inline-block';
+            major.parentNode.style.display = entry.minor ? 'inline-block' : 'none';
+            major.textContent = 'Publish v'+((app ? apps : modules)[name].length+1)+'.0';
+            minor.textContent = 'Publish v'+version+'.'+entry.minor;
+            timeline(name, version, app);
+            if (app) dom(entry.log.map(logLine), log, true);
+            else docs(name, entry.code);
+          } else if (!refresh) {
+            entry.tab.classList.add(panel = 'loading');
+            request(url(selected), function(e) {
+              try {
+                if (e.target.status != 200) throw 'error';
+                var response = e.target.response;
+                if (typeof response != 'object')
+                  response = JSON.parse(response);
+                entry.doc = CodeMirror.Doc(response.code, {name: 'javascript'});
+                entry.code = response.code;
+                entry.config = response.config;
+                entry.dependencies = response.dependencies;
+                entry.published = response.published;
+                entry.tab.classList.remove('error', 'loading');
+              } catch (e) {
+                entry.tab.classList.remove('loading');
+                entry.tab.classList.add('error');
+                if (selected && selected.entry == entry) {
+                  entry.tab.classList.remove('selected');
+                  body.classList.remove('show-'+panel);
+                  selected = null;
+                }
+                return status('failure', 'Error retrieving '+(selected.app ? 'app' : 'module'));
               }
-              return status('failure', 'Error retrieving '+(app ? 'app' : 'module'));
-            }
-            if (selected && entry == selected.entry)
-              toggle(name, version, app, origPanel, ln, true);
-          });
+              if (selected && selected.entry == entry)
+                view(selected, origPanel, ln, true);
+            });
+          }
         }
-      }
-      var first = app ? entry.running ? 'log' : 'code' : 'docs',
-          next = {loading: first, settings: first, code: 'settings', log: 'code', docs: 'code'}[selected.panel = panel = panel || first];
-      body.classList.add('show-'+panel);
-      body.scrollTop = panel == 'log' ? body.scrollHeight : 0;
-      entry.view.className = 'view '+next;
-      entry.view.title = 'Show '+next[0].toUpperCase()+next.slice(1);
-      if (panel == 'code') {
-        code.refresh();
-        if (ln != null) {
-          code.scrollIntoView({line: ln-1, ch: 0});
-          var line = code.addLineClass(ln-1, 'background', 'current');
-          setTimeout(function() {
-            entry.doc.removeLineClass(line, 'background', 'current');
-          }, 2000);
+        var next = {settings: app ? entry.running ? 'Log' : 'Code' : 'Docs', code: 'Settings'}[selected.panel = panel] || 'Code';
+        body.classList.add('show-'+panel);
+        body.scrollTop = panel == 'log' ? body.scrollHeight : 0;
+        entry.view.className = 'view '+next.toLowerCase();
+        entry.view.title = 'Show '+next;
+        if (panel == 'code') {
+          code.refresh();
+          if (ln != null) {
+            code.scrollIntoView({line: ln-1, ch: 0});
+            var line = code.addLineClass(ln-1, 'background', 'current');
+            setTimeout(function() {
+              entry.doc.removeLineClass(line, 'background', 'current');
+            }, 2000);
+          }
         }
+      } else if (selected) {
+        selected.entry.tab.classList.remove('selected');
+        selected = body.className = null;
       }
     };
     var publish = function(upgrade) {
@@ -182,11 +196,11 @@ simpl.add('app', function(o) {
         entry.tab = elem;
         elem.onclick = function(e) {
           if (!this.classList.contains('selected'))
-            toggle(name, major, app);
+            navigate(name, major, app);
         };
         return [
           {div: {className: 'controls', children: [
-            {button: {className: 'view', onclick: function() { toggle(name, major, app, this.className.replace(/\s*view\s*/, '')); }, children: function(e) {
+            {button: {className: 'view', onclick: function() { navigate(name, major, app, this.className.replace(/\s*view\s*/, '')); }, children: function(e) {
               entry.view = e;
               return [app || icons.info, icons.code, icons.settings, app && icons.log];
             }}},
@@ -225,11 +239,7 @@ simpl.add('app', function(o) {
                 return {option: {value: '', children: 'Localhost'}};
               }}}
             ]}}]
-        : {div: {className: 'home', onclick: function() {
-            if (!selected) return;
-            selected.entry.tab.classList.remove('selected');
-            selected = body.className = null;
-          }, children: [
+        : {div: {className: 'home', onclick: function() { navigate(); }, children: [
             {div: {className: 'controls', children: {button: {className: 'settings', title: 'Settings', children: icons.settings}}}},
             'Simpl.js'
           ]}},
@@ -305,7 +315,7 @@ simpl.add('app', function(o) {
                     });
                     if (selected && selected.app) {
                       log.textContent = '';
-                      toggle(selected.name, selected.version, true, selected.panel == 'log' && !selected.entry.running ? 'code' : selected.panel);
+                      navigate(selected.name, selected.version, true, selected.panel == 'log' && !selected.entry.running ? 'code' : selected.panel);
                     }
                     appList.classList.remove('disabled');
                     status();
@@ -338,7 +348,7 @@ simpl.add('app', function(o) {
                       entry.log = [];
                       if (selected && selected.entry == entry) {
                         log.textContent = '';
-                        toggle(data.app, data.version, true, 'log');
+                        navigate(data.app, data.version, true, 'log');
                       }
                     }
                     break;
@@ -377,7 +387,7 @@ simpl.add('app', function(o) {
             } else {
               apps[name] = [{minor: 0, code: boilerplate, config: {}, dependencies: {}, doc: CodeMirror.Doc(boilerplate, {name: 'javascript'}), log: []}];
               dom(li(name, 1, null, true), appList).className = 'changed';
-              toggle(name, 1, true);
+              navigate(name, 1, true);
               code.setCursor(1, 2);
               code.focus();
             }
@@ -406,7 +416,7 @@ simpl.add('app', function(o) {
             } else {
               modules[name] = [{minor: 0, code: boilerplate, dependencies: {}, doc: CodeMirror.Doc(boilerplate, {name: 'javascript'})}];
               dom(li(name, 1), moduleList).className = 'changed';
-              toggle(name, 1, false, 'code');
+              navigate(name, 1, false, 'code');
               code.setCursor(1, 2);
               code.focus();
             }
@@ -497,10 +507,7 @@ simpl.add('app', function(o) {
                 status('success', 'Deleted');
                 delete (current.app ? apps : modules)[current.name];
                 current.entry.tab.parentNode.removeChild(current.entry.tab);
-                if (selected && selected.entry == current.entry) {
-                  body.classList.remove(selected.app ? 'show-app' : 'show-module', 'show-'+selected.panel);
-                  selected = null;
-                }
+                if (selected && selected.entry == current.entry) navigate(); // TODO: remove history entries?
               });
             }}}
           ]}},
@@ -739,7 +746,7 @@ simpl.add('app', function(o) {
                 name = ref.module || selected.name,
                 version = ref.version ? 1-ref.version : selected.version;
             if (version > 0)
-              toggle(name, version, !ref.module, 'code', ref.line);
+              navigate(name, version, !ref.module, 'code', ref.line);
           }
         }}},
         {div: {id: 'docs', children: function(e) {
@@ -759,6 +766,12 @@ simpl.add('app', function(o) {
         }}}
       ]}}
     ], body);
+    window.onpopstate = function(e) {
+      var parts = location.pathname.split('/');
+      if (parts.length < 5) return view();
+      navigate(decodeURIComponent(parts[2]), +parts[3], parts[1] == 'apps', parts[4]);
+    };
+    window.onpopstate();
     connect();
   };
 }, 0, {html: 0, xhr: 0, jsonv: 0, docs: 0});
