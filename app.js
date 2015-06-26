@@ -61,31 +61,21 @@ simpl.add('app', function(o) {
         {div: {className: 'message', children: message}}
       ]}};
     };
-    var navigate = function(name, version, app, panel, ln) {
-      var entry = ((app ? apps : modules)[name] || [])[version-1],
-          target = entry && {name: name, version: version, app: app, entry: entry};
-      if (entry && !panel) panel = app ? entry.running ? 'log' : 'code' : 'docs';
-      view(target, panel, ln);
-      var path = target ? url(target)+'/'+panel : '/';
-      if (!name == !entry) {
-        if (location.pathname != path) window.history.pushState(null, null, path);
-        document.title = name ? name : 'Simpl.js';
-      }
-    };
-    var view = function(target, panel, ln, refresh) {
-      if (target) {
-        var name = target.name,
-            version = target.version,
-            app = target.app,
-            entry = target.entry,
-            origPanel = panel;
+    var navigate = function(name, version, app, panel, ln, refresh) {
+      var versions = (app ? apps : modules)[name],
+          entry = versions && versions[version-1];
+      if (entry) {
+        var first = app ? entry.running ? 'log' : 'code' : 'docs',
+            next = {settings: first, code: 'settings'}[panel = panel || first] || 'code';
         if (selected) body.classList.remove('show-'+selected.panel);
-        if (!selected || selected.entry != entry || refresh) {
+        if (selected && selected.entry == entry && !refresh) {
+          selected.panel = panel;
+        } else {
           if (selected) {
             selected.entry.tab.classList.remove('selected');
             body.classList.remove(selected.app ? 'show-app' : 'show-module');
           }
-          selected = target;
+          selected = {name: name, version: version, app: app, entry: entry, panel: panel};
           body.classList.add(app ? 'show-app' : 'show-module');
           entry.tab.classList.add('selected');
           if ('code' in entry) {
@@ -96,13 +86,13 @@ simpl.add('app', function(o) {
             suggest();
             del.style.display = entry.minor || version > 1 ? 'none' : 'inline-block';
             major.parentNode.style.display = entry.minor ? 'inline-block' : 'none';
-            major.textContent = 'Publish v'+((app ? apps : modules)[name].length+1)+'.0';
+            major.textContent = 'Publish v'+(versions.length+1)+'.0';
             minor.textContent = 'Publish v'+version+'.'+entry.minor;
             timeline(name, version, app);
             if (app) dom(entry.log.map(logLine), log, true);
             else docs(name, entry.code);
-          } else if (!refresh) {
-            entry.tab.classList.add(panel = 'loading');
+          } else if (!refresh && selected.panel != 'loading') {
+            entry.tab.classList.add(selected.panel = 'loading');
             request(url(selected), function(e) {
               try {
                 if (e.target.status != 200) throw 'error';
@@ -120,22 +110,21 @@ simpl.add('app', function(o) {
                 entry.tab.classList.add('error');
                 if (selected && selected.entry == entry) {
                   entry.tab.classList.remove('selected');
-                  body.classList.remove('show-'+panel);
+                  body.classList.remove('show-loading');
                   selected = null;
                 }
                 return status('failure', 'Error retrieving '+(selected.app ? 'app' : 'module'));
               }
               if (selected && selected.entry == entry)
-                view(selected, origPanel, ln, true);
+                navigate(name, version, app, panel, ln, true);
             });
           }
         }
-        var next = {settings: app ? entry.running ? 'Log' : 'Code' : 'Docs', code: 'Settings'}[selected.panel = panel] || 'Code';
-        body.classList.add('show-'+panel);
-        body.scrollTop = panel == 'log' ? body.scrollHeight : 0;
-        entry.view.className = 'view '+next.toLowerCase();
-        entry.view.title = 'Show '+next;
-        if (panel == 'code') {
+        body.classList.add('show-'+selected.panel);
+        body.scrollTop = selected.panel == 'log' ? body.scrollHeight : 0;
+        entry.view.className = 'view '+next;
+        entry.view.title = 'Show '+next[0].toUpperCase()+next.substr(1);
+        if (selected.panel == 'code') {
           code.refresh();
           if (ln != null) {
             code.scrollIntoView({line: ln-1, ch: 0});
@@ -148,6 +137,11 @@ simpl.add('app', function(o) {
       } else if (selected) {
         selected.entry.tab.classList.remove('selected');
         selected = body.className = null;
+      }
+      if (!name == !entry && !refresh) {
+        var path = entry ? url(selected)+'/'+panel : '/';
+        if (location.pathname != path) window.history.pushState(null, null, path);
+        document.title = name ? name : 'Simpl.js';
       }
     };
     var publish = function(upgrade) {
@@ -771,8 +765,7 @@ simpl.add('app', function(o) {
     ], body);
     window.onpopstate = function(e) {
       var parts = location.pathname.split('/');
-      if (parts.length < 5) return view();
-      navigate(decodeURIComponent(parts[2]), +parts[3], parts[1] == 'apps', parts[4]);
+      navigate(parts[2] && decodeURIComponent(parts[2]), +parts[3], parts[1] == 'apps', parts[4]);
     };
     window.onpopstate();
     connect();

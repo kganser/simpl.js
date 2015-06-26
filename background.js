@@ -221,13 +221,13 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           });
         };
         
-        if (match = request.path.match(/^\/([^\/]*)\.(\d+)(\.current)?\.js$/))
+        if (match = request.path.match(/^\/([^\/]+)\.(\d+)(\.current)?\.js$/))
           return db.get('modules/'+match[1]+'/versions/'+(match[2]-1)).then(function(module) {
             if (module && !match[3]) module = module.published.pop();
             if (module) return response.end(wrap(decodeURIComponent(match[1]), module.code, match[2], module.dependencies), 'js');
             response.generic(404);
           });
-        if (/^\/(apps|modules)\/[^\/]*(\/\d+(\/|$)|$)/.test(request.path)) {
+        if (/^\/(apps|modules)\/[^\/]+(\/\d+(\/|$)|$)/.test(request.path)) {
           var uri = request.path.substr(1),
               parts = uri.split('/'),
               app = parts[0] == 'apps',
@@ -308,7 +308,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                   });
                 });
               }, response.ok, method);
-          } else if (parts.length == 5 && parts[4] == 'config') {
+          } else if (parts[4] == 'config') {
             if (method == 'PUT')
               return request.slurp(function(body) {
                 if (body === undefined) return response.generic(415);
@@ -421,7 +421,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
               };
             });
           });
-        if (request.path == '/')
+        if (/^\/((apps|modules)\/[^\/]+\/\d+\/(code|settings|log|docs))?$/.test(request.path))
           return forward('workspace', function(callback) {
             db.get('', false, function(path) {
               // apps,modules,sessions/<name>/versions/<#>/code,config,dependencies,published/<#>
