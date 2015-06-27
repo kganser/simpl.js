@@ -361,7 +361,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                   email: data.email,
                   expires: Date.now()+86400000
                 }).then(function() {
-                  response.generic(303, {Location: '/'});
+                  response.generic(303, {Location: session.redirect || '/'});
                 });
               });
             });
@@ -371,7 +371,11 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           if (!secret) return response.generic(303, {Location: 'http://simpljs.com/launch'});
           return authenticate(sid = request.cookie.sid, function(session) {
             if (!session) sid = token();
-            gcSessions(db).put('sessions/'+sid, {secret: secret, expires: Date.now()+86400000}).then(function() {
+            gcSessions(db).put('sessions/'+sid, {
+              secret: secret,
+              redirect: request.query.redirect,
+              expires: Date.now()+86400000
+            }).then(function() {
               response.generic(303, {
                 'Set-Cookie': 'sid='+sid,
                 Location: 'http://simpljs.com/authorize?client_id=simpljs&redirect_uri='+encodeURIComponent('http://'+request.headers.Host+'/auth')+'&state='+signature(sid)
@@ -502,9 +506,9 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
   var ws, port, path = '', launcher = false;
 
   chrome.app.runtime.onLaunched.addListener(function(source) {
-    var token = source && source.url && source.url.substr(26),
-        headless = token == 'headless';
-    path = token && !headless ? '/login?token='+token : '';
+    var args = ((source || {}).url || '').match(/^http:\/\/simpljs.com\/launch-([^\/]+)(.*)/),
+        headless = args && args[1] == 'headless';
+    path = args && !headless ? '/login?token='+args[1]+'&redirect='+args[2] : '';
     if (launcher.focus) {
       // TODO: use chrome.browser.openTab() to navigate in existing tab
       if (!port) return launcher.focus();
