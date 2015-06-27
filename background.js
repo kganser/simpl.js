@@ -362,14 +362,14 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                   email: data.email,
                   expires: Date.now()+86400000
                 }).then(function() {
-                  response.generic(303, {Location: session.redirect || '/'});
+                  response.generic(303, {Location: session.redirect});
                 });
               });
             });
           });
         if (request.path == '/login') {
           var secret = request.query.token,
-              redirect = request.query.redirect;
+              redirect = request.query.redirect || '/';
           if (!secret) return response.generic(303, {Location: 'http://simpljs.com/launch'});
           return authenticate(sid = request.cookie.sid, function(session) {
             if (!session) sid = token();
