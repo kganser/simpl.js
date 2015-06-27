@@ -214,7 +214,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           authenticate(sid, function(session, local) {
             if (local) return fallback(callback);
             if (!session) return logout();
-            api(path, session.accessToken, function(status, data) {
+            api(path, session.access_token, function(status, data) {
               if (status != 200) return logout(); // TODO: handle certain error statuses
               callback(data, {username: session.username, name: session.name, email: session.email});
             }, false, method, data, text);
@@ -352,10 +352,11 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             if (!session || !code || signature(sid) != request.query.state) return response.end(code ? session ? 'Bad state in request' : 'No session' : 'No authorization code', null, 400);
             api('token?authorization_code='+code+'&client_secret='+session.secret, null, function(status, data) {
               if (status != 200) return response.end('Could not get access token', null, 502);
-              api('user', code = data.accessToken, function(status, data) {
+              api('user', code = data.access_token, function(status, data) {
                 if (status != 200) return response.end('Could not get user info', null, 502);
                 db.put('sessions/'+sid, {
-                  accessToken: code,
+                  secret: session.secret,
+                  access_token: code,
                   username: data.username,
                   name: data.name,
                   email: data.email,
@@ -367,13 +368,15 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             });
           });
         if (request.path == '/login') {
-          var secret = request.query.token;
+          var secret = request.query.token,
+              redirect = request.query.redirect;
           if (!secret) return response.generic(303, {Location: 'http://simpljs.com/launch'});
           return authenticate(sid = request.cookie.sid, function(session) {
             if (!session) sid = token();
+            else if (session.secret == secret) return response.generic(303, {Location: redirect});
             gcSessions(db).put('sessions/'+sid, {
               secret: secret,
-              redirect: request.query.redirect,
+              redirect: redirect,
               expires: Date.now()+86400000
             }).then(function() {
               response.generic(303, {
@@ -397,7 +400,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             if (!session && !local) return response.generic(401);
             var socketId = response.socket.socketId,
                 user = session ? session.username : '',
-                token = session && session.accessToken;
+                token = session && session.access_token;
             o.websocket.accept(request, response, function(client) {
               clients[socketId] = {user: user, connection: client};
               if (session) {
