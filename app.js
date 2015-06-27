@@ -61,7 +61,7 @@ simpl.add('app', function(o) {
         {div: {className: 'message', children: message}}
       ]}};
     };
-    var navigate = function(name, version, app, panel, ln, refresh) {
+    var navigate = function(name, version, app, panel, ln, refresh) { // TODO: remove `refresh`
       var versions = (app ? apps : modules)[name],
           entry = versions && versions[version-1];
       if (entry) {
@@ -91,7 +91,7 @@ simpl.add('app', function(o) {
             timeline(name, version, app);
             if (app) dom(entry.log.map(logLine), log, true);
             else docs(name, entry.code);
-          } else if (!refresh && selected.panel != 'loading') {
+          } else if (!refresh && !entry.tab.classList.contains('loading')) {
             entry.tab.classList.add(selected.panel = 'loading');
             request(url(selected), function(e) {
               try {
@@ -113,7 +113,7 @@ simpl.add('app', function(o) {
                   body.classList.remove('show-loading');
                   selected = null;
                 }
-                return status('failure', 'Error retrieving '+(selected.app ? 'app' : 'module'));
+                return status('failure', 'Error retrieving '+(app ? 'app' : 'module'));
               }
               if (selected && selected.entry == entry)
                 navigate(name, version, app, panel, ln, true);
