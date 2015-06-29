@@ -22,7 +22,20 @@ p {
 }
 a {
   text-decoration: none;
+  color: #33c;
+}
+a:hover {
+  text-decoration: underline;
+}
+a.block {
+  display: block;
   color: black;
+}
+a.block:hover, header a:hover {
+  text-decoration: none;
+}
+a.block:hover h2 {
+  text-decoration: underline;
 }
 svg {
   width: 15px;
@@ -80,6 +93,9 @@ a.button {
   text-decoration: none;
   color: #666;
   background: #f7f7f7;
+}
+button.icon svg, a.button.icon svg {
+  margin-right: 0;
 }
 button:hover, a.button:hover {
   color: white;
@@ -151,7 +167,6 @@ header li a:hover {
   image-rendering: pixelated;
   font: 500 24px/32px "Segoe UI", ArialMT, sans-serif;
   color: black;
-  text-decoration: none;
 }
 .account {
   float: right;
@@ -505,7 +520,6 @@ pre em {
   max-width: 670px;
 }
 #page-user aside {
-  float: left;
   width: 200px;
   margin-left: -230px;
   font-size: 14px;
@@ -516,8 +530,10 @@ pre em {
 }
 #page-user aside a {
   display: block;
-  color: #33c;
   margin-bottom: 8px;
+}
+#page-user aside a svg {
+  fill: #666;
 }
 #page-user h1 {
   margin: 0;
@@ -526,12 +542,23 @@ pre em {
   color: black;
 }
 #page-user h2 {
-  margin: 0 0 5px 0;
+  margin-bottom: 0;
 }
 #page-user p {
-  margin: 0 0 1em 0;
   line-height: 1;
+  margin-top: .5em;
   color: #666;
+}
+form.menu {
+  display: block;
+  background: transparent;
+  margin: 0;
+  padding: 0;
+}
+.menu button, .menu a.button {
+  color: #666;
+  background: #f7f7f7;
+  margin: 0 5px 5px 0;
 }
 @media only screen and (max-width: 600px) {
   #page-user main {
