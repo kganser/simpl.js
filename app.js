@@ -70,7 +70,7 @@ simpl.add('app', function(o) {
     var navigate = function(name, version, app, panel, ln, refresh) { // TODO: remove `refresh`
       var entry = (app ? apps : modules)[name],
           versions = entry && entry.versions;
-      if (entry = versions[version]) {
+      if (entry = entry && versions[version]) {
         var first = app ? entry.running ? 'log' : 'code' : 'docs',
             next = {settings: first, code: 'settings'}[panel = panel || first] || 'code';
         if (selected) body.classList.remove('show-'+selected.panel);
