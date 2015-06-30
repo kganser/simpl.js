@@ -196,6 +196,10 @@ nav .icon-loading, nav .icon-error {
   height: 15px;
   color: #666;
 }
+nav .icon-fork {
+  height: 15px;
+  color: #666;
+}
 nav .icon-error {
   color: #c33;
 }

@@ -8,14 +8,20 @@ simpl.add('app', function(o) {
   
   return function(apps, modules, user, token, body) {
     Object.keys(apps).forEach(function(name) {
-      apps[name].forEach(function(version, i, app) {
-        app[i] = {minor: version, log: []};
+      var versions = {},
+          n = name.split('@');
+      Object.keys(apps[name]).forEach(function(v) {
+        versions[n[1] ? v : +v+1] = {minor: apps[name][v], log: []};
       });
+      apps[name] = {name: n[0], source: n[1], versions: versions};
     });
     Object.keys(modules).forEach(function(name) {
-      modules[name].forEach(function(version, i, module) {
-        module[i] = {minor: version};
+      var versions = {},
+          n = name.split('@');
+      Object.keys(modules[name]).forEach(function(v) {
+        versions[n[1] ? v : +v+1] = {minor: modules[name][v]};
       });
+      modules[name] = {name: n[0], source: n[1], versions: versions};
     });
     var appList, moduleList, selected, code, config, major, minor, del, dependencies, search, suggest, timeline, history, log, docs, status, connect, send, servers,
         icons = {}, dom = o.html.dom, boilerplate = 'function(modules) {\n  \n}';
@@ -62,9 +68,9 @@ simpl.add('app', function(o) {
       ]}};
     };
     var navigate = function(name, version, app, panel, ln, refresh) { // TODO: remove `refresh`
-      var versions = (app ? apps : modules)[name],
-          entry = versions && versions[version-1];
-      if (entry) {
+      var entry = (app ? apps : modules)[name],
+          versions = entry && entry.versions;
+      if (entry = versions[version]) {
         var first = app ? entry.running ? 'log' : 'code' : 'docs',
             next = {settings: first, code: 'settings'}[panel = panel || first] || 'code';
         if (selected) body.classList.remove('show-'+selected.panel);
@@ -86,7 +92,7 @@ simpl.add('app', function(o) {
             suggest();
             del.style.display = entry.minor || version > 1 ? 'none' : 'inline-block';
             major.parentNode.style.display = entry.minor ? 'inline-block' : 'none';
-            major.textContent = 'Publish v'+(versions.length+1)+'.0';
+            major.textContent = 'Publish v'+(Object.keys(versions).length+1)+'.0';
             minor.textContent = 'Publish v'+version+'.'+entry.minor;
             timeline(name, version, app);
             if (app) dom(entry.log.map(logLine), log, true);
@@ -162,11 +168,12 @@ simpl.add('app', function(o) {
         if (e.target.status != 200)
           return status('failure', 'Error publishing new version');
         status('success', 'Published');
-        var versions = (current.app ? apps : modules)[current.name],
+        var versions = (current.app ? apps : modules)[current.name].versions,
             version = upgrade
-              ? versions.push(current.app ? {minor: 1, log: []} : {minor: 1})
+              ? Object.keys(versions).length+1
               : 'v'+current.version+'.'+entry.minor++;
         if (upgrade) {
+          versions[version] = current.app ? {minor: 1, log: []} : {minor: 1};
           (current.app ? appList : moduleList).insertBefore(
             dom(li(current.name, version, 1, current.app)),
             versions[version-2].tab.nextSibling);
@@ -187,10 +194,12 @@ simpl.add('app', function(o) {
       });
     };
     var li = function(name, major, minor, app) {
-      var entry = (app ? apps : modules)[name][major-1],
-          version = minor ? 'v'+major+'.'+(minor-1) : '';
+      var entry = (app ? apps : modules)[name],
+          version = entry.versions[major],
+          v = entry.source ? entry.source+' v'+major
+            : minor ? 'v'+major+'.'+(minor-1) : '';
       return {li: function(elem) {
-        entry.tab = elem;
+        version.tab = elem;
         elem.onclick = function(e) {
           if (!this.classList.contains('selected'))
             navigate(name, major, app);
@@ -198,7 +207,7 @@ simpl.add('app', function(o) {
         return [
           {div: {className: 'controls', children: [
             {button: {className: 'view', onclick: function() { navigate(name, major, app, this.className.replace(/\s*view\s*/, '')); }, children: function(e) {
-              entry.view = e;
+              version.view = e;
               return [app || icons.info, icons.code, icons.settings, app && icons.log];
             }}},
             app && ['run', 'restart', 'stop'].map(function(command) {
@@ -210,8 +219,8 @@ simpl.add('app', function(o) {
           ]}},
           {span: {
             className: 'name',
-            title: version ? name+' '+version : name,
-            children: [icons.loading, icons.error, name, {span: version}]
+            title: v ? entry.name+' '+v : entry.name,
+            children: [icons.loading, icons.error, entry.name, {span: entry.source ? [icons.fork, v] : v}]
           }}
         ];
       }};
@@ -258,8 +267,10 @@ simpl.add('app', function(o) {
               status('Connecting...', 'connecting');
               server = host || undefined;
               appList.classList.add('disabled');
-              Object.keys(apps).forEach(function(app) {
-                apps[app].forEach(function(entry) {
+              Object.keys(apps).forEach(function(name) {
+                var versions = apps[name].versions;
+                Object.keys(versions).forEach(function(version) {
+                  var entry = versions[version];
                   entry.tab.classList.remove('running', 'error');
                   entry.running = false;
                   entry.log = [];
@@ -279,7 +290,8 @@ simpl.add('app', function(o) {
                 var event = message.event,
                     instance = message.instance,
                     data = message.data || {},
-                    entry = (apps[data.app] || {})[data.version-1];
+                    entry = apps[data.app];
+                if (entry) entry = entry.versions[data.version];
                 if (event in {error: 1, log: 1, run: 1, stop: 1} && (instance != server || !entry)) return;
                 switch (event) {
                   case 'connect':
@@ -304,7 +316,7 @@ simpl.add('app', function(o) {
                   case 'state':
                     Object.keys(data).forEach(function(app) {
                       if (apps[app]) data[app].forEach(function(version) {
-                        if (app = apps[app][version-1]) {
+                        if (app = apps[app].versions[version]) {
                           app.tab.classList.add('running');
                           app.running = true;
                         }
@@ -376,13 +388,14 @@ simpl.add('app', function(o) {
           }}},
           {button: {title: 'Add', children: icons.add, onclick: function() {
             var field = this.previousSibling,
-                name = field.value;
+                name = field.value,
+                error = name ? ~name.indexOf('@') && 'Illegal character: @' : 'Please enter app name';
             field.value = '';
-            if (!name || apps[name]) {
+            if (error) {
               field.focus();
-              alert(name ? 'App name taken' : 'Please enter app name');
+              alert(error);
             } else {
-              apps[name] = [{minor: 0, code: boilerplate, config: {}, dependencies: {}, doc: CodeMirror.Doc(boilerplate, {name: 'javascript'}), log: []}];
+              apps[name] = {versions: {minor: 0, code: boilerplate, config: {}, dependencies: {}, doc: CodeMirror.Doc(boilerplate, {name: 'javascript'}), log: []}};
               dom(li(name, 1, null, true), appList).className = 'changed';
               navigate(name, 1, true);
               code.setCursor(1, 2);
@@ -393,8 +406,9 @@ simpl.add('app', function(o) {
         {ul: function(e) {
           appList = e;
           return Object.keys(apps).map(function(name) {
-            return apps[name].map(function(app, major) {
-              return li(name, major+1, app.minor, true);
+            var versions = apps[name].versions;
+            return Object.keys(versions).map(function(major) {
+              return li(name, major, versions[major].minor, true);
             });
           });
         }},
@@ -405,13 +419,14 @@ simpl.add('app', function(o) {
           }}},
           {button: {title: 'Add', children: icons.add, onclick: function() {
             var field = this.previousSibling,
-                name = field.value;
+                name = field.value,
+                error = name ? ~name.indexOf('@') && 'Illegal character: @' : 'Please enter app name';
             field.value = '';
-            if (!name || modules[name]) {
+            if (error) {
               field.focus();
-              alert(name ? 'Module name taken' : 'Please enter module name');
+              alert(error);
             } else {
-              modules[name] = [{minor: 0, code: boilerplate, dependencies: {}, doc: CodeMirror.Doc(boilerplate, {name: 'javascript'})}];
+              modules[name] = {versions: {minor: 0, code: boilerplate, dependencies: {}, doc: CodeMirror.Doc(boilerplate, {name: 'javascript'})}};
               dom(li(name, 1), moduleList).className = 'changed';
               navigate(name, 1, false, 'code');
               code.setCursor(1, 2);
@@ -422,8 +437,9 @@ simpl.add('app', function(o) {
         {ul: function(e) {
           moduleList = e;
           return Object.keys(modules).map(function(name) {
-            return modules[name].map(function(module, major) {
-              return li(name, major+1, module.minor);
+            var versions = modules[name].versions;
+            return Object.keys(versions).map(function(major) {
+              return li(name, major, versions[major].minor);
             });
           });
         }},
@@ -523,11 +539,13 @@ simpl.add('app', function(o) {
                 if (e.keyCode != 13) {
                   var results = [], value = this.value;
                   if (value) Object.keys(modules).forEach(function(name) {
-                    if (~name.indexOf(value) && (selected.app || name != selected.name))
-                      modules[name].forEach(function(version, i) {
-                        results.push({name: name, version: -i}); // current
-                        if (version.minor) results.push({name: name, version: i+1}); // published
+                    if (~name.indexOf(value) && (selected.app || name != selected.name)) {
+                      var versions = modules[name].versions;
+                      Object.keys(versions).forEach(function(version) {
+                        results.push({name: name, version: 1-version}); // current
+                        if (versions[version].minor) results.push({name: name, version: +version}); // published
                       });
+                    }
                   });
                   suggest(results);
                 } else if (this.nextSibling.firstChild) {
@@ -539,7 +557,7 @@ simpl.add('app', function(o) {
                   dom(matches && matches.map(function(match) {
                     var module = modules[match.name],
                         v = match.version;
-                    if (v < 0 || !v && module[0] && module[0].minor) v--;
+                    if (v < 0 || !v && module.versions[1] && module.versions[1].minor) v--;
                     return {li: [{button: {className: 'name', children: [match.name, {span: v ? v > 0 ? 'v'+v : 'v'+-v+' current' : ''}], onclick: function() {
                       var entry = selected.entry;
                       search.value = '';
@@ -561,7 +579,7 @@ simpl.add('app', function(o) {
                 dom(Object.keys(values).map(function(name) {
                   var module = modules[name],
                       v = values[name];
-                  if (v < 0 || !v && module && module[0] && module[0].minor) v--;
+                  if (v < 0 || !v && module && module.versions[1] && module.versions[1].minor) v--;
                   return {li: {className: 'module', children: [
                     {button: {className: 'delete', title: 'Remove', children: '×', onclick: function() {
                       var button = this,
@@ -721,7 +739,7 @@ simpl.add('app', function(o) {
                     dom([{span: null}, name], elem.firstChild, true));
                 first = last = null;
                 history();
-                var minor = (app ? apps : modules)[name][version-1].minor;
+                var minor = (app ? apps : modules)[name].versions[version].minor;
                 dom(new Array(minor+1).join().split(',').map(function(x, i) {
                   return {li: [{span: null}, i ? 'v'+version+'.'+(minor-i) : 'Current']};
                 }), elem, true);
