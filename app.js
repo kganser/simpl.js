@@ -393,13 +393,13 @@ simpl.add('app', function(o) {
                 name = field.value,
                 error = !name ? 'Please enter app name'
                   : ~name.indexOf('@') ? 'Illegal character: @'
-                  : modules[name] && 'App name already exists';
+                  : apps[name] && 'App name already exists';
             if (error) {
               field.focus();
               alert(error);
             } else {
               field.value = '';
-              apps[name] = {versions: {minor: 0, code: boilerplate, config: {}, dependencies: {}, doc: CodeMirror.Doc(boilerplate, {name: 'javascript'}), log: []}};
+              apps[name] = {name: name, versions: {1: {minor: 0, code: boilerplate, config: {}, dependencies: {}, doc: CodeMirror.Doc(boilerplate, {name: 'javascript'}), log: []}}};
               dom(li(name, 1, null, true), appList).className = 'changed';
               navigate(name, 1, true);
               code.setCursor(1, 2);
@@ -432,7 +432,7 @@ simpl.add('app', function(o) {
               alert(error);
             } else {
               field.value = '';
-              modules[name] = {versions: {minor: 0, code: boilerplate, dependencies: {}, doc: CodeMirror.Doc(boilerplate, {name: 'javascript'})}};
+              modules[name] = {name: name, versions: {1: {minor: 0, code: boilerplate, dependencies: {}, doc: CodeMirror.Doc(boilerplate, {name: 'javascript'})}}};
               dom(li(name, 1), moduleList).className = 'changed';
               navigate(name, 1, false, 'code');
               code.setCursor(1, 2);
