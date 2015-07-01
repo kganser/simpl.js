@@ -23,7 +23,7 @@ simpl.add('app', function(o) {
       });
       modules[name] = {name: n[0], source: n[1], versions: versions};
     });
-    var appList, moduleList, selected, code, config, major, minor, del, dependencies, search, suggest, timeline, history, log, docs, status, connect, send, servers,
+    var appList, moduleList, selected, code, config, major, minor, remove, dependencies, search, suggest, timeline, history, log, docs, status, connect, send, servers,
         icons = {}, dom = o.html.dom, boilerplate = 'function(modules) {\n  \n}';
     // Entypo pictograms by Daniel Bruce — www.entypo.com
     Array.prototype.slice.call(document.getElementById('icons').childNodes).forEach(function(icon) {
@@ -68,10 +68,10 @@ simpl.add('app', function(o) {
       ]}};
     };
     var navigate = function(name, version, app, panel, ln, refresh) { // TODO: remove `refresh`
-      var entry = (app ? apps : modules)[name],
-          versions = entry && entry.versions;
-      if (entry = entry && versions[version]) {
-        var first = app ? entry.running ? 'log' : 'code' : 'docs',
+      var record = (app ? apps : modules)[name];
+      if (record) {
+        var entry = record.versions[version],
+            first = app ? entry.running ? 'log' : 'code' : 'docs',
             next = {settings: first, code: 'settings'}[panel = panel || first] || 'code';
         if (selected) body.classList.remove('show-'+selected.panel);
         if (selected && selected.entry == entry && !refresh) {
@@ -90,11 +90,13 @@ simpl.add('app', function(o) {
             dependencies(entry.dependencies);
             search.value = '';
             suggest();
-            del.style.display = entry.minor || version > 1 ? 'none' : 'inline-block';
-            major.parentNode.style.display = entry.minor ? 'inline-block' : 'none';
-            major.textContent = 'Publish v'+(Object.keys(versions).length+1)+'.0';
+            remove.parentNode.style.display = record.source || !entry.minor ? 'inline-block' : 'none';
+            major.parentNode.style.display = record.source || !entry.minor ? 'none' : 'inline-block';
+            minor.parentNode.style.display = record.source ? 'none' : 'inline-block';
+            remove.textContent = record.source ? 'Remove' : 'Delete';
+            major.textContent = 'Publish v'+(Object.keys(record.versions).length+1)+'.0';
             minor.textContent = 'Publish v'+version+'.'+entry.minor;
-            timeline(name, version, app);
+            timeline(record, version);
             if (app) dom(entry.log.map(logLine), log, true);
             else docs(name, entry.code);
           } else if (!refresh && !entry.tab.classList.contains('loading')) {
@@ -144,10 +146,10 @@ simpl.add('app', function(o) {
         selected.entry.tab.classList.remove('selected');
         selected = body.className = null;
       }
-      if (!name == !entry && !refresh) {
-        var path = entry ? url(selected)+'/'+panel : '/';
+      if (!name == !record && !refresh) {
+        var path = record ? url(selected)+'/'+panel : '/';
         if (location.pathname != path) window.history.pushState(null, null, path);
-        document.title = name ? name : 'Simpl.js';
+        document.title = record ? record.name : 'Simpl.js';
       }
     };
     var publish = function(upgrade) {
@@ -190,7 +192,7 @@ simpl.add('app', function(o) {
           minor.textContent = 'Publish v'+current.version+'.'+entry.minor;
         }
         major.parentNode.style.display = 'inline-block';
-        del.style.display = 'none';
+        remove.parentNode.style.display = 'none';
       });
     };
     var li = function(name, major, minor, app) {
@@ -211,7 +213,7 @@ simpl.add('app', function(o) {
               return [app || icons.info, icons.code, icons.settings, app && icons.log];
             }}},
             app && ['run', 'restart', 'stop'].map(function(command) {
-              return {button: {className: command, title: command[0].toUpperCase()+command.slice(1), children: icons[command], onclick: function(e) {
+              return {button: {className: command, title: command[0].toUpperCase()+command.substr(1), children: icons[command], onclick: function(e) {
                 e.stopPropagation();
                 send(command, {app: name, version: major});
               }}};
@@ -506,7 +508,7 @@ simpl.add('app', function(o) {
           {section: {id: 'actions', children: [
             {button: {className: 'publish', children: [icons.upgrade, {span: function(e) { major = e; }}], onclick: function() { publish(true); }}}, {br: null},
             {button: {className: 'publish', children: [icons.upgrade, {span: function(e) { minor = e; }}], onclick: function() { publish(); }}}, {br: null},
-            {button: {className: 'delete', children: function(e) { del = e; return [icons.delete, 'Delete']; }, onclick: function() {
+            {button: {className: 'delete', children: [icons.delete, {span: function(e) { remove = e; }}], onclick: function() {
               var button = this,
                   current = selected,
                   type = selected.app ? 'app' : 'module';
@@ -732,17 +734,17 @@ simpl.add('app', function(o) {
                   })});
                 }
               };
-              timeline = function(name, version, app) {
-                if (arguments.length == 1)
+              timeline = function(record, major) {
+                if (typeof record == 'string')
                   return elem.insertBefore(
                     dom({li: [{span: null}, 'Current']}),
-                    dom([{span: null}, name], elem.firstChild, true));
+                    dom([{span: null}, record], elem.firstChild, true));
                 first = last = null;
                 history();
-                var minor = (app ? apps : modules)[name].versions[version].minor;
+                var minor = record.versions[major].minor;
                 dom(new Array(minor+1).join().split(',').map(function(x, i) {
-                  return {li: [{span: null}, i ? 'v'+version+'.'+(minor-i) : 'Current']};
-                }), elem, true);
+                  return {li: [{span: null}, i ? 'v'+major+'.'+(minor-i) : 'Current']};
+                }).slice(record.source ? 1 : 0), elem, true);
               };
             }}},
             {table: function(e) {
