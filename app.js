@@ -157,7 +157,7 @@ simpl.add('app', function(o) {
       var current = selected,
           entry = selected.entry,
           group = selected.app ? apps : modules,
-          type = group == apps ? 'app' : 'module',
+          type = selected.app ? 'app' : 'module',
           name = selected.name in group ? '' : selected.name,
           message = 'This change requires you to copy this '+type+' to your account. Please give it a unique name within your existing '+type+'s to continue.';
       do {
@@ -169,11 +169,19 @@ simpl.add('app', function(o) {
       request(url(selected)+'?name='+encodeURIComponent(name), {method: 'POST'}, function(e) {
         if (e.target.status != 200)
           return status('failure', 'Error copying linked '+type);
-        group[name] = {name: name, versions: {1: {minor: 0, code: entry.code, config: entry.config, dependencies: entry.dependencies, doc: entry.doc, tab: entry.tab}}};
-        delete group[current.id];
+        group[name] = {name: name, versions: {1: {
+          minor: 0,
+          code: entry.code,
+          config: entry.config,
+          dependencies: entry.dependencies,
+          doc: entry.doc,
+          log: []
+        }}};
         // TODO: move to position
-        dom([icons.error, name, {span: null}], entry.tab.lastChild, true).title = name;
-        navigate(name, version, current.app, current.panel);
+        dom(li(name, 1, null, current.app), current.app ? appList : moduleList);
+        entry.tab.parentNode.removeChild(entry.tab);
+        navigate(name, 1, current.app, current.panel);
+        delete group[current.id];
         callback();
       });
     };
