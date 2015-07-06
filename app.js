@@ -37,7 +37,7 @@ simpl.add('app', function(o) {
       };
     });
     var url = function(e, source) {
-      return (e.app ? '/apps/' : '/modules/')+encodeURIComponent(e.name)+(source ? '?source=' : '/')+e.version;
+      return (e.app ? '/apps/' : '/modules/')+encodeURIComponent(e.id)+(source ? '?source=' : '/')+e.version;
     };
     var request = function(path, options, callback) {
       if (typeof options == 'function') {
@@ -81,7 +81,7 @@ simpl.add('app', function(o) {
             selected.entry.tab.classList.remove('selected');
             body.classList.remove(selected.app ? 'show-app' : 'show-module');
           }
-          selected = {name: name, version: version, app: app, entry: entry, panel: panel};
+          selected = {id: name, name: record.name, source: record.source, version: version, app: app, entry: entry, panel: panel};
           body.classList.add(app ? 'show-app' : 'show-module');
           entry.tab.classList.add('selected');
           if ('code' in entry) {
@@ -152,6 +152,31 @@ simpl.add('app', function(o) {
         document.title = record ? record.name : 'Simpl.js';
       }
     };
+    var fork = function(callback) {
+      if (!selected.source) return callback();
+      var current = selected,
+          entry = selected.entry,
+          group = selected.app ? apps : modules,
+          type = group == apps ? 'app' : 'module',
+          name = selected.name in group ? '' : selected.name,
+          message = 'This change requires you to copy this '+type+' to your account. Please give it a unique name within your existing '+type+'s to continue.';
+      do {
+        name = prompt(message, name);
+        message = name ? ~name.indexOf('@') ? 'Illegal character: @' : name in group ? 'Name already exists.' : false : 'Please enter a name.';
+      } while (name != null && message);
+      if (!name) return;
+      status('info', 'Copying linked '+type+'...');
+      request(url(selected)+'?name='+encodeURIComponent(name), {method: 'POST'}, function(e) {
+        if (e.target.status != 200)
+          return status('failure', 'Error copying linked '+type);
+        group[name] = {name: name, versions: {1: {minor: 0, code: entry.code, config: entry.config, dependencies: entry.dependencies, doc: entry.doc, tab: entry.tab}}};
+        delete group[current.id];
+        // TODO: move to position
+        dom([icons.error, name, {span: null}], entry.tab.lastChild, true).title = name;
+        navigate(name, version, current.app, current.panel);
+        callback();
+      });
+    };
     var publish = function(upgrade) {
       var current = selected,
           entry = selected.entry,
@@ -170,14 +195,14 @@ simpl.add('app', function(o) {
         if (e.target.status != 200)
           return status('failure', 'Error publishing new version');
         status('success', 'Published');
-        var versions = (current.app ? apps : modules)[current.name].versions,
+        var versions = (current.app ? apps : modules)[current.id].versions,
             version = upgrade
               ? Object.keys(versions).length+1
               : 'v'+current.version+'.'+entry.minor++;
         if (upgrade) {
           versions[version] = current.app ? {minor: 1, log: []} : {minor: 1};
           (current.app ? appList : moduleList).insertBefore(
-            dom(li(current.name, version, 1, current.app)),
+            dom(li(current.id, version, 1, current.app)),
             versions[version-2].tab.nextSibling);
           major.textContent = 'Publish v'+(version+1)+'.0';
         } else {
@@ -196,12 +221,11 @@ simpl.add('app', function(o) {
       });
     };
     var li = function(name, major, minor, app) {
-      var entry = (app ? apps : modules)[name],
-          version = entry.versions[major],
-          v = entry.source ? entry.source+' v'+major
-            : minor ? 'v'+major+'.'+(minor-1) : '';
+      var record = (app ? apps : modules)[name],
+          entry = record.versions[major],
+          v = minor ? 'v'+major+'.'+(minor-1) : '';
       return {li: function(elem) {
-        version.tab = elem;
+        entry.tab = elem;
         elem.onclick = function(e) {
           if (!this.classList.contains('selected'))
             navigate(name, major, app);
@@ -209,7 +233,7 @@ simpl.add('app', function(o) {
         return [
           {div: {className: 'controls', children: [
             {button: {className: 'view', onclick: function() { navigate(name, major, app, this.className.replace(/\s*view\s*/, '')); }, children: function(e) {
-              version.view = e;
+              entry.view = e;
               return [app || icons.info, icons.code, icons.settings, app && icons.log];
             }}},
             app && ['run', 'restart', 'stop'].map(function(command) {
@@ -221,8 +245,8 @@ simpl.add('app', function(o) {
           ]}},
           {span: {
             className: 'name',
-            title: v ? entry.name+' '+v : entry.name,
-            children: [icons.loading, icons.error, entry.name, {span: entry.source ? [icons.fork, v] : v}]
+            title: v ? name+' '+v : name,
+            children: [icons.loading, icons.error, record.name, {span: record.source ? [icons.link, record.source+' '+v] : v}]
           }}
         ];
       }};
@@ -326,7 +350,7 @@ simpl.add('app', function(o) {
                     });
                     if (selected && selected.app) {
                       log.textContent = '';
-                      navigate(selected.name, selected.version, true, selected.panel == 'log' && !selected.entry.running ? 'code' : selected.panel);
+                      navigate(selected.id, selected.version, true, selected.panel == 'log' && !selected.entry.running ? 'code' : selected.panel);
                     }
                     appList.classList.remove('disabled');
                     status();
@@ -492,19 +516,21 @@ simpl.add('app', function(o) {
             code.replaceSelection('  ');
           }});
           CodeMirror.commands.save = function() {
-            var entry = selected.entry,
-                code = entry.doc.getValue();
-            status('info', 'Saving...');
-            request(url(selected), {method: 'PUT', data: code}, function(e) {
-              if (e.target.status != 200)
-                return status('failure', 'Error saving document');
-              status('success', 'Saved');
-              entry.tab.classList.remove('changed');
-              entry.code = code;
-              entry.dirty = false;
-              if (!entry.published) entry.published = [];
-              if (selected && !selected.app && selected.entry == entry)
-                docs(selected.name, entry.code);
+            fork(function() {
+              var entry = selected.entry,
+                  code = entry.doc.getValue();
+              status('info', 'Saving...');
+              request(url(selected), {method: 'PUT', data: code}, function(e) {
+                if (e.target.status != 200)
+                  return status('failure', 'Error saving document');
+                status('success', 'Saved');
+                entry.tab.classList.remove('changed');
+                entry.code = code;
+                entry.dirty = false;
+                if (!entry.published) entry.published = [];
+                if (selected && !selected.app && selected.entry == entry)
+                  docs(selected.name, entry.code);
+              });
             });
           };
         }}},
@@ -524,7 +550,7 @@ simpl.add('app', function(o) {
                 if (e.target.status != 200)
                   return status('failure', 'Error deleting '+type);
                 status('success', 'Deleted');
-                delete (current.app ? apps : modules)[current.name];
+                delete (current.app ? apps : modules)[current.id];
                 current.entry.tab.parentNode.removeChild(current.entry.tab);
                 if (selected && selected.entry == current.entry) navigate();
               });
@@ -545,7 +571,7 @@ simpl.add('app', function(o) {
                 if (e.keyCode != 13) {
                   var results = [], value = this.value;
                   if (value) Object.keys(modules).forEach(function(name) {
-                    if (~name.indexOf(value) && (selected.app || name != selected.name)) {
+                    if (~name.indexOf(value) && (selected.app || name != selected.id)) {
                       var versions = modules[name].versions;
                       Object.keys(versions).forEach(function(version) {
                         results.push({name: name, version: 1-version}); // current
@@ -565,15 +591,17 @@ simpl.add('app', function(o) {
                         v = match.version;
                     if (v < 0 || !v && module.versions[1] && module.versions[1].minor) v--;
                     return {li: [{button: {className: 'name', children: [match.name, {span: v ? v > 0 ? 'v'+v : 'v'+-v+' current' : ''}], onclick: function() {
-                      var entry = selected.entry;
                       search.value = '';
                       suggest();
-                      request(url(selected)+'/dependencies', {method: 'POST', json: match}, function(e) {
-                        if (e.target.status != 200)
-                          return status('failure', 'Error updating dependencies');
-                        entry.dependencies[match.name] = match.version;
-                        if (selected && selected.entry == entry)
-                          dependencies(entry.dependencies);
+                      fork(function() {
+                        var entry = selected.entry;
+                        request(url(selected)+'/dependencies', {method: 'POST', json: match}, function(e) {
+                          if (e.target.status != 200)
+                            return status('failure', 'Error updating dependencies');
+                          entry.dependencies[match.name] = match.version;
+                          if (selected && selected.entry == entry)
+                            dependencies(entry.dependencies);
+                        });
                       });
                     }}}]};
                   }), e, true);
@@ -588,6 +616,7 @@ simpl.add('app', function(o) {
                   if (v < 0 || !v && module && module.versions[1] && module.versions[1].minor) v--;
                   return {li: {className: 'module', children: [
                     {button: {className: 'delete', title: 'Remove', children: '×', onclick: function() {
+                      if (!fork(function() { return true; })) return;
                       var button = this,
                           entry = selected.entry;
                       button.disabled = true;
@@ -680,7 +709,7 @@ simpl.add('app', function(o) {
                   first = target;
                 }
                 var versions = [], range = first && last;
-                for (var i = 0, node = this.firstChild; node; node = node.nextSibling, i++) {
+                for (var i = selected.source ? 1 : 0, node = this.firstChild; node; node = node.nextSibling, i++) {
                   if (node == first || node == last) {
                     versions.push(i ? selected.entry.published[selected.entry.published.length-i].code : selected.entry.code);
                     node.className = range ? versions.length > 1 ? 'last selected' : 'first selected' : 'selected';
@@ -764,7 +793,7 @@ simpl.add('app', function(o) {
         {pre: {id: 'log', children: function(e) { log = e; }, onclick: function(e) {
           if (e.target.className == 'location') {
             var ref = e.target.dataset,
-                name = ref.module || selected.name,
+                name = ref.module || selected.id,
                 version = ref.version ? 1-ref.version : selected.version;
             if (version > 0)
               navigate(name, version, !ref.module, 'code', ref.line);

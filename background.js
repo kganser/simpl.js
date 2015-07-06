@@ -249,7 +249,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           
           if (parts.length < 5 && method == 'POST') {
             var upgrade = parts.length == 3;
-            if (upgrade && !/\d+/.test(request.query.source)) return response.error();
+            if (upgrade && !/^\d+$/.test(request.query.source)) return response.error();
             return forward(request.uri.substr(1), function(callback) {
               db.get(upgrade ? path+'/'+(request.query.source-1) : path, true).then(function(version) {
                 if (!version) return response.error();
@@ -298,33 +298,28 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                   });
                 }, response.ok, method, code, true);
               }, 'utf8', 262144);
-            if (method == 'DELETE')
+            if (method == 'DELETE') // TODO: use unversioned path
               return forward(uri, function(callback) {
                 db.delete(path).then(function() {
                   parts[3] = 0;
-                  this.get(parts.join('/'), false).then(function(exists) {
+                  this.get(parts.join('/'), function() { return false; }).then(function(exists) {
                     if (exists) return callback();
                     this.delete(parts[0]+'/'+parts[1]).then(callback);
                   });
                 });
               }, response.ok, method);
-          } else if (parts[4] == 'config') {
-            if (method == 'PUT')
-              return request.slurp(function(body) {
-                if (body === undefined) return response.generic(415);
-                forward(uri, function(callback) {
-                  if (!app) return response.error();
-                  db.put(path, body).then(function(error) {
-                    if (!error) return callback();
-                    if (parts[3]) return response.error();
-                    create(this, null, body).then(callback);
-                  });
-                }, response.ok, method, body);
-              }, 'json');
-            if (method == 'DELETE')
-              return forward(uri, function(callback) {
-                db.delete(path).then(callback);
-              }, response.ok, method);
+          } else if (parts[4] == 'config' && method == 'PUT') {
+            return request.slurp(function(body) {
+              if (body === undefined) return response.generic(415);
+              forward(uri, function(callback) {
+                if (!app) return response.error();
+                db.put(path, body).then(function(error) {
+                  if (!error) return callback();
+                  if (parts[3]) return response.error();
+                  create(this, null, body).then(callback);
+                });
+              }, response.ok, method, body);
+            }, 'json');
           } else if (parts[4] == 'dependencies') {
             if (method == 'POST' && parts.length == 5)
               return request.slurp(function(body) {
