@@ -237,6 +237,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           parts.splice(2, 0, 'versions');
           var path = parts.join('/');
           
+          // TODO: create client-side
           var create = function(trans, code, config, dependency) {
             var record = {
               code: code || 'function(modules) {\n  \n}',
@@ -300,17 +301,11 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
               }, 'utf8', 262144);
             if (method == 'DELETE') // TODO: use unversioned path
               return forward(uri, function(callback) {
-                db.delete(path).then(function() {
-                  parts[3] = 0;
-                  this.get(parts.join('/'), function() { return false; }).then(function(exists) {
-                    if (exists) return callback();
-                    this.delete(parts[0]+'/'+parts[1]).then(callback);
-                  });
-                });
+                db.delete(parts[0]+'/'+parts[1]).then(callback);
               }, response.ok, method);
           } else if (parts[4] == 'config' && method == 'PUT') {
             return request.slurp(function(body) {
-              if (body === undefined) return response.generic(415);
+              if (body === undefined) return response.error();
               forward(uri, function(callback) {
                 if (!app) return response.error();
                 db.put(path, body).then(function(error) {
@@ -323,8 +318,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           } else if (parts[4] == 'dependencies') {
             if (method == 'POST' && parts.length == 5)
               return request.slurp(function(body) {
-                if (body === undefined) return response.generic(415);
-                if (body.name == null || typeof body.version != 'number') return response.error();
+                if (!body || !body.name || typeof body.version != 'number') return response.error();
                 forward(uri, function(callback) {
                   db.put(path+'/'+encodeURIComponent(body.name), body.version).then(function(error) {
                     if (!error) return callback();

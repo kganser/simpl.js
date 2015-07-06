@@ -178,7 +178,7 @@ simpl.add('app', function(o) {
           log: []
         }}};
         // TODO: move to position
-        dom(li(name, 1, null, current.app), current.app ? appList : moduleList);
+        dom(li(name, 1, 0, current.app), current.app ? appList : moduleList);
         entry.tab.parentNode.removeChild(entry.tab);
         navigate(name, 1, current.app, current.panel);
         delete group[current.id];
