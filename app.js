@@ -166,9 +166,18 @@ simpl.add('app', function(o) {
       } while (name != null && message);
       if (!name) return;
       status('info', 'Copying linked '+type+'...');
+      // TODO: use pegged minor version
       request(url(selected)+'?name='+encodeURIComponent(name), {method: 'POST'}, function(e) {
         if (e.target.status != 200)
           return status('failure', 'Error copying linked '+type);
+        status('success', 'Copied successfully');
+        Object.keys(entry.dependencies).forEach(function(name) {
+          var scoped = name.split('@');
+          if (scoped = scoped[1] ? scoped[1] == user.username ? scoped[0] : false : scoped[0]+'@'+current.source) {
+            entry.dependencies[scoped] = entry.dependencies[name];
+            delete entry.dependencies[name];
+          }
+        });
         group[name] = {name: name, versions: {1: {
           minor: 0,
           code: entry.code,
@@ -182,7 +191,7 @@ simpl.add('app', function(o) {
         entry.tab.parentNode.removeChild(entry.tab);
         navigate(name, 1, current.app, current.panel);
         delete group[current.id];
-        callback();
+        if (callback) callback();
       });
     };
     var publish = function(upgrade) {
@@ -597,7 +606,7 @@ simpl.add('app', function(o) {
                   dom(matches && matches.map(function(match) {
                     var module = modules[match.name],
                         v = match.version;
-                    if (v < 0 || !v && module.versions[1] && module.versions[1].minor) v--;
+                    if (v < 0 || !v && module.versions[1].minor) v--;
                     return {li: [{button: {className: 'name', children: [match.name, {span: v ? v > 0 ? 'v'+v : 'v'+-v+' current' : ''}], onclick: function() {
                       search.value = '';
                       suggest();
@@ -618,26 +627,29 @@ simpl.add('app', function(o) {
             ]}},
             {ul: function(e) {
               dependencies = function(values) {
-                dom(Object.keys(values).map(function(name) {
-                  var module = modules[name],
-                      v = values[name];
-                  if (v < 0 || !v && module && module.versions[1] && module.versions[1].minor) v--;
+                dom(Object.keys(values).map(function(id) {
+                  var scoped = id.split('@'),
+                      name = scoped[0],
+                      source = scoped[1] == user.username ? null : scoped[1] || selected.source,
+                      module = modules[id],
+                      v = values[id];
+                  if (v < 0 || !v && module && module.versions[1].minor) v--;
                   return {li: {className: 'module', children: [
                     {button: {className: 'delete', title: 'Remove', children: '×', onclick: function() {
-                      if (!fork(function() { return true; })) return;
+                      if (selected.source) return fork();
                       var button = this,
                           entry = selected.entry;
                       button.disabled = true;
-                      request(url(selected)+'/dependencies/'+encodeURIComponent(name), {method: 'DELETE'}, function(e) {
+                      request(url(selected)+'/dependencies/'+encodeURIComponent(id), {method: 'DELETE'}, function(e) {
                         button.disabled = false;
                         if (e.target.status != 200)
                           return status('failure', 'Error updating dependencies');
-                        delete entry.dependencies[name];
+                        delete entry.dependencies[id];
                         if (selected && selected.entry == entry)
                           button.parentNode.parentNode.removeChild(button.parentNode);
                       });
                     }}},
-                    {span: {className: 'name', children: [name, {span: v ? v > 0 ? 'v'+v : 'v'+-v+' current' : ''}]}}
+                    {span: {className: 'name', children: [name, {span: v ? v > 0 ? source ? [icons.link, source+' v'+v] : 'v'+v : 'v'+-v+' current' : ''}]}}
                   ]}};
                 }), e, true);
               };

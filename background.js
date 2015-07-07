@@ -249,15 +249,17 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           };
           
           if (parts.length < 5 && method == 'POST') {
-            var upgrade = parts.length == 3;
-            if (upgrade && !/^\d+$/.test(request.query.source)) return response.error();
+            var upgrade = parts.length == 3,
+                source = request.query.source;
+            if (upgrade && !/^\d+$/.test(source)) return response.error();
             return forward(request.uri.substr(1), function(callback) {
-              db.get(upgrade ? path+'/'+(request.query.source-1) : path, true).then(function(version) {
+              db.get(upgrade ? path+'/'+(source-1) : path, true).then(function(version) {
                 if (!version) return response.error();
                 if (Object.keys(version.dependencies).some(function(name) { return version.dependencies[name] < 1; }))
                   return response.error();
                 var published = version.published.pop();
-                if (published && version.code == published.code &&
+                if (!published && upgrade ||
+                    published && version.code == published.code &&
                     JSON.stringify(version.config) == JSON.stringify(published.config) &&
                     JSON.stringify(version.dependencies) == JSON.stringify(published.dependencies))
                   return response.error();
@@ -269,7 +271,11 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                     code: version.code,
                     config: version.config,
                     dependencies: version.dependencies
-                  }]
+                  }],
+                  source: {
+                    major: +source,
+                    minor: version.published.length-1
+                  }
                 };
                 if (!app) {
                   delete record.config;
