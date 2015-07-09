@@ -123,8 +123,8 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       client.send(JSON.stringify({event: 'log', data: log}));
     });
   };
-  var run = function(user, name, version, token, instance) { // TODO: use instance token
-    var id = [user, name, version].map(encodeURIComponent).join('/');
+  var run = function(user, name, version, token, instance) {
+    var id = [user, name, version].map(encodeURIComponent).join('/'); // TODO: use @ separator, remove encodeURIComponent
     if (apps[id]) return;
     (function(callback) {
       var path = 'apps/'+encodeURIComponent(name);
@@ -135,7 +135,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     }(function(app) {
       if (!app) return broadcast('error', {app: name, version: version, message: 'App not found'}, user);
       logs[id] = [];
-      apps[id] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\nsimpl.use('+JSON.stringify(app.dependencies)+','+app.code+');', function(module, callback) {
+      apps[id] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\nsimpl.use('+JSON.stringify(app.dependencies)+','+app.code+','+JSON.stringify(name.split('@')[1])+');', function(module, callback) {
         var path = 'modules/'+encodeURIComponent(module.name),
             v = module.version,
             current = v < 1;
@@ -148,6 +148,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         }(function(record) {
           if (record && !current) record = record.published.pop();
           if (record) return callback(wrap(module.name, record.code, module.version, record.dependencies));
+          if (!apps[id]) return;
           apps[id].terminate();
           delete logs[id];
           delete apps[id];

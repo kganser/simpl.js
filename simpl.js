@@ -1,4 +1,4 @@
-var simpl = function(modules, clients) {
+var simpl = function(modules, clients, self) {
   var dispatch = function(client) {
     var requested = [];
     for (var i = client ? clients.push(client)-1 : 0; i < clients.length; i++) {
@@ -33,17 +33,15 @@ var simpl = function(modules, clients) {
     }
     return requested;
   };
-  return {
+  return self = {
     add: function(name, module, version, dependencies) {
-      if (dependencies) return simpl.use(dependencies, function(o) {
-        simpl.add(name, function() { return module(o); }, version);
+      return self.use(dependencies || {}, function(o) {
+        if (!modules[name]) modules[name] = {};
+        if (!modules[name][version = parseInt(version, 10) || 0]) {
+          modules[name][version] = {export: function() { return module(o); }};
+          return dispatch();
+        }
       });
-      if (!modules[name]) modules[name] = {};
-      if (!modules[name][version = parseInt(version, 10) || 0]) {
-        modules[name][version] = {export: module};
-        return dispatch();
-      }
-      return [];
     },
     use: function(modules, callback) {
       return dispatch({dependencies: modules, callback: callback});
@@ -212,17 +210,22 @@ if (location.protocol != 'http:') simpl = function(s) {
   
   return {
     add: function(name, module, version, dependencies) {
-      if (dependencies) return simpl.use(dependencies, function(o) {
-        simpl.add(name, function() {
+      return simpl.use(dependencies || {}, function(o) {
+        s.add(name, function() {
           return module(o, channel(false, name));
         }, version);
-      });
-      return s.add(name, function() {
-        return module({}, channel(false, name));
-      }, version);
+      }, name.split('@')[1]);
     },
-    use: function(modules, callback) {
+    use: function(modules, callback, namespace) {
       return load(s.use(modules, function(o) {
+        Object.keys(o).forEach(function(id) {
+          var name = id.split('@'),
+              user = name[1];
+          if (namespace && (!user || namespace == user)) {
+            o[user ? name[0] : name[0]+'@'+simpl.user] = o[id];
+            delete o[id];
+          }
+        });
         try {
           callback(o, channel(false));
         } catch (e) {

@@ -171,13 +171,6 @@ simpl.add('app', function(o) {
         if (e.target.status != 200)
           return status('failure', 'Error copying linked '+type);
         status('success', 'Copied successfully');
-        Object.keys(entry.dependencies).forEach(function(name) {
-          var scoped = name.split('@');
-          if (scoped = scoped[1] ? scoped[1] == user.username ? scoped[0] : false : scoped[0]+'@'+current.source) {
-            entry.dependencies[scoped] = entry.dependencies[name];
-            delete entry.dependencies[name];
-          }
-        });
         group[name] = {name: name, versions: {1: {
           minor: 0,
           code: entry.code,
@@ -628,9 +621,7 @@ simpl.add('app', function(o) {
             {ul: function(e) {
               dependencies = function(values) {
                 dom(Object.keys(values).map(function(id) {
-                  var scoped = id.split('@'),
-                      name = scoped[0],
-                      source = scoped[1] == user.username ? null : scoped[1] || selected.source,
+                  var name = id.split('@'),
                       module = modules[id],
                       v = values[id];
                   if (v < 0 || !v && module && module.versions[1].minor) v--;
@@ -649,7 +640,7 @@ simpl.add('app', function(o) {
                           button.parentNode.parentNode.removeChild(button.parentNode);
                       });
                     }}},
-                    {span: {className: 'name', children: [name, {span: v ? v > 0 ? source ? [icons.link, source+' v'+v] : 'v'+v : 'v'+-v+' current' : ''}]}}
+                    {span: {className: 'name', children: [name[0], {span: v ? v > 0 ? name[1] ? [icons.link, name[1]+' v'+v] : 'v'+v : 'v'+-v+' current' : ''}]}}
                   ]}};
                 }), e, true);
               };
