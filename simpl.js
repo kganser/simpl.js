@@ -212,7 +212,7 @@ if (location.protocol != 'http:') simpl = function(s) {
     add: function(name, module, version, dependencies) {
       return simpl.use(dependencies || {}, function(o) {
         s.add(name, function() {
-          return module(o, channel(false, name));
+          return module(o, channel(false, name.replace(/@simpljs$/, '')));
         }, version);
       }, name.split('@')[1]);
     },
