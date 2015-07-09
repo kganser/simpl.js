@@ -212,6 +212,7 @@ if (location.protocol != 'http:') simpl = function(s) {
     add: function(name, module, version, dependencies) {
       return simpl.use(dependencies || {}, function(o) {
         s.add(name, function() {
+          // TODO: multiple clients for host module (e.g., socket@simpljs, socket v2, etc)
           return module(o, channel(false, name.replace(/@simpljs$/, '')));
         }, version);
       }, name.split('@')[1]);

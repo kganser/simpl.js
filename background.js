@@ -135,7 +135,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     }(function(app) {
       if (!app) return broadcast('error', {app: name, version: version, message: 'App not found'}, user);
       logs[id] = [];
-      apps[id] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';\nsimpl.use('+JSON.stringify(app.dependencies)+','+app.code+','+JSON.stringify(name.split('@')[1])+');', function(module, callback) {
+      apps[id] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';simpl.user='+JSON.stringify(user)+';simpl.use('+JSON.stringify(app.dependencies)+','+app.code+','+JSON.stringify(name.split('@')[1])+');', function(module, callback) {
         var path = 'modules/'+encodeURIComponent(module.name),
             v = module.version,
             current = v < 1;
@@ -182,7 +182,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
   
   o.xhr('/simpl.js', function(e) {
     loader = e.target.responseText;
-    lines = loader.match(/\n/g).length+1;
+    lines = loader.match(/\n/g).length;
   });
   o.xhr('/icons.json', {responseType: 'json'}, function(e) {
     var o = e.target.response;
