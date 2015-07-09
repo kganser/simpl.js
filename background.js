@@ -109,7 +109,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
   var state = function(user, client) {
     var state = {}, log = [];
     Object.keys(apps).forEach(function(id) {
-      var parts = id.split('/').map(decodeURIComponent);
+      var parts = id.split('@');
       if (parts[0] == user) {
         var app = parts[1],
             version = parseInt(parts[2], 10);
@@ -124,7 +124,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     });
   };
   var run = function(user, name, version, token, instance) {
-    var id = [user, name, version].map(encodeURIComponent).join('/'); // TODO: use @ separator, remove encodeURIComponent
+    var id = [user, name, version].join('@');
     if (apps[id]) return;
     (function(callback) {
       var path = 'apps/'+encodeURIComponent(name);
@@ -167,7 +167,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     }));
   };
   var stop = function(user, name, version) {
-    var id = [user, name, version].map(encodeURIComponent).join('/');
+    var id = [user, name, version].join('@');
     if (!apps[id]) return;
     apps[id].terminate();
     broadcast('stop', {app: name, version: version}, user);
