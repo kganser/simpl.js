@@ -206,24 +206,23 @@ simpl.add('app', function(o) {
           return status('failure', 'Error publishing new version');
         status('success', 'Published');
         var versions = (current.app ? apps : modules)[current.id].versions,
-            version = upgrade
-              ? Object.keys(versions).length+1
-              : 'v'+current.version+'.'+entry.minor++;
+            version = Object.keys(versions).length+1;
         if (upgrade) {
           versions[version] = current.app ? {minor: 1, log: []} : {minor: 1};
           (current.app ? appList : moduleList).insertBefore(
             dom(li(current.id, version, 1, current.app)),
-            versions[version-2].tab.nextSibling);
+            versions[version-1].tab.nextSibling);
           major.textContent = 'Publish v'+(version+1)+'.0';
         } else {
           entry.published.push(current.app
             ? {code: entry.code, config: entry.config, dependencies: entry.dependencies}
             : {code: entry.code, dependencies: entry.dependencies});
-          entry.tab.lastChild.title = current.name+' '+version;
-          entry.tab.lastChild.lastChild.textContent = version;
-          timeline(version);
-          major.parentNode.style.display = 'inline-block';
+          var v = 'v'+current.version+'.'+entry.minor++;
+          entry.tab.lastChild.title = current.name+' '+v;
+          entry.tab.lastChild.lastChild.textContent = v;
+          major.textContent = 'Publish v'+version+'.0';
           minor.textContent = 'Publish v'+current.version+'.'+entry.minor;
+          timeline(v);
         }
         major.parentNode.style.display = 'inline-block';
         remove.parentNode.style.display = 'none';
