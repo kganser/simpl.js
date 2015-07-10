@@ -306,10 +306,10 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                   });
                 }, response.ok, method, code, true);
               }, 'utf8', 262144);
-            if (method == 'DELETE') // TODO: use unversioned path
-              return forward(uri, function(callback) {
-                db.delete(parts[0]+'/'+parts[1]).then(callback);
-              }, response.ok, method);
+          } else if (parts.length == 3 && method == 'DELETE') {
+            return forward(uri, function(callback) {
+              db.delete(uri).then(callback);
+            }, response.ok, method);
           } else if (parts[4] == 'config' && method == 'PUT') {
             return request.slurp(function(body) {
               if (body === undefined) return response.error();

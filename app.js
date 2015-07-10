@@ -36,8 +36,8 @@ simpl.add('app', function(o) {
           .setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#'+icon.id);
       };
     });
-    var url = function(e, source) {
-      return (e.app ? '/apps/' : '/modules/')+encodeURIComponent(e.id)+(source ? '?source=' : '/')+e.version;
+    var url = function(e, unversioned) {
+      return (e.app ? '/apps/' : '/modules/')+encodeURIComponent(e.id)+(unversioned ? '' : '/'+e.version);
     };
     var request = function(path, options, callback) {
       if (typeof options == 'function') {
@@ -201,7 +201,7 @@ simpl.add('app', function(o) {
           JSON.stringify(entry.dependencies) == JSON.stringify(published.dependencies))
         return alert('No changes to publish');
       status('info', 'Publishing...');
-      request(url(current, upgrade), {method: 'POST'}, function(e) {
+      request(url(current, true)+(upgrade ? '?source=' : '/')+current.version, {method: 'POST'}, function(e) {
         if (e.target.status != 200)
           return status('failure', 'Error publishing new version');
         status('success', 'Published');
@@ -223,7 +223,6 @@ simpl.add('app', function(o) {
           entry.tab.lastChild.lastChild.textContent = version;
           timeline(version);
           major.parentNode.style.display = 'inline-block';
-          major.textContent = 'Publish v'+(versions.length+1)+'.0';
           minor.textContent = 'Publish v'+current.version+'.'+entry.minor;
         }
         major.parentNode.style.display = 'inline-block';
@@ -555,7 +554,7 @@ simpl.add('app', function(o) {
               if (!confirm('Are you sure you want to delete this '+type+'?')) return;
               button.disabled = true;
               status('info', 'Deleting '+type+'...');
-              request(url(current), {method: 'DELETE'}, function(e) {
+              request(url(current, true), {method: 'DELETE'}, function(e) {
                 button.disabled = false;
                 if (e.target.status != 200)
                   return status('failure', 'Error deleting '+type);
