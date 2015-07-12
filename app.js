@@ -176,6 +176,7 @@ simpl.add('app', function(o) {
           code: entry.code,
           config: entry.config,
           dependencies: entry.dependencies,
+          published: [],
           doc: entry.doc,
           log: []
         }}};
@@ -185,6 +186,16 @@ simpl.add('app', function(o) {
         navigate(name, 1, current.app, current.panel);
         delete group[current.id];
         if (callback) callback();
+      });
+    };
+    var create = function(callback) {
+      var entry = selected.entry;
+      if (entry.published) return callback();
+      request(url(selected), {method: 'PUT', data: entry.code}, function(e) {
+        if (e.target.status != 200)
+          return status('failure', 'Error saving document');
+        entry.published = [];
+        callback();
       });
     };
     var publish = function(upgrade) {
@@ -534,7 +545,7 @@ simpl.add('app', function(o) {
                 entry.code = code;
                 entry.dirty = false;
                 if (!entry.published) entry.published = [];
-                if (selected && !selected.app && selected.entry == entry)
+                if (selected && selected.entry == entry)
                   docs(selected.name, entry.code);
               });
             });
@@ -597,16 +608,19 @@ simpl.add('app', function(o) {
                         v = match.version;
                     if (v < 0 || !v && module.versions[1].minor) v--;
                     return {li: [{button: {className: 'name', children: [match.name, {span: v ? v > 0 ? 'v'+v : 'v'+-v+' current' : ''}], onclick: function() {
+                      var current = selected,
+                          entry = selected.entry;
                       search.value = '';
                       suggest();
                       fork(function() {
-                        var entry = selected.entry;
-                        request(url(selected)+'/dependencies', {method: 'POST', json: match}, function(e) {
-                          if (e.target.status != 200)
-                            return status('failure', 'Error updating dependencies');
-                          entry.dependencies[match.name] = match.version;
-                          if (selected && selected.entry == entry)
-                            dependencies(entry.dependencies);
+                        create(function() {
+                          request(url(current)+'/dependencies', {method: 'POST', json: match}, function(e) {
+                            if (e.target.status != 200)
+                              return status('failure', 'Error updating dependencies');
+                            entry.dependencies[match.name] = match.version;
+                            if (selected && selected.entry == entry)
+                              dependencies(entry.dependencies);
+                          });
                         });
                       });
                     }}}]};
@@ -646,8 +660,8 @@ simpl.add('app', function(o) {
             {h2: 'Configuration'},
             {pre: function(e) {
               config = o.jsonv(e, selected ? selected.entry.config : null, function(method, path, data) {
-                var entry = selected.entry,
-                    config = entry.config;
+                var current = selected,
+                    config = selected.entry.config;
                 path.split('/').map(decodeURIComponent).forEach(function(key, i, path) {
                   if (Array.isArray(config)) key = parseInt(key, 10);
                   if (i < path.length-1) config = config[key];
@@ -656,9 +670,11 @@ simpl.add('app', function(o) {
                   else if (typeof key == 'number') config.splice(key, 1);
                   else delete config[key];
                 });
-                request(url(selected)+'/config', {method: 'PUT', json: entry.config}, function(e) {
-                  if (e.target.status != 200)
-                    status('failure', 'Error updating configuration');
+                create(function() {
+                  request(url(current)+'/config', {method: 'PUT', json: config}, function(e) {
+                    if (e.target.status != 200)
+                      status('failure', 'Error updating configuration');
+                  });
                 });
               });
             }}

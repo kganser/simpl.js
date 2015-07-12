@@ -238,17 +238,6 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           parts.splice(2, 0, 'versions');
           var path = parts.join('/');
           
-          // TODO: create client-side
-          var create = function(trans, code, config, dependency) {
-            var record = {
-              code: code || 'function(modules) {\n  \n}',
-              dependencies: dependency || {},
-              published: []
-            };
-            if (app) record.config = config;
-            return trans.put(parts[0]+'/'+parts[1], {versions: [record]});
-          };
-          
           if (parts.length < 5 && method == 'POST') {
             var upgrade = parts.length == 3,
                 source = request.query.source;
@@ -302,7 +291,9 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                   db.put(path+'/code', code).then(function(error) { // TODO: check If-Match header
                     if (!error) return callback();
                     if (parts[3]) return response.error();
-                    create(this, code).then(callback);
+                    var record = {code: code, dependencies: {}, published: []};
+                    if (app) record.config = config;
+                    this.put(parts[0]+'/'+parts[1], {versions: [record]}).then(callback);
                   });
                 }, response.ok, method, code, true);
               }, 'utf8', 262144);
@@ -315,11 +306,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
               if (body === undefined) return response.error();
               forward(uri, function(callback) {
                 if (!app) return response.error();
-                db.put(path, body).then(function(error) {
-                  if (!error) return callback();
-                  if (parts[3]) return response.error();
-                  create(this, null, body).then(callback);
-                });
+                db.put(path, body).then(callback);
               }, response.ok, method, body);
             }, 'json');
           } else if (parts[4] == 'dependencies') {
@@ -327,13 +314,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
               return request.slurp(function(body) {
                 if (!body || !body.name || typeof body.version != 'number') return response.error();
                 forward(uri, function(callback) {
-                  db.put(path+'/'+encodeURIComponent(body.name), body.version).then(function(error) {
-                    if (!error) return callback();
-                    if (parts[3]) return response.error();
-                    var dependency = {};
-                    dependency[body.name] = body.version;
-                    create(this, null, null, dependency).then(callback);
-                  });
+                  db.put(path+'/'+encodeURIComponent(body.name), body.version).then(callback);
                 }, response.ok, method, body);
               }, 'json');
             if (method == 'DELETE' && parts.length == 6)
