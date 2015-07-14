@@ -292,7 +292,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                     if (!error) return callback();
                     if (parts[3]) return response.error();
                     var record = {code: code, dependencies: {}, published: []};
-                    if (app) record.config = config;
+                    if (app) record.config = {};
                     this.put(parts[0]+'/'+parts[1], {versions: [record]}).then(callback);
                   });
                 }, response.ok, method, code, true);
