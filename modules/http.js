@@ -187,6 +187,7 @@ simpl.add('http', function(modules) {
           return o;
         };
         var request, remaining, headers = '';
+        socket.setKeepAlive(true, 5); // TODO: check that this is required to trigger onReceiveError
         return function(buffer) {
           do {
             var start = 0, end = buffer.byteLength;
