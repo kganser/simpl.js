@@ -390,6 +390,9 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                   client.close(1001);
                   delete clients[socketId];
                 };
+                client.socket.onDisconnect = function() {
+                  ws.close();
+                };
               }
               return function(data) {
                 try { var message = JSON.parse(data); } catch (e) { return; }
