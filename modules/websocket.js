@@ -49,7 +49,7 @@ simpl.add('websocket', function(modules) {
       `protocols` and `extensions` are specified in decreasing priority order. */
       
   /** Connection: {
-        send: function(message:string|ArrayBuffer, callback=undefined:function(info:SendInfo)) -> Connection,
+        send: function(message:string|ArrayBuffer, callback=undefined:function(info:SendInfo)),
         close: function(code=1000:number),
         onMessage: function(message:string|ArrayBuffer),
         onError: function(code:number),
@@ -112,7 +112,11 @@ simpl.add('websocket', function(modules) {
               if (info.error) error(1006);
               if (callback) callback(info);
             });
-            return connection;
+          },
+          ping: function() {
+            if (!closed) socket.send(frame(9, utf8('ping').buffer), function(info) {
+              if (info.error) error(1006);
+            });
           },
           close: function(code) {
             if (!closed) socket.send(frame(8, utf8(self.statusMessage(code)).buffer, code || 1000), socket.disconnect);
