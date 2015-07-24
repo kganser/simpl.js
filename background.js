@@ -180,10 +180,16 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     if (typeof ws == 'object') ws.close();
   };
   
-  o.xhr('/simpl.js', function(e) {
-    loader = e.target.responseText;
-    lines = loader.match(/\n/g).length;
-  });
+  (function(parts, count) {
+    parts.forEach(function(file, i) {
+      o.xhr(file, function(e) {
+        parts[i] = e.target.responseText;
+        if (--count) return;
+        loader = parts.join('');
+        lines = loader.match(/\n/g).length;
+      });
+    });
+  }(['/simpl.js', '/loader.js'], 2));
   o.xhr('/icons.json', {responseType: 'json'}, function(e) {
     var o = e.target.response;
     icons = Object.keys(o).map(function(name) {
