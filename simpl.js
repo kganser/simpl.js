@@ -16,19 +16,15 @@ var simpl = function(modules, clients, self) {
           available[name] = modules[name][version];
       });
       if (Object.keys(available).length == needed.length) {
-        try {
-          needed.forEach(function(name) {
-            var module = available[name];
-            if (!module.init) {
-              module.init = true;
-              module.export = module.export();
-            }
-            client.dependencies[name] = module.export;
-          });
-          clients.splice(i--, 1)[0].callback(client.dependencies);
-        } catch (e) {
-          throw e.stack || e;
-        }
+        needed.forEach(function(name) {
+          var module = available[name];
+          if (!module.init) {
+            module.init = true;
+            module.export = module.export();
+          }
+          client.dependencies[name] = module.export;
+        });
+        clients.splice(i--, 1)[0].callback(client.dependencies);
       }
     }
     return requested;
