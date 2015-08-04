@@ -98,7 +98,7 @@ simpl.add('app', function(o) {
             minor.textContent = 'Publish v'+version+'.'+entry.minor;
             timeline(record, version);
             if (app) dom(entry.log.map(logLine), log, true);
-            else docs(name, entry.code);
+            else docs(record.name, entry.code);
           } else if (!refresh && !entry.tab.classList.contains('loading')) {
             entry.tab.classList.add(selected.panel = 'loading');
             request(url(selected), function(e) {
