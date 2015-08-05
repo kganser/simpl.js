@@ -7,14 +7,7 @@
 // You can find some technical background for some of the code below
 // at http://marijnhaverbeke.nl/blog/#cm-internals .
 
-(function(mod) {
-  if (typeof exports == "object" && typeof module == "object") // CommonJS
-    module.exports = mod();
-  else if (typeof define == "function" && define.amd) // AMD
-    return define([], mod);
-  else // Plain browser env
-    this.CodeMirror = mod();
-})(function() {
+var CodeMirror = function() {
   "use strict";
 
   // BROWSER SNIFFING
@@ -7828,16 +7821,9 @@
   CodeMirror.version = "4.6.0";
 
   return CodeMirror;
-});
+}();
 
-(function(mod) {
-  if (typeof exports == "object" && typeof module == "object") // CommonJS
-    mod(require("../../lib/codemirror"));
-  else if (typeof define == "function" && define.amd) // AMD
-    define(["../../lib/codemirror"], mod);
-  else // Plain browser env
-    mod(CodeMirror);
-})(function(CodeMirror) {
+(function() {
 "use strict";
 
 CodeMirror.defineMode("javascript", function(config, parserConfig) {
@@ -8508,16 +8494,9 @@ CodeMirror.defineMIME("application/ld+json", {name: "javascript", jsonld: true})
 CodeMirror.defineMIME("text/typescript", { name: "javascript", typescript: true });
 CodeMirror.defineMIME("application/typescript", { name: "javascript", typescript: true });
 
-});
+}());
 
-(function(mod) {
-  if (typeof exports == "object" && typeof module == "object") // CommonJS
-    mod(require("../../lib/codemirror"));
-  else if (typeof define == "function" && define.amd) // AMD
-    define(["../../lib/codemirror"], mod);
-  else // Plain browser env
-    mod(CodeMirror);
-})(function(CodeMirror) {
+(function() {
   var ie_lt8 = /MSIE \d/.test(navigator.userAgent) &&
     (document.documentMode == null || document.documentMode < 8);
 
@@ -8626,16 +8605,9 @@ CodeMirror.defineMIME("application/typescript", { name: "javascript", typescript
   CodeMirror.defineExtension("scanForBracket", function(pos, dir, style, config){
     return scanForBracket(this, pos, dir, style, config);
   });
-});
+}());
 
-(function(mod) {
-  if (typeof exports == "object" && typeof module == "object") // CommonJS
-    mod(require("../../lib/codemirror"));
-  else if (typeof define == "function" && define.amd) // AMD
-    define(["../../lib/codemirror"], mod);
-  else // Plain browser env
-    mod(CodeMirror);
-})(function(CodeMirror) {
+(function() {
   "use strict";
 
   var DEFAULT_MIN_CHARS = 2;
@@ -8735,16 +8707,9 @@ CodeMirror.defineMIME("application/typescript", { name: "javascript", typescript
       stream.skipTo(query.charAt(0)) || stream.skipToEnd();
     }};
   }
-});
+}());
 
-(function(mod) {
-  if (typeof exports == "object" && typeof module == "object") // CommonJS
-    mod(require("../../lib/codemirror"));
-  else if (typeof define == "function" && define.amd) // AMD
-    define(["../../lib/codemirror"], mod);
-  else // Plain browser env
-    mod(CodeMirror);
-})(function(CodeMirror) {
+(function() {
   function dialogDiv(cm, template, bottom) {
     var wrap = cm.getWrapperElement();
     var dialog;
@@ -8888,16 +8853,9 @@ CodeMirror.defineMIME("application/typescript", { name: "javascript", typescript
 
     return close;
   });
-});
+}());
 
-(function(mod) {
-  if (typeof exports == "object" && typeof module == "object") // CommonJS
-    mod(require("../../lib/codemirror"), require("./searchcursor"), require("../dialog/dialog"));
-  else if (typeof define == "function" && define.amd) // AMD
-    define(["../../lib/codemirror", "./searchcursor", "../dialog/dialog"], mod);
-  else // Plain browser env
-    mod(CodeMirror);
-})(function(CodeMirror) {
+(function() {
   "use strict";
 
   function searchOverlay(query, caseInsensitive) {
@@ -9079,16 +9037,9 @@ CodeMirror.defineMIME("application/typescript", { name: "javascript", typescript
   CodeMirror.commands.clearSearch = clearSearch;
   CodeMirror.commands.replace = replace;
   CodeMirror.commands.replaceAll = function(cm) {replace(cm, true);};
-});
+}());
 
-(function(mod) {
-  if (typeof exports == "object" && typeof module == "object") // CommonJS
-    mod(require("../../lib/codemirror"));
-  else if (typeof define == "function" && define.amd) // AMD
-    define(["../../lib/codemirror"], mod);
-  else // Plain browser env
-    mod(CodeMirror);
-})(function(CodeMirror) {
+(function() {
   "use strict";
   var Pos = CodeMirror.Pos;
 
@@ -9266,4 +9217,4 @@ CodeMirror.defineMIME("application/typescript", { name: "javascript", typescript
     if (ranges.length)
       this.setSelections(ranges, 0);
   });
-});
+}());
