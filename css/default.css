@@ -127,7 +127,7 @@ a.button.large svg {
   height: 40px;
   float: left;
 }
-header, main, .column {
+header, footer, main, .column {
   display: block;
   max-width: 900px;
   margin: 0 auto;
@@ -157,6 +157,15 @@ header li a {
 }
 header li a:hover {
   color: black;
+}
+footer {
+  padding: 20px 10px;
+  margin-top: 60px;
+  border-top: solid 1px #eee;
+  color: #999;
+}
+footer a {
+  float: right;
 }
 .logo {
   display: inline-block;
@@ -359,9 +368,7 @@ aside {
 .workspace li {
   padding: 5px 0;
   margin-bottom: 5px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  clear: right;
 }
 .workspace li span {
   font-size: 90%;
@@ -370,11 +377,12 @@ aside {
 }
 .controls {
   float: right;
-  margin: -5px 0;
+  text-align: right;
+  margin-top: -5px;
   padding: 0;
 }
 .controls button, .controls a.button {
-  margin: 0 0 0 5px;
+  margin: 0 0 5px 5px;
 }
 pre {
   margin: 8px 0;
