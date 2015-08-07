@@ -163,6 +163,7 @@ footer {
   margin-top: 60px;
   border-top: solid 1px #eee;
   color: #999;
+  clear: both;
 }
 footer a {
   float: right;
