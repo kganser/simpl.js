@@ -530,7 +530,7 @@ pre em {
 }
 #page-user aside {
   width: 200px;
-  margin-left: -230px;
+  margin: 0 0 60px -230px;
   font-size: 14px;
   color: #666;
 }
