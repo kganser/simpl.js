@@ -9,23 +9,23 @@ var markup = function() {
     });
     return node.children;
   };
-  return function(node, parent, clear) {
+  return function markup(node, parent, clear) {
     if (clear && parent) while (parent.firstChild) parent.removeChild(parent.firstChild);
     switch (typeof node) {
       case 'object':
         if (!node) return;
         if (Array.isArray(node)) {
-          node.forEach(function(node) { self.dom(node, parent); });
+          node.forEach(function(node) { markup(node, parent); });
           return parent;
         }
         var tag = Object.keys(node)[0],
             elem = document.createElement(tag);
         if (parent) parent.appendChild(elem); 
         node = node[tag];
-        self.dom(typeof node == 'object' && node && !Array.isArray(node) ? attr(node, elem) : node, elem);
+        markup(typeof node == 'object' && node && !Array.isArray(node) ? attr(node, elem) : node, elem);
         return elem;
       case 'function':
-        return self.dom(node(parent), parent);
+        return markup(node(parent), parent);
       case 'string':
       case 'number':
         node = document.createTextNode(node);
@@ -59,3 +59,14 @@ var xhr = function(url, options, callback) {
   xhr.send(options.json ? JSON.stringify(options.json) : options.data);
   return xhr;
 };
+var icons = {};
+Array.prototype.slice.call(document.getElementById('icons').childNodes).forEach(function(icon) {
+  icons[icon.id.substr(5)] = function(el) {
+    var ns = 'http://www.w3.org/2000/svg',
+        svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('class', icon.id);
+    el.appendChild(svg)
+      .appendChild(document.createElementNS(ns, 'use'))
+      .setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', '#'+icon.id);
+  };
+});
