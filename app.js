@@ -270,8 +270,7 @@ simpl.add('app', function(o) {
     };
     dom([
       {nav: [user
-        ? [ {div: {className: 'user', children: [
-              {img: {src: user.image}},
+        ? [ {div: {className: 'user', style: {backgroundImage: 'url('+user.image+')'}, children: [
               {a: {className: 'logout', href: '/logout', title: 'Log Out', children: icons.logout}},
               user.name
             ]}},
