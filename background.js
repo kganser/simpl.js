@@ -23,11 +23,11 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     var parts = signed.split('.');
     return signature(parts[0]) == parts[1] && signed;
   };
-  var api = function(path, token, callback, instance, method, data, text) {
+  var api = function(path, token, callback, method, data, text) {
     o.xhr('http://api.simpljs.com/'+path, {
       method: method,
       responseType: 'json',
-      headers: {Authorization: token ? (instance ? 'Instance ' : 'Bearer ')+token : null},
+      headers: {Authorization: token ? 'Bearer '+token : null},
       json: text ? undefined : data,
       data: text ? data : undefined
     }, function(e) {
@@ -123,7 +123,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       client.send(JSON.stringify({event: 'log', data: log}));
     });
   };
-  var run = function(user, name, version, token, instance) {
+  var run = function(user, name, version, token) {
     var id = [user, name, version].join('@');
     if (apps[id]) return;
     (function(callback) {
@@ -131,7 +131,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       if (!token) return db.get(path+'/versions/'+(version-1)).then(callback);
       api(path+'/'+version, token, function(status, data) {
         callback(status == 200 && data);
-      }, instance);
+      });
     }(function(app) {
       if (!app) return broadcast('error', {app: name, version: version, message: 'App not found'}, user);
       logs[id] = [];
@@ -144,7 +144,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           if (!token) return db.get(path+'/versions/'+(v-1)).then(callback);
           api(path+'/'+v, token, function(status, data) {
             callback(status == 200 && data);
-          }, instance);
+          });
         }(function(record) {
           if (record && !current) record = record.published.pop();
           if (record) return callback(wrap(module.name, record.code, module.version, record.dependencies));
@@ -224,7 +224,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             api(path, session.access_token, function(status, data) {
               if (status != 200) return logout(); // TODO: handle certain error statuses
               callback(data, {username: session.username, name: session.name, email: session.email});
-            }, false, method, data, text);
+            }, method, data, text);
           });
         };
         
@@ -522,12 +522,13 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         ws = true;
         o.xhr('http://169.254.169.254/latest/user-data', function(e) {
           try {
-            var key = JSON.parse(utf8(decode(e.target.responseText.trim()))).key,
-                user = decodeURIComponent(utf8(decode(key.split('.')[0], true)).split('/')[0]);
+            var data = JSON.parse(utf8(decode(e.target.responseText.trim()))),
+                token = data.token,
+                user = data.user;
           } catch (e) { return; }
           var connections, client, retries = 0;
           var connect = function() {
-            ws = new WebSocket('ws://api.simpljs.com/connect?key='+key);
+            ws = new WebSocket('ws://api.simpljs.com/connect?access_token='+token);
             ws.onopen = function() {
               connections = 0;
               client = {user: user, connection: ws};
@@ -548,7 +549,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
               if (command == 'stop' || command == 'restart')
                 stop(user, message.app, message.version);
               if (command == 'run' || command == 'restart')
-                run(user, message.app, message.version, key, true);
+                run(user, message.app, message.version, token);
             };
             ws.onclose = function() {
               delete clients[-1];
