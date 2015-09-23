@@ -42,7 +42,11 @@
   },
   "url_handlers": {
     "launch": {
-      "matches": ["http://simpljs.com/launch-*"],
+      "matches": [
+        "https://simpljs.com/launch-*",
+        "http://simpljs.com/launch-*",
+        "http://test.simpljs.com/launch-*"
+      ],
       "title": "Launch Simpl.js Console"
     }
   }

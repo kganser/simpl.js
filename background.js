@@ -495,7 +495,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
   var ws, port, path = '', launcher = false;
 
   chrome.app.runtime.onLaunched.addListener(function(source) {
-    var args = ((source || {}).url || '').match(/^http:\/\/simpljs.com\/launch-([^\/]+)(.*)/),
+    var args = ((source || {}).url || '').match(/^https?:\/\/(?:test.)?simpljs.com\/launch-([^\/]+)(.*)/),
         headless = args && args[1] == 'headless';
     path = args && !headless ? '/login?token='+args[1]+'&redirect='+args[2] : '';
     if (launcher.focus) {
@@ -520,11 +520,10 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         e.target.getElementById('action').click();
         if (ws) return;
         ws = true;
-        o.xhr('http://169.254.169.254/latest/user-data', function(e) {
+        o.xhr('http://169.254.169.254/latest/user-data', {responseType: 'json'}, function(e) {
           try {
-            var data = JSON.parse(utf8(decode(e.target.responseText.trim()))),
-                token = data.token,
-                user = data.user;
+            var token = e.response.token,
+                user = e.response.user;
           } catch (e) { return; }
           var connections, client, retries = 0;
           var connect = function() {
@@ -557,6 +556,9 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
               if (retries < 6) retries++;
               setTimeout(connect, (1 << retries) * 1000);
             };
+            setInterval(function() {
+              if (clients[-1]) ws.send('ping');
+            }, 60000);
           };
           connect();
         });

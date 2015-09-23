@@ -298,6 +298,9 @@ simpl.add('app', function(o) {
               e.parentNode.className = message ? className || 'info' : null;
               e.textContent = message;
             };
+            setInterval(function() {
+              if (socket) socket.send('ping');
+            }, 60000);
             send = function(command, data) {
               if (!socket || socket.readyState != 1) return;
               if (!data) data = {};
