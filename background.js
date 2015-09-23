@@ -522,8 +522,8 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         ws = true;
         o.xhr('http://169.254.169.254/latest/user-data', {responseType: 'json'}, function(e) {
           try {
-            var token = e.response.token,
-                user = e.response.user;
+            var token = e.target.response.token,
+                user = e.target.response.user;
           } catch (e) { return; }
           var connections, client, retries = 0;
           var connect = function() {
