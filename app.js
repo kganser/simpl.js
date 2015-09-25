@@ -228,8 +228,6 @@ simpl.add('app', function(o) {
           entry.published.push(current.app
             ? {code: entry.code, config: entry.config, dependencies: entry.dependencies}
             : {code: entry.code, dependencies: entry.dependencies});
-          entry.tab.lastChild.title = current.name+' '+version;
-          entry.tab.lastChild.lastChild.textContent = version;
           minor.textContent = 'Publish v'+current.version+'.'+entry.minor;
           timeline(version);
         }
@@ -240,7 +238,7 @@ simpl.add('app', function(o) {
     var li = function(name, major, minor, app) {
       var record = (app ? apps : modules)[name],
           entry = record.versions[major],
-          v = minor ? 'v'+major+'.'+(minor-1) : '';
+          v = minor ? 'v'+major : '';
       return {li: function(elem) {
         entry.tab = elem;
         elem.onclick = function(e) {
@@ -341,7 +339,7 @@ simpl.add('app', function(o) {
                 switch (event) {
                   case 'connect':
                     for (var i = servers.firstChild; i && i.value.localeCompare(instance) < 0; i = i.nextSibling);
-                    if (i.value == instance) i.disabled = false;
+                    if (i && i.value == instance) i.disabled = false;
                     else servers.insertBefore(dom({option: {value: instance, children: message.name}}), i);
                     break;
                   case 'disconnect':
