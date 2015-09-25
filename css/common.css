@@ -370,10 +370,13 @@ aside {
   margin-bottom: 5px;
   clear: right;
 }
-.workspace li span {
+.workspace li span, .workspace .source {
   font-size: 90%;
   color: #999;
   margin-left: 10px;
+}
+.workspace .source svg {
+  margin: 0;
 }
 .controls {
   float: right;
@@ -392,6 +395,42 @@ aside {
   background: #f7f7f7;
   font-size: 100%;
   text-transform: capitalize;
+}
+#welcome {
+  background: #3c3;
+  color: white;
+  padding: 10px 10px 10px 70px;
+  position: relative;
+}
+#welcome .close {
+  float: right;
+  background: transparent;
+  text-decoration: none;
+  font: bold 16px/17px arial sans-serif;
+  color: white;
+  margin: -10px -10px 0 0;
+  padding: 5px 9px;
+}
+#welcome h1 {
+  margin: 0;
+  color: white;
+  font-weight: 500;
+}
+#welcome p {
+  line-height: 1.2em;
+}
+#welcome svg {
+  width: 80px;
+  height: 80px;
+  position: absolute;
+  top: 5px;
+  left: -10px;
+  fill: white;
+  opacity: .3;
+}
+#welcome a {
+  color: white;
+  text-decoration: underline;
 }
 pre {
   margin: 8px 0;
@@ -493,6 +532,17 @@ pre em {
 }
 #pricing p {
   margin: 0;
+}
+#pricing .coming-soon {
+  padding: 5px 10px;
+  background: #c60;
+  color: white;
+  font: normal 11px arial, sans-serif;
+}
+#pricing .coming-soon svg {
+  fill: white;
+  height: 15px;
+  width: 15px;
 }
 #forum {
   border: 0;
