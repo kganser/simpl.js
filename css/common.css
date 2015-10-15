@@ -567,6 +567,19 @@ pre em {
   color: white;
   margin-left: 10px;
 }
+#avatar {
+  padding-top: 0;
+}
+#avatar a {
+  font-size: 12px;
+}
+#avatar a:hover {
+  text-decoration: none;
+}
+#avatar img {
+  margin-right: 5px;
+  vertical-align: middle;
+}
 .byline {
   margin-top: -12px;
   font-size: 12px;
@@ -626,6 +639,69 @@ form.menu {
   color: #666;
   background: #f7f7f7;
   margin: 0 5px 5px 0;
+}
+.featured li {
+  display: inline-block;
+  vertical-align: top;
+  margin: 0 0 9px 9px;
+  width: 294px;
+  height: 145px;
+  background: #ececec;
+}
+.featured li:first-child {
+  width: 597px;
+  height: 299px;
+  float: left;
+  margin-left: 0;
+}
+.featured a {
+  display: block;
+  height: 100%;
+  color: black;
+  position: relative;
+}
+.featured div {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 5px;
+  padding: 5px 10px;
+  background: rgba(255,255,255,.5);
+}
+.featured h3 {
+  margin: 0;
+}
+#page-gallery section {
+  display: inline-block;
+  vertical-align: top;
+  font-size: 14px;
+}
+#page-gallery section a {
+  display: block;
+  margin-bottom: 10px;
+  height: 100%;
+  color: black;
+}
+#page-gallery section a:hover {
+  text-decoration: none;
+}
+#page-gallery section a h3 {
+  margin: 0 0 5px 0;
+}
+#page-gallery section a p {
+  color: #666;
+  margin: 0;
+}
+.modules {
+  width: 597px;
+}
+.developers {
+  width: 294px;
+  padding-left: 9px;
+}
+.developers img {
+  vertical-align: middle;
+  margin-right: 10px;
 }
 @media only screen and (max-width: 600px) {
   #page-user main {
