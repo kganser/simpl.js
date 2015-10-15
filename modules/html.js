@@ -98,7 +98,7 @@ simpl.add('html', function() {
               object = value && typeof value == 'object' && !Array.isArray(value);
           return '<'+tag+(object ? Object.keys(value) : []).map(function(attr) {
             var v = value[attr];
-            return attr == 'children' || v === false ? '' : ' '+attr+(v == null ? '' : '="'+String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;')+'"');
+            return attr == 'children' || v === false ? '' : ' '+attr+(v == null || v === true ? '' : '="'+String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;')+'"');
           }).join('')+'>'+self.markup(object ? value.children : value)+(selfClosing[tag] ? '' : '</'+tag+'>');
         case 'function':
           var args;
