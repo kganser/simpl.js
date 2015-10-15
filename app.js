@@ -588,10 +588,11 @@ simpl.add('app', function(o) {
                 if (e.keyCode != 13) {
                   var results = [], value = this.value;
                   if (value) Object.keys(modules).forEach(function(name) {
-                    if (~name.indexOf(value) && (selected.app || name != selected.id)) {
+                    var parts = name.split('@');
+                    if (~parts[0].indexOf(value) && (selected.app || name != selected.id)) {
                       var versions = modules[name].versions;
                       Object.keys(versions).forEach(function(version) {
-                        results.push({name: name, version: 1-version}); // current
+                        if (!parts[1]) results.push({name: name, version: 1-version}); // current
                         if (versions[version].minor) results.push({name: name, version: +version}); // published
                       });
                     }
