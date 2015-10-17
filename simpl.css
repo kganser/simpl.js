@@ -93,7 +93,8 @@ nav h2, #settings h2 {
   position: relative;
   cursor: default;
 }
-.show-app .home:after, .show-module .home:after {
+.show-app .home:after, .show-module .home:after,
+.show-app .user:after, .show-module .user:after {
   display: none;
 }
 .user {
@@ -103,8 +104,7 @@ nav h2, #settings h2 {
   background-repeat: no-repeat;
   background-size: 30px;
   white-space: nowrap;
-  text-overflow: ellipsis;
-  overflow: hidden;
+  cursor: default;
 }
 .user, .servers {
   margin-bottom: 1px;
@@ -297,7 +297,7 @@ nav .selected {
   background: #f7f7f7;
   position: relative;
 }
-nav .selected:after, .home:after {
+nav .selected:after, .home:after, .user:after {
   content: "";
   position: absolute;
   top: 0;

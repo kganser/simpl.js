@@ -267,28 +267,32 @@ simpl.add('app', function(o) {
       }};
     };
     dom([
-      {nav: [user
-        ? [ {div: {className: 'user', style: {backgroundImage: 'url('+user.image+')'}, children: [
-              {a: {className: 'logout', href: '/logout', title: 'Log Out', children: icons.logout}},
-              user.name
-            ]}},
-            {div: {className: 'servers localhost', children: [
-              {span: [icons.laptop, icons.network]},
-              {select: {onchange: function() {
-                for (var i = this.firstChild; i; i = i.nextSibling)
-                  if (i.disabled) { this.removeChild(i); break; }
-                this.parentNode.className = this.value ? 'servers' : 'servers localhost';
-                connect(this.value);
-                status();
-              }, children: function(e) {
-                servers = e;
-                return {option: {value: '', children: 'Localhost'}};
-              }}}
-            ]}}]
-        : {div: {className: 'home', onclick: function() { navigate(); }, children: [
+      {nav: [
+        {div: {
+          className: user ? 'user' : 'home',
+          style: {backgroundImage: user ? 'url('+user.image+')' : null},
+          onclick: function() { navigate(); },
+          children: user ? [
+            {a: {className: 'logout', href: '/logout', title: 'Log Out', children: icons.logout}},
+            user.name
+          ] : [
             {div: {className: 'controls', children: {button: {className: 'settings', title: 'Settings', children: icons.settings}}}},
             'Simpl.js'
-          ]}},
+          ]
+        }},
+        user && {div: {className: 'servers localhost', children: [
+          {span: [icons.laptop, icons.network]},
+          {select: {onchange: function() {
+            for (var i = this.firstChild; i; i = i.nextSibling)
+              if (i.disabled) { this.removeChild(i); break; }
+            this.parentNode.className = this.value ? 'servers' : 'servers localhost';
+            connect(this.value);
+            status();
+          }, children: function(e) {
+            servers = e;
+            return {option: {value: '', children: 'Localhost'}};
+          }}}
+        ]}},
         {div: {id: 'connection', children: [
           {span: function(e) {
             var socket, server, unload, timer, countdown, retries = 0;
