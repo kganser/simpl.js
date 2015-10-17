@@ -388,7 +388,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             o.websocket.accept(request, response, function(client) {
               clients[socketId] = {user: user, connection: client};
               if (session && session.plan == 'pro') {
-                var ws = new WebSocket('ws://api.simpljs.com/connect?access_token='+token);
+                var ws = new WebSocket('wss://api.simpljs.com/connect?access_token='+token);
                 ws.onmessage = function(e) {
                   if (typeof e.data == 'string')
                     client.send(e.data);
