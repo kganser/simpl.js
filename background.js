@@ -343,6 +343,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                   username: data.username,
                   name: data.name,
                   email: data.email,
+                  plan: data.plan,
                   expires: Date.now()+86400000
                 }).then(function() {
                   response.generic(303, {Location: session.redirect});
@@ -386,7 +387,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                 token = session && session.access_token;
             o.websocket.accept(request, response, function(client) {
               clients[socketId] = {user: user, connection: client};
-              if (session) {
+              if (session && session.plan == 'pro') {
                 var ws = new WebSocket('ws://api.simpljs.com/connect?access_token='+token);
                 ws.onmessage = function(e) {
                   if (typeof e.data == 'string')
@@ -404,7 +405,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                 try { var message = JSON.parse(data); } catch (e) { return; }
                 var instance = message.instance,
                     command = message.command;
-                if (instance) return session && ws.send(data);
+                if (instance) return ws && ws.send(data);
                 if (command == 'connect')
                   return state(user, client);
                 if (command == 'stop' || command == 'restart')
