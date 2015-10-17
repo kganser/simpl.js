@@ -24,7 +24,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     return signature(parts[0]) == parts[1] && signed;
   };
   var api = function(path, token, callback, method, data, text) {
-    o.xhr('http://api.simpljs.com/'+path, {
+    o.xhr('https://api.simpljs.com/'+path, {
       method: method,
       responseType: 'json',
       headers: {Authorization: token ? 'Bearer '+token : null},
@@ -354,7 +354,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         if (request.path == '/login') {
           var secret = request.query.token,
               redirect = request.query.redirect || '/';
-          if (!secret) return response.generic(303, {Location: 'http://simpljs.com/launch'});
+          if (!secret) return response.generic(303, {Location: 'https://simpljs.com/launch'});
           return authenticate(sid = request.cookie.sid, function(session) {
             if (!session) sid = token();
             else if (session.secret == secret) return response.generic(303, {Location: redirect});
@@ -365,7 +365,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             }).then(function() {
               response.generic(303, {
                 'Set-Cookie': 'sid='+sid,
-                Location: 'http://simpljs.com/authorize?client_id=simpljs&redirect_uri='+encodeURIComponent('http://'+request.headers.Host+'/auth')+'&state='+signature(sid)
+                Location: 'https://simpljs.com/authorize?client_id=simpljs&redirect_uri='+encodeURIComponent('http://'+request.headers.Host+'/auth')+'&state='+signature(sid)
               });
             });
           });

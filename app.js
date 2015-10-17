@@ -506,7 +506,7 @@ simpl.add('app', function(o) {
           {p: 'Apps and modules can be published with a major-minor versioning scheme. Major versions can be developed in parallel, while minor versions represent backward-compatible incremental changes.'},
           {p: 'Browse the core modules and run the included demo apps to get started.'},
           {div: [
-            {a: {target: '_blank', href: 'http://simpljs.com/support', children: [icons.megaphone, {span: 'Simpl.js Forum'}]}},
+            {a: {target: '_blank', href: 'https://simpljs.com/support', children: [icons.megaphone, {span: 'Simpl.js Forum'}]}},
             {a: {id: 'facebook', target: '_blank', href: 'https://www.facebook.com/simpljs', children: icons.facebook}},
             {a: {id: 'twitter', target: '_blank', href: 'https://twitter.com/simpljs', children: icons.twitter}},
             {a: {id: 'google', target: '_blank', href: 'https://www.google.com/+Simpljs', children: icons.google}}
