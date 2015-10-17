@@ -576,14 +576,19 @@ pre em {
 #avatar a:hover {
   text-decoration: none;
 }
-#avatar img {
+#avatar img, .avatar {
   margin-right: 5px;
   vertical-align: middle;
 }
+.avatar.small {
+  vertical-align: bottom;
+  height: 16px;
+  width: 16px;
+}
 .byline {
-  margin-top: -12px;
+  margin: -12px 0 1em;
   font-size: 12px;
-  color: #33c;
+  color: #666;
 }
 .list {
   list-style: disc;
@@ -628,6 +633,20 @@ pre em {
   line-height: 1;
   margin-top: .5em;
   color: #666;
+}
+#page-user main footer {
+  text-align: right;
+  color: #999;
+}
+#page-user main footer a {
+  float: none;
+  color: black;
+}
+#page-user main footer a:hover {
+  text-decoration: none;
+}
+#page-user main footer img {
+  image-rendering: pixelated;
 }
 form.menu {
   display: block;
