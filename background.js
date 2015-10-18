@@ -6,7 +6,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       encode = o.string.base64FromBuffer,
       decode = o.string.base64ToBuffer,
       utf8 = o.string.fromUTF8Buffer,
-      apps = {}, logs = {}, clients = {};
+      apps = {}, logs = {}, clients = {}, services = {}, ping;
   
   var signature = function(value) {
     try {
@@ -176,7 +176,10 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
   var shutdown = function() {
     if (!server) return;
     server.disconnect();
+    clients = {};
+    services = {};
     server = port = null;
+    clearInterval(ping);
     if (typeof ws == 'object') ws.close();
   };
   
@@ -388,7 +391,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             o.websocket.accept(request, response, function(client) {
               clients[socketId] = {user: user, connection: client};
               if (session && session.plan == 'pro') {
-                var ws = new WebSocket('wss://api.simpljs.com/connect?access_token='+token);
+                var ws = services[socketId] = new WebSocket('wss://api.simpljs.com/connect?access_token='+token);
                 ws.onmessage = function(e) {
                   if (typeof e.data == 'string')
                     client.send(e.data);
@@ -396,9 +399,12 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                 ws.onclose = function() {
                   client.close(1001);
                   delete clients[socketId];
+                  delete services[socketId];
                 };
                 client.socket.onDisconnect = function() {
                   ws.close();
+                  delete clients[socketId];
+                  delete services[socketId];
                 };
               }
               return function(data) {
@@ -481,6 +487,12 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         if (!error) {
           server = s;
           port = command.port;
+          ping = setInterval(function() {
+            if (typeof ws == 'object') ws.send('ping');
+            Object.keys(services).forEach(function(id) {
+              services[id].send('ping');
+            });
+          }, 30000);
         }
         launcher.postMessage({error: error, action: 'start', port: port, path: path});
         path = '';
@@ -528,7 +540,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           } catch (e) { return; }
           var connections, client, retries = 0;
           var connect = function() {
-            ws = new WebSocket('ws://api.simpljs.com/connect?access_token='+token);
+            ws = new WebSocket('wss://api.simpljs.com/connect?access_token='+token);
             ws.onopen = function() {
               connections = 0;
               client = {user: user, connection: ws};
@@ -557,9 +569,6 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
               if (retries < 6) retries++;
               setTimeout(connect, (1 << retries) * 1000);
             };
-            setInterval(function() {
-              if (clients[-1]) ws.send('ping');
-            }, 60000);
           };
           connect();
         });
