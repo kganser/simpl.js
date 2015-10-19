@@ -278,6 +278,17 @@ footer a {
 .features {
   padding: 50px 10px;
 }
+.social {
+  text-align: center;
+}
+.social .icon {
+  margin: 0 10px;
+}
+.social .icon svg {
+  height: 25px;
+  width: 25px;
+  padding: 8px;
+}
 #page-login main {
   text-align: center;
   padding: 0;
@@ -296,13 +307,13 @@ footer a {
 #github {
   background: black;
 }
-#facebook {
+#facebook, a.facebook:hover {
   background: #3b5998;
 }
-#twitter {
+#twitter, a.twitter:hover {
   background: #55acee;
 }
-#google {
+#google, a.google:hover {
   background: #d73d32;
 }
 form {
@@ -538,6 +549,7 @@ pre em {
   background: #c60;
   color: white;
   font: normal 11px arial, sans-serif;
+  white-space: nowrap;
 }
 #pricing .coming-soon svg {
   fill: white;
