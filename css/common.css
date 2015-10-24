@@ -194,9 +194,8 @@ footer a {
   color: black;
   padding: 5px 2px 5px 37px;
   background-color: transparent;
-  background-position: left;
+  background-position: -1px center;
   background-repeat: no-repeat;
-  background-size: 31px;
 }
 #user svg {
   visibility: hidden;
