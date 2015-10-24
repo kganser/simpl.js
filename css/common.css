@@ -49,12 +49,15 @@ ul, ol {
   padding: 0;
   list-style: none;
 }
-button, input, textarea {
+button, input, textarea, select {
   font: 13px arial, sans-serif;
   border-radius: 0;
   border: none;
   padding: 3px;
   margin-top: -3px;
+}
+select {
+  padding: 2px 0;
 }
 textarea {
   vertical-align: bottom;
@@ -335,10 +338,9 @@ label label {
   padding: 0;
 }
 label span, form div label {
-  display: inline-block;
-  vertical-align: top;
+  float: left;
   text-align: right;
-  margin: 0 10px 0 -100px;
+  margin-left: -100px;
   padding: 0;
   width: 90px;
 }
@@ -677,7 +679,9 @@ form.menu {
   margin: 0 0 9px 9px;
   width: 294px;
   height: 145px;
-  background: #ececec;
+  background-color: #ececec;
+  background-size: cover;
+  background-position: center;
 }
 .featured li:first-child {
   width: 597px;
@@ -695,11 +699,12 @@ form.menu {
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 5px;
+  bottom: 0;
   padding: 5px 10px;
-  background: rgba(255,255,255,.5);
+  background: rgba(0, 0, 0, .6);
+  color: white;
 }
-.featured h3 {
+.featured p {
   margin: 0;
 }
 #page-gallery section {
@@ -716,7 +721,7 @@ form.menu {
 #page-gallery section a:hover {
   text-decoration: none;
 }
-#page-gallery section a h3 {
+.featured h3, #page-gallery section a h3 {
   margin: 0 0 5px 0;
 }
 #page-gallery section a p {
@@ -733,6 +738,14 @@ form.menu {
 .developers img {
   vertical-align: middle;
   margin-right: 10px;
+}
+#preview {
+  display: none;
+  width: 240px;
+  height: 100px;
+  background-color: #ececec;
+  background-size: cover;
+  background-position: center;
 }
 @media only screen and (max-width: 600px) {
   #page-user main {
