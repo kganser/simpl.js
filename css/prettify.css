@@ -1,20 +1,16 @@
-pre .str { color: #c00; }
-pre .kwd { color: #cc0; }
-pre .com { color: #ccc; font-style: italic; }
-pre .typ { color: #0cc; }
-pre .lit { color: #c00; }
-pre .pun { color: #0cc; }
-pre .pln { color: white; }
-pre .tag { color: #0cc; }
-pre .atn { color: #0c0; }
-pre .atv { color: #0cc; }
-pre .dec { color: #00c; }
-
 pre.prettyprint {
-	background: black;
-  border: none;
-  padding: 5px 8px;
+  background: white;
 }
+
+pre .str { color: #a11; }
+pre .kwd { color: #708; }
+pre .com { color: #a50; font-style: italic; }
+pre .typ { color: #606; }
+pre .lit { color: #00f; }
+pre .tag { color: #008; }
+pre .atn { color: #606; }
+pre .atv { color: #080; }
+pre .dec, pre .var { color: #f50; }
 
 @media print {
   pre .str { color: #060; }
