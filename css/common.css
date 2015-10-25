@@ -508,6 +508,18 @@ pre em {
 #pricing {
   border-spacing: 5px;
 }
+#pricing .free {
+  border-bottom: solid 2px #f7f7f7;
+}
+#pricing .free p {
+  margin: 0;
+}
+#pricing .button {
+  margin: .5em 0;
+  padding: 5px 10px;
+  background: #3c3;
+  color: white;
+}
 #pricing th {
   font: 500 22px "Segoe UI", ArialMT, sans-serif;
   padding: 25px 0;
@@ -542,8 +554,8 @@ pre em {
   height: 40px;
   fill: #3c3;
 }
-#pricing p {
-  margin: 0;
+#pricing h3 {
+  margin: 0 0 .5em 0;
 }
 #pricing .coming-soon {
   padding: 5px 10px;
