@@ -84,8 +84,9 @@ button[disabled], input[disabled] {
   margin-bottom: 10px;
   text-align: left;
 }
-.success a, .error a {
+.success a, .error a, #welcome a {
   color: white;
+  text-decoration: underline;
 }
 a.button {
   display: inline-block;
@@ -306,6 +307,17 @@ footer a {
 #page-login form {
   margin: 0 20px 20px;
 }
+.compare {
+  float: right;
+}
+.disclosure {
+  font-size: 11px;
+  line-height: 14px;
+  color: #666;
+  width: 314px;
+  padding: 0 15px;
+  margin: 15px -50px 10px -120px
+}
 #github {
   background: black;
 }
@@ -353,9 +365,6 @@ form p {
 form .error {
   margin: -20px -50px 20px -120px;
   display: none;
-}
-.g-recaptcha {
-  margin: 15px -30px 0 -100px;
 }
 aside {
   width: 170px;
@@ -439,10 +448,6 @@ aside {
   left: -10px;
   fill: white;
   opacity: .3;
-}
-#welcome a {
-  color: white;
-  text-decoration: underline;
 }
 pre {
   margin: 8px 0;
