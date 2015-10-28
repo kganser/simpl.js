@@ -270,14 +270,14 @@ simpl.add('app', function(o) {
       {nav: [
         {div: {
           className: user ? 'user' : 'home',
-          style: {backgroundImage: user ? 'url('+user.image+')' : null},
           onclick: function() { navigate(); },
-          children: user ? [
-            {a: {className: 'logout', href: '/logout', title: 'Log Out', children: icons.logout}},
-            user.name
-          ] : [
-            {div: {className: 'controls', children: {button: {className: 'settings', title: 'Settings', children: icons.settings}}}},
-            'Simpl.js'
+          children: [
+            {div: {className: 'controls', children: {a: user
+              ? {id: 'logout', href: '/logout', title: 'Log Out', children: icons.logout}
+              : {id: 'login', href: '/login', title: 'Log In or Register', children: icons.login}}}},
+            user
+              ? {span: {className: 'name', style: {backgroundImage: 'url('+user.image+')'}, children: user.name}}
+              : 'Simpl.js'
           ]
         }},
         user && {div: {className: 'servers localhost', children: [
@@ -502,6 +502,11 @@ simpl.add('app', function(o) {
       {div: {id: 'main', children: [
         {div: {id: 'home', children: [
           {h1: 'Simpl.js'},
+          !user && {div: {className: 'promo', children: [
+            {p: [{strong: 'Become a Member!'}, ' Create a profile page and easily share apps and modules as part of the Simpl.js community. You can also deploy your apps to cloud servers and launch them right from your workspace!']},
+            {a: {target: '_blank', href: 'https://simpljs.com/register', children: 'Sign Up'}},
+            {a: {target: '_blank', href: 'https://simpljs.com/pricing', children: 'Learn More'}}
+          ]}},
           {p: ['Simpl.js makes it easy to develop software that runs in your browser with access to low-level system APIs. ', {strong: 'Apps'}, ' run in separate WebWorker threads with ', {code: 'modules'}, ' and ', {code: 'config'}, ' objects as specified in the app\'s ', icons.settings,'settings panel. Any ', {code: 'console'}, ' output is streamed to the app\'s ', icons.log,'log panel. ', {strong: 'Modules'}, ' are libraries imported as dependencies by apps and other modules. Module documentation is generated using the ', {code: 'docs'}, ' module syntax.']},
           {p: 'Apps and modules can be published with a major-minor versioning scheme. Major versions can be developed in parallel, while minor versions represent backward-compatible incremental changes.'},
           {p: 'Browse the core modules and run the included demo apps to get started.'},
