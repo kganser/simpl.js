@@ -1,0 +1,15 @@
+#page-login main {
+  text-align: center;
+  padding: 0;
+}
+#page-login p .button {
+  margin: 2px 5px;
+  padding: 7px 10px;
+  color: white;
+}
+#page-login em {
+  font: italic 16px georgia, serif;
+}
+#page-login form {
+  margin: 0 20px 20px;
+}

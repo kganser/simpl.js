@@ -1,11 +1,13 @@
 ---
+id: blog
 title: Tips For App Configuration
+styles: [common.css, blog.css]
 ---
 <h1>Blog</h1>
 <h2>Tips For App Configuration</h2>
 <div class="byline">posted June 10, 2015, by Klaus</div>
 <p>If you're used to running or developing apps that accept arguments from a config file or the command line, you've likely spent more time wrestling with configuration syntax than you're comfortable admitting. Simpl.js takes some of this hassle out of configuration by accepting a single JSON-formatted <code>config</code> object as input to each app. As a developer, this means no <code>getopt</code> and no <code>eval</code> for parsing configuration data, but here are some additional pointers that will improve the user experience when configuring your app:</p>
-<ul class="list">
+<ul>
   <li><strong>Sane Defaults</strong> - Your app should work normally (or log a descriptive error message) if its <code>config</code> object is empty.</li>
   <li><strong>Backward Compatibility</strong> - Rather than reinterpreting a configuration field in a new version of your app, create a separate field and support both.</li>
   <li><strong>True JSON</strong> - Adhere to JSON semantics in your config file; don't use things like comma-delimited string values or objects with significant key ordering.</li>

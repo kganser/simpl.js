@@ -1,0 +1,66 @@
+#page-user main {
+  padding-left: 240px;
+  max-width: 670px;
+}
+#page-user aside {
+  width: 200px;
+  margin: 0 0 60px -230px;
+  font-size: 14px;
+  color: #666;
+}
+#page-user aside div {
+  margin-bottom: 8px;
+}
+#page-user aside a {
+  display: block;
+  margin-bottom: 8px;
+}
+#page-user aside a svg {
+  fill: #666;
+}
+#page-user h1 {
+  margin: 0;
+  font-size: 25px;
+  font-weight: 500;
+  color: black;
+}
+#page-user h2 {
+  margin-bottom: 0;
+}
+#page-user p {
+  line-height: 1;
+  margin-top: .5em;
+  color: #666;
+}
+#page-user main footer {
+  text-align: right;
+  color: #999;
+}
+#page-user main footer a {
+  float: none;
+  color: black;
+}
+#page-user main footer a:hover {
+  text-decoration: none;
+}
+#page-user main footer img {
+  image-rendering: pixelated;
+}
+@media only screen and (max-width: 600px) {
+  #page-user main {
+    padding-left: 10px;
+  }
+  #page-user aside {
+    float: none;
+    width: auto;
+    margin: 0 0 20px 0;
+    padding-left: 110px;
+    white-space: nowrap;
+    overflow: auto;
+  }
+  #page-user aside img {
+    float: left;
+    width: 100px;
+    margin-left: -110px;
+  }
+}

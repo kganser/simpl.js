@@ -1,0 +1,64 @@
+#pricing {
+  border-spacing: 5px;
+}
+#pricing .free {
+  border-bottom: solid 2px #f7f7f7;
+}
+#pricing .free p {
+  margin: 0;
+}
+#pricing .button {
+  margin: .5em 0;
+  padding: 5px 10px;
+  background: #3c3;
+  color: white;
+}
+#pricing th {
+  font: 500 22px "Segoe UI", ArialMT, sans-serif;
+  padding: 25px 0;
+  background: #f7f7f7;
+  position: relative;
+  overflow: hidden;
+}
+#pricing th span {
+  position: relative;
+}
+#pricing th svg {
+  width: 80px;
+  height: 80px;
+  position: absolute;
+  top: -10px;
+  left: 5px;
+  fill: #f0f0f0;
+}
+#pricing td {
+  width: 30%;
+  text-align: center;
+}
+#pricing .price td {
+  font-size: 15px;
+  padding: 5px 0;
+}
+#pricing td:first-child {
+  text-align: left;
+}
+#pricing td svg {
+  width: 40px;
+  height: 40px;
+  fill: #3c3;
+}
+#pricing h3 {
+  margin: 0 0 .5em 0;
+}
+#pricing .coming-soon {
+  padding: 5px 10px;
+  background: #c60;
+  color: white;
+  font: normal 11px arial, sans-serif;
+  white-space: nowrap;
+}
+#pricing .coming-soon svg {
+  fill: white;
+  height: 15px;
+  width: 15px;
+}

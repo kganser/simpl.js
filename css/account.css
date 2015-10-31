@@ -1,0 +1,30 @@
+#page-account h2 {
+  display: inline-block;
+  vertical-align: top;
+  width: 120px;
+  margin: 0 20px 10px 0;
+}
+#page-account form {
+  min-width: 250px
+}
+#accounts button {
+  margin-top: -5px;
+}
+#cancel {
+  background: #c33;
+  color: white;
+  margin-left: 10px;
+}
+#avatar {
+  padding-top: 0;
+}
+#avatar a {
+  font-size: 12px;
+}
+#avatar a:hover {
+  text-decoration: none;
+}
+#avatar img, .avatar {
+  margin-right: 5px;
+  vertical-align: middle;
+}

@@ -1,6 +1,7 @@
 ---
+id: blog
 title: Hosting Your App's Static Content on GitHub
-styles: [common.css, prettify.css]
+styles: [common.css, blog.css, prettify.css]
 scripts: [prettify.js]
 ---
 <style>
@@ -43,7 +44,7 @@ scripts: [prettify.js]
 <div class="byline">posted June 11, 2015, by Klaus</div>
 <p>Simpl.js is designed for single-document javascript applications and modules. While this is all you need to create rich applications of any size using modern web APIs, you'll likely be looking for a cleaner way to incorporate static content into your apps. Whether you link to css, js, images, and other static assets, or proxy them through your Simpl.js application, they will need to live on some file server in the cloud.</p>
 <p>For most applications, GitHub is a great place to host static assets. Here are some of the benefits:</p>
-<ul class="list">
+<ul>
   <li><strong>Free Hosting</strong> - GitHub offers free, reliable hosting for public repositories. Even if your app itself needs to be private, your static assets likely don't.</li>
   <li><strong>Version Controlled</strong> - Already a good development practice, version control for static content helps in the deployment of web applications. GitHub serves all files in your repository's history via versioned URLs, making it easy to implement far-future caching, and to upgrade your app in lock-step with its static assets.</li>
   <li><strong>Static Site Generator</strong> - GitHub can automatically compose documents from templates or generate full static sites as necessary to supplement or back up your Simpl.js web application.</li>

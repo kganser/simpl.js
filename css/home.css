@@ -1,0 +1,105 @@
+#page-home main {
+  margin-top: -20px;
+  max-width: none;
+  padding: 0;
+}
+#page-home h1 {
+  color: black;
+  font-size: 42px;
+  font-weight: 500;
+  margin: 0;
+}
+#page-home h2 {
+  font-size: 24px;
+}
+.stage {
+  background: #f7f7f7;
+  padding: 0;
+  position: relative;
+}
+.stage div {
+  margin: 0 auto;
+  padding: 30px 20px;
+}
+.stage p {
+  font-size: 20px;
+  color: #666;
+}
+.features p {
+  font-size: 16px;
+}
+#screens {
+  background: rgba(0, 0, 0, .6);
+  padding: 5px 0;
+  margin: 0;
+  text-align: center;
+  font-size: 0;
+  overflow: hidden;
+}
+#screens li {
+  display: inline-block;
+  vertical-align: bottom;
+  margin: 5px;
+}
+#screens a {
+  display: block;
+  width: 150px;
+  height: 100px;
+  transition: all .5s;
+}
+#screen-code {
+  background: url(/img/code.png) -227px -100px;
+}
+#screen-docs {
+  background: url(/img/docs.png) -8px -81px;
+}
+#screen-settings {
+  background: url(/img/settings.png) -122px -240px;
+}
+#screen-logs {
+  background: url(/img/logs.png) -8px -81px;
+}
+.features {
+  padding: 50px 10px;
+}
+.social {
+  text-align: center;
+}
+.social .icon {
+  margin: 0 10px;
+}
+.social .icon svg {
+  height: 25px;
+  width: 25px;
+  padding: 8px;
+}
+@media only screen and (min-width: 900px) {
+  .stage div {
+    height: 360px;
+    max-width: 260px;
+    padding: 100px 90px 0 650px;
+    background: url(/img/code-large.png) no-repeat left 40px/600px;
+  }
+  #screens {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    white-space: nowrap;
+  }
+  #screens a:hover {
+    height: 400px;
+    width: 640px;
+    margin-top: 40px;
+    box-shadow: 0 0 15px rgba(0, 0, 0, .3);
+    background-position: top left;
+  }
+  .features {
+    text-align: center;
+  }
+  .features div {
+    display: inline-block;
+    width: 30%;
+    margin: 0 1.5%;
+    vertical-align: top;
+  }
+}

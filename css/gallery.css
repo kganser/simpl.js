@@ -1,0 +1,66 @@
+.featured li {
+  display: inline-block;
+  vertical-align: top;
+  margin: 0 0 9px 9px;
+  width: 294px;
+  height: 145px;
+  background-color: #ececec;
+  background-size: cover;
+  background-position: center;
+}
+.featured li:first-child {
+  width: 597px;
+  height: 299px;
+  float: left;
+  margin-left: 0;
+}
+.featured a {
+  display: block;
+  height: 100%;
+  color: black;
+  position: relative;
+}
+.featured div {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 5px 10px;
+  background: rgba(0, 0, 0, .6);
+  color: white;
+}
+.featured p {
+  margin: 0;
+}
+#page-gallery section {
+  display: inline-block;
+  vertical-align: top;
+  font-size: 14px;
+}
+#page-gallery section a {
+  display: block;
+  margin-bottom: 10px;
+  height: 100%;
+  color: black;
+}
+#page-gallery section a:hover {
+  text-decoration: none;
+}
+.featured h3, #page-gallery section a h3 {
+  margin: 0 0 5px 0;
+}
+#page-gallery section a p {
+  color: #666;
+  margin: 0;
+}
+.modules {
+  width: 597px;
+}
+.developers {
+  width: 294px;
+  padding-left: 9px;
+}
+.developers img {
+  vertical-align: middle;
+  margin-right: 10px;
+}

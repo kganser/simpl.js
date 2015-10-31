@@ -1,0 +1,43 @@
+.toc {
+  background: #f7f7f7;
+  float: right;
+  position: relative;
+  width: 150px;
+}
+.toc a {
+  display: block;
+  padding: 3px 20px;
+  color: #666;
+  text-decoration: none;
+}
+.toc li:first-child a {
+  padding-top: 10px;
+}
+.toc li:last-child a {
+  padding-bottom: 10px;
+}
+.toc a:hover {
+  color: black;
+}
+.endpoint {
+  border: none;
+  background: transparent;
+  padding: 2px 4px 2px 0;
+}
+.endpoint span {
+  color: white;
+  background: #666;
+  padding: 2px 4px;
+}
+.endpoint .get {
+  background: #3c3;
+}
+.endpoint .delete {
+  background: #c33;
+}
+.endpoint .put {
+  background: #33c;
+}
+.endpoint .post {
+  background: #a3a;
+}

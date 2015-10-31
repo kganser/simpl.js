@@ -1,0 +1,87 @@
+.workspace {
+  padding-left: 200px;
+}
+.workspace form {
+  display: block;
+  background: transparent;
+  padding: 0;
+}
+.workspace button {
+  color: #666;
+  background: #f7f7f7;
+  margin: 0 0 5px 0;
+}
+.workspace ul {
+  margin-bottom: 10px;
+}
+.workspace li {
+  padding: 5px 0;
+  margin-bottom: 5px;
+  clear: right;
+}
+.workspace li span, .workspace .source {
+  font-size: 90%;
+  color: #999;
+  margin-left: 10px;
+}
+.workspace .source svg {
+  margin: 0;
+}
+.controls {
+  float: right;
+  text-align: right;
+  margin-top: -5px;
+  padding: 0;
+}
+.controls button, .controls a.button {
+  margin: 0 0 5px 5px;
+}
+.workspace .controls span {
+  display: inline-block;
+  padding: 5px 10px;
+  margin: 0 0 5px 5px;
+  color: #666;
+  background: #f7f7f7;
+  font-size: 100%;
+  text-transform: capitalize;
+}
+#welcome {
+  background: #3c3;
+  color: white;
+  padding: 10px 10px 10px 70px;
+  position: relative;
+}
+#welcome .close {
+  float: right;
+  background: transparent;
+  text-decoration: none;
+  font: bold 16px/17px arial sans-serif;
+  color: white;
+  margin: -10px -10px 0 0;
+  padding: 5px 9px;
+}
+#welcome h1 {
+  margin: 0;
+  color: white;
+  font-weight: 500;
+}
+#welcome p {
+  line-height: 1.2em;
+}
+#welcome svg {
+  width: 80px;
+  height: 80px;
+  position: absolute;
+  top: 5px;
+  left: -10px;
+  fill: white;
+  opacity: .3;
+}
+#preview {
+  display: none;
+  width: 240px;
+  height: 100px;
+  background-color: #ececec;
+  background-size: cover;
+  background-position: center;
+}

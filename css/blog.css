@@ -1,0 +1,10 @@
+#page-blog main ul {
+  list-style: disc;
+  margin: 1em 0;
+  padding-left: 2em;
+  font-size: 14px;
+  line-height: 1.5em;
+}
+#page-blog main ul li {
+  margin: .5em 0;
+}
