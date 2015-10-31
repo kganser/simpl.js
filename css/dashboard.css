@@ -1,31 +1,30 @@
-.workspace {
-  padding-left: 200px;
+#page-dashboard main {
+  padding-left: 210px;
+  max-width: 700px;
 }
-.workspace form {
+#page-dashboard form {
   display: block;
   background: transparent;
   padding: 0;
 }
-.workspace button {
-  color: #666;
-  background: #f7f7f7;
-  margin: 0 0 5px 0;
-}
-.workspace ul {
+#page-dashboard main ul {
   margin-bottom: 10px;
 }
-.workspace li {
+#page-dashboard main li {
   padding: 5px 0;
   margin-bottom: 5px;
   clear: right;
 }
-.workspace li span, .workspace .source {
+#page-dashboard main li span, #page-dashboard .source {
   font-size: 90%;
   color: #999;
   margin-left: 10px;
 }
-.workspace .source svg {
+#page-dashboard .source svg {
   margin: 0;
+}
+#add-server {
+  margin-right: 5px;
 }
 .controls {
   float: right;
@@ -36,7 +35,7 @@
 .controls button, .controls a.button {
   margin: 0 0 5px 5px;
 }
-.workspace .controls span {
+#page-dashboard .controls span {
   display: inline-block;
   padding: 5px 10px;
   margin: 0 0 5px 5px;
@@ -84,4 +83,9 @@
   background-color: #ececec;
   background-size: cover;
   background-position: center;
+}
+@media only screen and (max-width: 600px) {
+  #page-dashboard main {
+    padding-left: 10px;
+  }
 }

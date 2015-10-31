@@ -4,7 +4,7 @@
 }
 #page-user aside {
   width: 200px;
-  margin: 0 0 60px -230px;
+  margin: 0 0 20px -230px;
   font-size: 14px;
   color: #666;
 }
@@ -40,12 +40,6 @@
   float: none;
   color: black;
 }
-#page-user main footer a:hover {
-  text-decoration: none;
-}
-#page-user main footer img {
-  image-rendering: pixelated;
-}
 @media only screen and (max-width: 600px) {
   #page-user main {
     padding-left: 10px;
@@ -53,7 +47,7 @@
   #page-user aside {
     float: none;
     width: auto;
-    margin: 0 0 20px 0;
+    margin-left: 0;
     padding-left: 110px;
     white-space: nowrap;
     overflow: auto;

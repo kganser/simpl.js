@@ -5,6 +5,7 @@ body {
 }
 h1, h2, h3 {
   font: 500 28px "Segoe UI", ArialMT, sans-serif;
+  margin: .7em 0;
 }
 h1 {
   color: #999;
@@ -50,7 +51,6 @@ ul, ol {
   list-style: none;
 }
 button, input, textarea, select {
-  font: 13px arial, sans-serif;
   border-radius: 0;
   border: none;
   padding: 3px;
@@ -62,14 +62,20 @@ select {
 textarea {
   vertical-align: bottom;
 }
-button, input[type=submit] {
-  padding: 5px 10px;
-  background: #666;
-  color: white;
+button, input[type=submit], a.button {
+  font: 13px/15px arial, sans-serif;
+  padding: 5px 8px;
+  color: #666;
+  background: #f7f7f7;
   cursor: pointer;
   -webkit-appearance: none;
 }
+form button, input[type=submit] {
+  background: #666;
+  color: white;
+}
 button[type=submit], input[type=submit] {
+  padding: 5px 10px;
   margin-top: 10px;
 }
 button[disabled], input[disabled] {
@@ -90,13 +96,8 @@ button[disabled], input[disabled] {
 }
 a.button {
   display: inline-block;
-  padding: 5px 8px;
-  font-size: 13px;
-  line-height: 15px;
   text-align: center;
   text-decoration: none;
-  color: #666;
-  background: #f7f7f7;
 }
 button.icon svg, a.button.icon svg {
   margin-right: 0;
@@ -121,7 +122,7 @@ a.button.large {
   display: block;
   font-size: 15px;
   line-height: 22px;
-  padding: 10px 5px 10px 75px;
+  padding: 10px 0 10px 75px;
   margin-bottom: 10px;
   text-align: left;
 }
@@ -140,9 +141,6 @@ header, footer, main, .column {
 header {
   margin-bottom: 20px;
   padding: 20px 10px 10px;
-}
-header nav {
-  margin-bottom: 10px;
 }
 header ul {
   margin-left: 22px;
@@ -264,6 +262,7 @@ form .error {
 aside {
   width: 170px;
   float: left;
+  margin-left: -200px;
 }
 pre {
   margin: 8px 0;
@@ -283,15 +282,18 @@ code {
 pre em {
   margin: 0 2px;
 }
-.avatar.small {
-  vertical-align: bottom;
-  height: 16px;
-  width: 16px;
-}
 .byline {
-  margin: -12px 0 1em;
+  margin: -.7em 0 1em;
   font-size: 12px;
   color: #666;
+}
+a.user {
+  padding-left: 20px;
+  margin-left: 3px;
+  background-position: left;
+  background-size: 16px;
+  background-repeat: no-repeat;
+  image-rendering: pixelated;
 }
 form.menu {
   display: block;
@@ -303,4 +305,18 @@ form.menu {
   color: #666;
   background: #f7f7f7;
   margin: 0 5px 5px 0;
+}
+@media only screen and (max-width: 600px) {
+  aside {
+    float: none;
+    width: auto;
+    margin: 0 0 10px 0;
+    white-space: nowrap;
+    overflow: auto;
+  }
+  a.button.large {
+    display: inline-block;
+    padding-right: 10px;
+    margin: 0 10px 0 0;
+  }
 }
