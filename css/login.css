@@ -1,6 +1,5 @@
 #page-login main {
   text-align: center;
-  padding: 0;
 }
 #page-login p .button {
   margin: 2px 5px;
@@ -12,4 +11,12 @@
 }
 #page-login form {
   margin: 0 20px 20px;
+}
+@media only screen and (max-width: 600px) {
+  #page-login main {
+    overflow: hidden;
+  }
+  #page-login form {
+    margin: 0 -10px 20px;
+  }
 }
