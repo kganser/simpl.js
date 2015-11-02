@@ -27,17 +27,12 @@
 #page-user h2 {
   margin-bottom: 0;
 }
-#page-user p {
+#page-user section p {
   line-height: 1;
   margin-top: .5em;
   color: #666;
 }
-#page-user main footer {
-  text-align: right;
-  color: #999;
-}
-#page-user main footer a {
-  float: none;
+#page-user footer a.user {
   color: black;
 }
 @media only screen and (max-width: 600px) {

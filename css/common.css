@@ -167,8 +167,13 @@ footer {
   color: #999;
   clear: both;
 }
-footer a {
+footer div {
   float: right;
+}
+footer:after {
+  content: "";
+  display: block;
+  clear: both;
 }
 .logo {
   display: inline-block;
@@ -305,6 +310,10 @@ form.menu {
   color: #666;
   background: #f7f7f7;
   margin: 0 5px 5px 0;
+}
+.notice {
+  padding: 5px 10px;
+  border: solid 1px #ddd;
 }
 @media only screen and (max-width: 600px) {
   aside {
