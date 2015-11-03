@@ -10,9 +10,6 @@
 }
 #page-gallery p {
   margin: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .apps {
   padding-bottom: 33.33%;
@@ -52,6 +49,11 @@
   bottom: 0;
   padding: 5px 10px;
   background: rgba(0, 0, 0, .6);
+}
+.apps p {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .modules {
   padding-right: 34%;

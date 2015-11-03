@@ -28,8 +28,7 @@
   margin-bottom: 0;
 }
 #page-user section p {
-  line-height: 1;
-  margin-top: .5em;
+  margin: .5em 0;
   color: #666;
 }
 #page-user footer a.user {
