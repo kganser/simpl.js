@@ -276,6 +276,7 @@ simpl.add('http', function(modules) {
         json: 'application/json',
         txt:  'text/plain',
         png:  'image/png',
+        svg:  'image/svg+xml',
         ico:  'image/x-icon',
         pdf:  'application/pdf',
         zip:  'application/zip',
