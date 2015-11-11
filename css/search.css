@@ -1,0 +1,100 @@
+#page-search main {
+  padding-left: 210px;
+  max-width: 700px;
+}
+#page-search main header {
+  margin: 0 0 .5em -200px;
+  padding: 0 5px;
+  background: #f7f7f7;
+  position: relative;
+}
+#page-search main header:after {
+  content: "";
+  display: block;
+  clear: both;
+}
+#page-search main header svg {
+  position: absolute;
+  top: 5px;
+  left: 10px;
+  height: 30px;
+  width: 20px;
+  color: #666;
+}
+#search {
+  width: 100%;
+  box-sizing: border-box;
+  max-width: 300px;
+  font-size: 15px;
+  line-height: 30px;
+  margin: 5px 0;
+  padding: 0 0 0 30px;
+}
+#submit {
+  display: none;
+}
+.pagination {
+  float: right;
+  line-height: 28px;
+  padding: 6px;
+}
+.pagination input {
+  margin: 0 -5px 0 10px;
+  background: white;
+  color: black;
+  padding: 0 11px;
+  line-height: 28px;
+}
+.pagination input:hover {
+  background: #33c;
+  color: white;
+}
+.pagination input:disabled {
+  background: transparent;
+  color: black;
+}
+#page-search h3 {
+  margin: .7em 0 .5em;
+}
+#page-search label {
+  display: inline-block;
+  padding: 1px 8px 1px 0;
+  cursor: pointer;
+}
+#page-search aside button {
+  width: 100%;
+  margin-top: 20px;
+  background: #666;
+  color: white;
+}
+#results h2 {
+  margin-bottom: 0;
+}
+#results p {
+  color: #666;
+  margin: .5em 0;
+}
+@media only screen and (max-width: 600px) {
+  #page-search main {
+    max-width: none;
+    padding: 0 10px;
+  }
+  #page-search main header {
+    margin: 0;
+  }
+  #page-search aside {
+    padding: 10px 0;
+  }
+  #page-search h3 {
+    display: none;
+  }
+  #page-search aside div {
+    display: inline-block;
+    border-right: solid 2px #f7f7f7;
+    margin-right: 8px;
+  }
+  #page-search aside button {
+    width: auto;
+    margin: 0 0 0 10px;
+  }
+}

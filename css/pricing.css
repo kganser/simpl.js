@@ -1,5 +1,6 @@
 #pricing {
   border-spacing: 5px;
+  margin: -5px;
 }
 #pricing .free {
   border-bottom: solid 2px #f7f7f7;

@@ -4,7 +4,7 @@
 }
 #page-user aside {
   width: 200px;
-  margin: 0 0 20px -230px;
+  margin-left: -230px;
   font-size: 14px;
   color: #666;
 }

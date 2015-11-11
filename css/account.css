@@ -8,7 +8,11 @@
   min-width: 250px
 }
 #accounts button {
-  margin-top: -5px;
+  margin-top: -2px;
+}
+#accounts a {
+  display: inline-block;
+  padding: 3px 0;
 }
 #cancel {
   background: #c33;

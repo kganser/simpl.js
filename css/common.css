@@ -38,6 +38,9 @@ a.block:hover, header a:hover {
 a.block:hover h2 {
   text-decoration: underline;
 }
+h2 a, h3 a {
+  color: black;
+}
 svg {
   width: 15px;
   height: 15px;
@@ -50,14 +53,17 @@ ul, ol {
   padding: 0;
   list-style: none;
 }
-button, input, textarea, select {
+button, input, textarea {
   border-radius: 0;
   border: none;
   padding: 3px;
-  margin-top: -3px;
+  font: inherit;
 }
-select {
+.form select {
+  border-radius: 0;
+  border: none;
   padding: 2px 0;
+  font: inherit;
 }
 textarea {
   vertical-align: bottom;
@@ -70,7 +76,7 @@ button, input[type=submit], a.button {
   cursor: pointer;
   -webkit-appearance: none;
 }
-form button, input[type=submit] {
+.form button, input[type=submit] {
   background: #666;
   color: white;
 }
@@ -232,7 +238,7 @@ footer:after {
 #google, a.google:hover {
   background: #d73d32;
 }
-form {
+.form {
   display: inline-block;
   vertical-align: top;
   text-align: left;
@@ -240,34 +246,33 @@ form {
   margin: 0 0 20px 0;
   padding: 20px 50px 20px 120px;
 }
-label, form div {
+.form label, .form div {
   display: block;
   margin-bottom: 5px;
-  padding-top: 3px;
 }
-label label {
+.form label label {
   display: inline;
   margin: 0;
   padding: 0;
 }
-label span, form div label {
+.form label span, .form div label {
   float: left;
   text-align: right;
   margin-left: -100px;
-  padding: 0;
+  padding: 3px 0;
   width: 90px;
 }
-form p {
+.form p {
   margin: 0 -30px 0 -100px;
 }
-form .error {
+.form .error {
   margin: -20px -50px 20px -120px;
   display: none;
 }
 aside {
   width: 170px;
   float: left;
-  margin-left: -200px;
+  margin: 0 0 20px -200px;
 }
 pre {
   margin: 8px 0;
@@ -299,12 +304,6 @@ a.user {
   background-size: 16px;
   background-repeat: no-repeat;
   image-rendering: pixelated;
-}
-form.menu {
-  display: block;
-  background: transparent;
-  margin: 0;
-  padding: 0;
 }
 .menu button, .menu a.button {
   color: #666;
