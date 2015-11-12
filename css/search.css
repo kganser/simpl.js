@@ -40,17 +40,11 @@
 }
 .pagination input {
   margin: 0 -5px 0 10px;
-  background: white;
-  color: black;
   padding: 0 11px;
   line-height: 28px;
 }
-.pagination input:hover {
-  background: #33c;
-  color: white;
-}
 .pagination input:disabled {
-  background: transparent;
+  background: white;
   color: black;
 }
 #page-search h3 {
@@ -83,15 +77,17 @@
     margin: 0;
   }
   #page-search aside {
-    padding: 10px 0;
+    padding-bottom: 10px;
+    margin-top: 2px;
+    background: #f7f7f7;
+    text-align: center;
   }
   #page-search h3 {
     display: none;
   }
   #page-search aside div {
     display: inline-block;
-    border-right: solid 2px #f7f7f7;
-    margin-right: 8px;
+    margin: 5px;
   }
   #page-search aside button {
     width: auto;

@@ -319,8 +319,6 @@ a.user {
     float: none;
     width: auto;
     margin: 0 0 10px 0;
-    white-space: nowrap;
-    overflow: auto;
   }
   a.button.large {
     display: inline-block;

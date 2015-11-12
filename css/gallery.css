@@ -2,13 +2,8 @@
   margin: 0 0 5px 0;
 }
 #page-gallery main a.button {
-  color: #666;
   float: right;
   margin: .5em 0;
-}
-#page-gallery main a.button:hover {
-  background: #3c3;
-  color: white;
 }
 .apps {
   padding-bottom: 33.33%;
@@ -67,8 +62,7 @@
   padding-right: 34%;
   clear: both;
 }
-.modules a {
-  margin-bottom: 10px;
+.modules h3 a, .modules li a {
   color: black;
 }
 .modules p {
