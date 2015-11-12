@@ -272,7 +272,7 @@ footer:after {
 aside {
   width: 170px;
   float: left;
-  margin: 0 0 20px -200px;
+  margin: 0 0 60px -200px;
 }
 pre {
   margin: 8px 0;
@@ -298,12 +298,20 @@ pre em {
   color: #666;
 }
 a.user {
+  color: black;
   padding-left: 20px;
   margin-left: 3px;
   background-position: left;
   background-size: 16px;
   background-repeat: no-repeat;
   image-rendering: pixelated;
+}
+a.user.large {
+  display: block;
+  padding-left: 42px;
+  background-size: 32px;
+  font-size: 14px;
+  line-height: 32px;
 }
 .menu button, .menu a.button {
   color: #666;

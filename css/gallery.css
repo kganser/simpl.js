@@ -62,7 +62,7 @@
   padding-right: 34%;
   clear: both;
 }
-.modules h3 a, .modules li a {
+.modules h3 a {
   color: black;
 }
 .modules p {
@@ -77,14 +77,9 @@
 .modules aside h1 {
   margin-top: 0;
 }
-.modules aside a {
-  font-size: 14px;
+.modules aside li {
   display: block;
   margin: .5em 0;
-}
-.modules aside img {
-  vertical-align: middle;
-  margin-right: 10px;
 }
 @media only screen and (max-width: 600px) {
   .apps {

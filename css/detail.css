@@ -1,0 +1,55 @@
+#page-detail main {
+  padding-left: 210px;
+  max-width: 700px;
+}
+#page-detail h1 {
+  font-size: 24px;
+  font-weight: 500;
+  color: black;
+  margin: 0;
+}
+#page-detail img {
+  width: 300px;
+  max-width: 100%;
+  margin: 2em 0;
+}
+.tagline {
+  color: #666;
+  font-size: 15px;
+  margin: .5em 0;
+}
+button.large {
+  display: block;
+  font-size: 15px;
+  line-height: 30px;
+  width: 100%;
+  padding: 10px 20px 10px 0;
+  margin: 0 0 10px 0;
+}
+button.large svg {
+  width: 30px;
+  height: 30px;
+  margin-right: 15px;
+}
+.website {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dependencies {
+  font-size: 90%;
+  color: #999;
+}
+.dependencies li {
+  margin-bottom: 3px;
+}
+.dependencies a {
+  margin-right: 10px;
+  font-size: 13px;
+}
+@media only screen and (max-width: 600px) {
+  #page-detail main {
+    padding-left: 10px;
+  }
+}
