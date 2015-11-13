@@ -405,7 +405,7 @@ nav .selected button {
 }
 .promo {
   border: solid 1px #e0e0e0;
-  padding: 0 10px;
+  padding: 0 10px 3px;
 }
 .promo p {
   margin: 5px 0;
