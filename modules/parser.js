@@ -25,14 +25,14 @@ simpl.add('parser', function() {
       }
       
       LALR(1) parser generator. If `start` is a string, it must be a key in the `Grammar` object representing the start
-      symbol. If the returned parse function is called without an `input` string, it returns a json representation of
+      symbol. If the returned parse function is called without an `input` string, it returns a JSON representation of
       the state machine generated for this grammar, which can be fed back to `generate` as `start` to generate the same
       parse function.
       
       `tokens` is an optional mapping of symbols to regular expressions. It is used when tokenizing `input` during a
       call to the parse function. `tokens['']`, if present, denotes sequences to ignore; e.g. `/\s+/` for white space.
       When scanning for tokens, the longest match wins, followed by literal tokens (i.e. those not matched by a regular
-      expression in `tokens`.
+      expression in `tokens`).
       
       The parse function returned by `generate` will throw a `ParseError` object on string inputs not recognized by the
       grammar. */
@@ -45,8 +45,8 @@ simpl.add('parser', function() {
       (terminals and/or nonterminals representing a production to which this `nonterminal` can expand) followed by a
       non-string reduce term. If the reduce term is a function, it is called when reducing the immediately preceding
       string sequence (i.e. production) with an array of values corresponding to the symbols in the production, and is
-      expected to return a new value representing `nonterminal` for this production. If the reduce term is json, it
-      serves as a function that returns a copy of the json structure with any internal integer values between `0` and
+      expected to return a new value representing `nonterminal` for this production. If the reduce term is JSON, it
+      serves as a function that returns a copy of the JSON structure with any internal integer values between `0` and
       `values.length-1` replaced by the corresponding symbol value. If a symbol with an array value is placed directly
       inside another array, it is first unwrapped to aid in list construction.
       
