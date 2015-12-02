@@ -65,7 +65,7 @@ simpl.add('database', function() {
           if (!cursor) return --pending || callback(value);
           var result = cursor.value,
               key = array ? index++ : result.key,
-              action = c.action(key);
+              action = c.action(key, result.type == 'object' || result.type == 'array' ? undefined : result.value);
           if (action == 'stop') return --pending || callback(value);
           if (action != 'skip') {
             value[key] = pending++;
@@ -286,9 +286,9 @@ simpl.add('database', function() {
           }
           
           `get`, `put`, `insert`, `append`, and `delete` are convenience methods that operate through `transaction` for
-          a single objectStore and return the corresponding `ScopedTransaction`. `get` initiates a read-only
-          transaction by default. `transaction` returns a `ScopedTransaction` if a single (string) objectStore is
-          specified, and a `Transaction` if operating on multiple objectStores. */
+          a single objectStore and return the corresponding `ScopedTransaction`. `get` initiates a read-only transaction
+          by default. `transaction` returns a `ScopedTransaction` if a single (string) objectStore is specified, and a
+          `Transaction` if operating on multiple objectStores. */
       return self = {
         transaction: function(writable, stores) {
           if (stores == null) stores = 'data';
@@ -340,16 +340,17 @@ simpl.add('database', function() {
                 action: Action
               } */
               
-          /** Action:function(key:string|number) -> undefined|string
+          /** Action:function(key:string|number, value:string|number|boolean|null|undefined) -> undefined|string
               
               `Cursor` is a function called for each array or object encountered in the requested json structure. It is
               called with a `path` array (of strings and/or numeric indices) relative to the requested path (i.e. `[]`
               represents the path as requested in `get`) and an `array` boolean that is true if the substructure is an
               array. It returns an `Action` callback or object with a range and `action`, or false to prevent
               recursion into the structure. `lowerBound` and `upperBound` restrict the keys/indices traversed for this
-              object/array, and the `Action` function is called with each `key` in the requested range, in order. The
-              `Action` callback can optionally return either `'skip'` or `'stop'` to exclude the element at the given
-              key from the structure or to exclude and stop iterating, respectively.
+              object/array, and the `Action` function is called with each `key` and scalar `value` in the requested
+              range, in order. If a value is not scalar, `value` is undefined. The `Action` callback can optionally
+              return either `'skip'` or `'stop'` to exclude the element at the given key from the structure or to
+              exclude and stop iterating, respectively.
               
               For example, the following call uses a cursor to fetch only the immediate members of the object at the
               requested path. Object and array values will be empty:
