@@ -68,9 +68,12 @@ simpl.add('database', function() {
               action = c.action(key);
           if (action == 'stop') return --pending || callback(value);
           if (action != 'skip') {
-            value[key] = pending++;
+            pending++;
+            if (!array) value[key] = undefined;
             next(result, parent.concat([result.key]), path.concat([key]), function(child) {
-              value[key] = child;
+              if (c.value) child = c.value(key, child);
+              if (child !== undefined) value[key] = child;
+              else if (!array) delete value[key];
               if (!--pending) callback(value);
             });
           }
@@ -354,7 +357,8 @@ simpl.add('database', function() {
                 upperBound=null: string|number,
                 upperExclusive=false: boolean,
                 descending=false: boolean,
-                action: Action
+                action=undefined: Action,
+                value=undefined: function(key:string|number, value:json) -> json|undefined
               } */
               
           /** Action:function(key:string|number) -> undefined|string
@@ -366,7 +370,9 @@ simpl.add('database', function() {
               recursion into the structure. `lowerBound` and `upperBound` restrict the keys/indices traversed for this
               object/array, and the `Action` function is called with each `key` in the requested range, in order. The
               `Action` callback can optionally return either `'skip'` or `'stop'` to exclude the element at the given
-              key from the structure or to exclude and stop iterating, respectively.
+              key from the structure or to exclude and stop iterating, respectively. If specified, the `value` function
+              receives the value retrieved from each `key` and returns a value to insert into the parent object or
+              array, or undefined to skip insertion.
               
               For example, the following call uses a cursor to fetch only the immediate members of the object at the
               requested path. Object and array values will be empty:

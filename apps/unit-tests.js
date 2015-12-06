@@ -153,15 +153,23 @@ function(modules) {
             this.get('', function(path, array) {
               assert(!path.length && !array && i == 1 || path.length == 1 && path[0] === 'array' && array && i == 2,
                 'database cursor arguments '+i++);
-              return path.length ? function(key) {
-                if (key == 1) return 'skip';
-                if (key > 2) return 'stop';
+              return path.length ? {
+                action: function(key) {
+                  if (key == 1) return 'skip';
+                  if (key > 3) return 'stop';
+                },
+                value: function(key, value) {
+                  assert(i == 3 && key === 0 && value === 'elem' || i == 4 && key === 2 && value === 2 || i == 5 && key == 3 && value === 3,
+                    'database cursor values '+(i++-2));
+                  if (i == 4) return value;
+                  if (i == 5) return 3;
+                }
               } : {
                 upperBound: 'string',
                 upperExclusive: true
               };
             }).then(function(result) {
-              assert(i == 3 && compare({array: ['elem', undefined, 2]}, result), 'database cursor result');
+              assert(i == 6 && compare({array: ['elem', undefined, 3]}, result), 'database cursor result');
               this.put(encodeURIComponent('e$caped "stríng"'), "'válue'").then(function() {
                 this.get().then(function(value) {
                   assert('e$caped "stríng"' in value && value['e$caped "stríng"'] === "'válue'",
@@ -457,7 +465,7 @@ function(modules) {
       });
     },
     function() {
-      assert(passed == 86, 'tests complete ('+passed+'/86 in '+(Date.now()-start)+'ms)');
+      assert(passed == 89, 'tests complete ('+passed+'/89 in '+(Date.now()-start)+'ms)');
     }
   );
 }
