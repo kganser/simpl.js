@@ -386,8 +386,8 @@ simpl.add('database', function() {
               trans.append(store, path, value);
               return self;
             },
-            delete: !writable ? null : function(store, store, path) {
-              trans.delete(store, store, path);
+            delete: !writable ? null : function(store, path) {
+              trans.delete(store, path);
               return self;
             },
             then: function(callback) {
