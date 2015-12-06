@@ -59,21 +59,21 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         restore(callback, apps ? 'modules' : mods ? 'apps' : 'both');
       });
     }
-    var apps = {}, mods = {}, pending = 0;
+    var data = {apps: {}, mods: {}}, pending = 0;
     workspace.forEach(function(item) {
       if (scope != 'both' && scope == 'apps' == !item.file) return;
       pending++;
       o.xhr((item.file ? '/apps/'+item.file : '/modules/'+item.name)+'.js', function(e) {
         var code = e.target.responseText;
         if (item.file) {
-          apps[item.name] = {versions: [{
+          data.apps[item.name] = {versions: [{
             code: code,
             config: item.config || {},
             dependencies: item.dependencies || {},
             published: []
           }]};
         } else {
-          mods[item.name] = {versions: [{
+          data.mods[item.name] = {versions: [{
             code: 'function(modules'+(item.proxy ? ', proxy' : '')+') {\n'+code.split(/\n/).slice(1, -1).join('\n')+'\n}',
             dependencies: item.dependencies || {},
             published: []
@@ -81,14 +81,16 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         }
         if (!--pending) {
           var trans = db;
-          if (scope != 'modules')
+          if (scope != 'modules') {
+            Object.keys(apps).forEach(function(id) { stop.apply(null, id.split('@')); });
             trans = sparse
-              ? Object.keys(apps).reduce(function(t, name) { return t.put('apps/'+encodeURIComponent(name), apps[name]); }, trans)
-              : trans.put('apps', apps);
+              ? Object.keys(data.apps).reduce(function(t, name) { return t.put('apps/'+encodeURIComponent(name), data.apps[name]); }, trans)
+              : trans.put('apps', data.apps);
+          }
           if (scope != 'apps')
             trans = sparse
-              ? Object.keys(mods).reduce(function(t, name) { return t.put('modules/'+encodeURIComponent(name), mods[name]); }, trans)
-              : trans.put('modules', mods);
+              ? Object.keys(data.mods).reduce(function(t, name) { return t.put('modules/'+encodeURIComponent(name), data.mods[name]); }, trans)
+              : trans.put('modules', data.mods);
           trans.then(callback);
         }
       });
