@@ -113,25 +113,28 @@ function(modules) {
       db.get().get('array').then(function(root, array) {
         assert(compare(root, data), 'database get root');
         assert(compare(array, data.array), 'database get path');
-        db.put('object/boolean', false).then(function() {
-          this.get('object/boolean').then(function(result) {
-            assert(result === false, 'database put');
-            this.insert('array/2', 2).then(function() {
-              this.get('array').then(function(result) {
-                assert(compare(['elem', 1, 2, null], result), 'database insert');
-                this.append('array', 3).then(function() {
-                  this.get('array').then(function(result) {
-                    assert(compare(['elem', 1, 2, null, 3], result), 'database append');
-                    this.delete('object').then(function() {
-                      this.get().get('object').get('object/boolean').then(function(all, deleted, child) {
-                        assert(compare({array: ['elem', 1, 2, null, 3], string: 'value'}, all) && deleted === undefined && child === undefined,
-                          'database delete record');
-                        this.delete('array/3').then(function() {
-                          this.get('array').then(function(result) {
-                            assert(compare(['elem', 1, 2, 3], result), 'database delete array element');
-                            this.put('array/4', 4).then(function() {
-                              this.get('array').then(function(result) {
-                                assert(compare(['elem', 1, 2, 3, 4], result), 'database array index resolution');
+        this.count('array').count('object').count('string').then(function(a, b, c) {
+          assert(a === 3 && b === 1 && c === 0, 'database count');
+          db.put('object/boolean', false).then(function() {
+            this.get('object/boolean').then(function(result) {
+              assert(result === false, 'database put');
+              this.insert('array/2', 2).then(function() {
+                this.get('array').then(function(result) {
+                  assert(compare(['elem', 1, 2, null], result), 'database insert');
+                  this.append('array', 3).then(function() {
+                    this.get('array').then(function(result) {
+                      assert(compare(['elem', 1, 2, null, 3], result), 'database append');
+                      this.delete('object').then(function() {
+                        this.get().get('object').get('object/boolean').then(function(all, deleted, child) {
+                          assert(compare({array: ['elem', 1, 2, null, 3], string: 'value'}, all) && deleted === undefined && child === undefined,
+                            'database delete record');
+                          this.delete('array/3').then(function() {
+                            this.get('array').then(function(result) {
+                              assert(compare(['elem', 1, 2, 3], result), 'database delete array element');
+                              this.put('array/4', 4).then(function() {
+                                this.get('array').then(function(result) {
+                                  assert(compare(['elem', 1, 2, 3, 4], result), 'database array index resolution');
+                                });
                               });
                             });
                           });
@@ -143,29 +146,30 @@ function(modules) {
               });
             });
           });
-        });
-        db.get('', true).then(function(result) {
-          assert(compare({array: ['elem', 1, 2, 3, 4], string: 'value'}, result),
-            'database write transaction after write transaction');
-          var i = 1;
-          this.get('', function(path, array) {
-            assert(!path.length && !array && i == 1 || path.length == 1 && path[0] === 'array' && array && i == 2,
-              'database cursor arguments '+i++);
-            return path.length ? function(key) {
-              if (key > 2) return 'stop';
-            } : {
-              upperBound: 'string',
-              upperExclusive: true
-            };
-          }).then(function(result) {
-            assert(i == 3 && compare({array: ['elem', 1, 2]}, result), 'database cursor result');
-            this.put(encodeURIComponent('e$caped "stríng"'), "'válue'").then(function() {
-              this.get().then(function(value) {
-                assert('e$caped "stríng"' in value && value['e$caped "stríng"'] === "'válue'",
-                  'database put/get encoded paths, unicode values');
-                db.close();
-                modules.database.delete('unit-tests', function(error, blocked) {
-                  if (!blocked) next(assert(!error, 'database delete'));
+          db.get('', true).then(function(result) {
+            assert(compare({array: ['elem', 1, 2, 3, 4], string: 'value'}, result),
+              'database write transaction after write transaction');
+            var i = 1;
+            this.get('', function(path, array) {
+              assert(!path.length && !array && i == 1 || path.length == 1 && path[0] === 'array' && array && i == 2,
+                'database cursor arguments '+i++);
+              return path.length ? function(key) {
+                if (key == 1) return 'skip';
+                if (key > 2) return 'stop';
+              } : {
+                upperBound: 'string',
+                upperExclusive: true
+              };
+            }).then(function(result) {
+              assert(i == 3 && compare({array: ['elem', undefined, 2]}, result), 'database cursor result');
+              this.put(encodeURIComponent('e$caped "stríng"'), "'válue'").then(function() {
+                this.get().then(function(value) {
+                  assert('e$caped "stríng"' in value && value['e$caped "stríng"'] === "'válue'",
+                    'database put/get encoded paths, unicode values');
+                  db.close();
+                  modules.database.delete('unit-tests', function(error, blocked) {
+                    if (!blocked) next(assert(!error, 'database delete'));
+                  });
                 });
               });
             });
@@ -453,7 +457,7 @@ function(modules) {
       });
     },
     function() {
-      assert(passed == 85, 'tests complete ('+passed+'/85 in '+(Date.now()-start)+'ms)');
+      assert(passed == 86, 'tests complete ('+passed+'/86 in '+(Date.now()-start)+'ms)');
     }
   );
 }

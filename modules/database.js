@@ -245,6 +245,12 @@ simpl.add('database', function() {
               append(store, path, value, callback);
             };
           },
+          count: function(store, path, callback, bounds) {
+            if (!bounds) bounds = {};
+            store.count(scopedRange(path, bounds.lowerBound, bounds.upperBound, bounds.lowerExclusive, bounds.upperExclusive)).onsuccess = function(e) {
+              callback(e.target.result);
+            };
+          },
           delete: function(store, path, callback) {
             store.delete(makeKey(path));
             deleteChildren(store, path, callback);
@@ -278,6 +284,7 @@ simpl.add('database', function() {
       /** Database: {
             transaction: function(writable=false:boolean, stores='data':[string, ...]|string) -> Transaction|ScopedTransaction,
             get: function(path='':string, writable=false:boolean, cursor=undefined:Cursor, store='data':string) -> ScopedTransaction,
+            count: function(path='':string, writable=false:boolean, bounds=undefined:Bounds, store='data':string) -> ScopedTransaction,
             put: function(path='':string, value:json, store='data':string) -> ScopedTransaction,
             insert: function(path='':string, value:json, store='data':string) -> ScopedTransaction,
             append: function(path='':string, value:json, store='data':string) -> ScopedTransaction,
@@ -285,10 +292,10 @@ simpl.add('database', function() {
             close: function
           }
           
-          `get`, `put`, `insert`, `append`, and `delete` are convenience methods that operate through `transaction` for
-          a single objectStore and return the corresponding `ScopedTransaction`. `get` initiates a read-only
-          transaction by default. `transaction` returns a `ScopedTransaction` if a single (string) objectStore is
-          specified, and a `Transaction` if operating on multiple objectStores. */
+          `get`, `count`, `put`, `insert`, `append`, and `delete` are convenience methods that operate through
+          `transaction` for a single objectStore and return the corresponding `ScopedTransaction`. `get` and `count`
+          initiate a read-only transaction by default. `transaction` returns a `ScopedTransaction` if a single (string)
+          objectStore is specified, and a `Transaction` if operating on multiple objectStores. */
       return self = {
         transaction: function(writable, stores) {
           if (stores == null) stores = 'data';
@@ -297,6 +304,7 @@ simpl.add('database', function() {
           });
           /** Transaction: {
                 get: function(store:string, path='':string, cursor=undefined:Cursor) -> Transaction,
+                count: function(store:string, path='':string, bounds=undefined:Bounds) -> Transaction,
                 put: null|function(store:string, path='':string, value:json) -> Transaction,
                 insert: null|function(store:string, path='':string, value:json) -> Transaction,
                 append: null|function(store:string, path='':string, value:json) -> Transaction,
@@ -309,6 +317,7 @@ simpl.add('database', function() {
               
           /** ScopedTransaction: {
                 get: function(path='':string, cursor=undefined:Cursor) -> ScopedTransaction,
+                count: function(path='':string, bounds=undefined:Bounds) -> ScopedTransaction,
                 put: null|function(path='':string, value:json) -> ScopedTransaction,
                 insert: null|function(path='':string, value:json) -> ScopedTransaction,
                 append: null|function(path='':string, value:json) -> ScopedTransaction,
@@ -322,14 +331,22 @@ simpl.add('database', function() {
               `path` is a `/`-separated string of array indices and `encodeURIComponent`-encoded object keys denoting
               the path to the desired element within the object store's json data structure; e.g.
               `'users/123/firstName'`. If undefined, `cursor` buffers all data at the requested path as the result of a
-              `get` operation. `insert` will splice the given `value` into the parent array at the specified position,
-              shifting any subsequent elements forward.
+              `get` operation. `count` returns a count of the number of elements in an object or array at `path` (with
+              optional `bounds`). `insert` will splice the given `value` into the parent array at the specified
+              position, shifting any subsequent elements forward.
               
               When all pending operations complete, `callback` is called with the result of each queued operation in
               order. More operations can be queued onto the same transaction at that time via `this`.
               
               Results from `put`, `insert`, `append`, and `delete` are error strings or undefined if successful. `get`
               results are json data or undefined if no value exists at the requested path. */
+              
+          /** Bounds: {
+                lowerBound=null: string|number,
+                lowerExclusive=false: boolean,
+                upperBound=null: string|number,
+                upperExclusive=false: boolean
+              } */
               
           /** Cursor: function(path:[string|number, ...], array:boolean) -> boolean|Action|{
                 lowerBound=null: string|number,
@@ -374,6 +391,10 @@ simpl.add('database', function() {
               trans.get(store, path, cursor);
               return self;
             },
+            count: function(store, path, bounds) {
+              trans.count(store, path, bounds);
+              return self;
+            },
             put: !writable ? null : function(store, path, value) {
               trans.put(store, path, value);
               return self;
@@ -396,6 +417,10 @@ simpl.add('database', function() {
           } : {
             get: function(path, cursor) {
               trans.get(stores, path, cursor);
+              return self;
+            },
+            count: function(path, bounds) {
+              trans.count(stores, path, bounds);
               return self;
             },
             put: !writable ? null : function(path, value) {
@@ -421,6 +446,9 @@ simpl.add('database', function() {
         },
         get: function(path, writable, cursor, store) {
           return self.transaction(writable, store).get(path, cursor);
+        },
+        count: function(path, writable, bounds, store) {
+          return self.transaction(writable, store).count(path, bounds);
         },
         put: function(path, value, store) {
           return self.transaction(true, store).put(path, value);
