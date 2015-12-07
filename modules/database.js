@@ -139,7 +139,8 @@ simpl.add('database', function() {
         the requested version or does not exist. If `upgrade` is a json value, the data stores in the first transaction
         operation on this `Database` will be populated with this value on an upgrade event. Otherwise, an upgrade will
         be handled by the given function via `UpgradeTransaction`. */
-      var self, db, queue, close, open = function(stores, callback) {
+      var self, db, queue, close;
+      var open = function(stores, callback) {
         if (db) return callback();
         if (queue) return queue.push(callback);
         queue = [callback];
@@ -187,8 +188,10 @@ simpl.add('database', function() {
           request.onblocked = function() { onError(null, true); };
         }
       };
-      var transaction = function(type, stores, callback) {
-        var trans, pending = 0, values = [], self = {
+      var transaction = function(type, stores, object) {
+        var group = {pending: 0, values: []},
+            trans, self;
+        Object.keys(self = {
           get: get,
           put: function(store, path, callback, value, insert, empty) {
             var parentPath = path.slice(0, -1);
@@ -258,30 +261,29 @@ simpl.add('database', function() {
             store.delete(makeKey(path));
             deleteChildren(store, path, callback);
           }
-        };
-        Object.keys(self).forEach(function(name) {
+        }).forEach(function(name) {
           var method = self[name];
-          var wrapped = function(store, path, value, insert) {
-            var i = values.push(pending++)-1, p = path;
-            resolvePath(store = trans.objectStore(store), path, function(path, empty) {
-              method(store, path, function(value) {
-                values[i] = value;
-                if (!--pending) {
-                  var v = values;
-                  values = [];
-                  callback.apply(null, v);
-                }
-              }, value, insert, empty);
-            });
-          };
           self[name] = function(store, path, value, insert) {
-            if (trans) return wrapped(store, path, value, insert);
+            var g = group, i = g.pending++;
             open(stores, function() {
               if (!trans) trans = db.transaction(stores, type);
-              wrapped(store, path, value, insert);
+              resolvePath(store = trans.objectStore(store), path, function(path, empty) {
+                method(store, path, function(value) {
+                  g.values[i] = value;
+                  if (!--g.pending && g.callback) {
+                    g.callback.apply(object, g.values);
+                    g = null;
+                  }
+                }, value, insert, empty);
+              });
             });
           };
         });
+        self.then = function(callback) {
+          if (!group.pending) throw new Error('No pending database operations');
+          group.callback = callback;
+          group = {pending: 0, values: []};
+        };
         return self;
       };
       /** Database: {
@@ -302,9 +304,6 @@ simpl.add('database', function() {
       return self = {
         transaction: function(writable, stores) {
           if (stores == null) stores = 'data';
-          var self, cb, trans = transaction(writable ? 'readwrite' : 'readonly', stores, function() {
-            if (cb) cb.apply(self, arguments);
-          });
           /** Transaction: {
                 get: function(store:string, path='':string, cursor=undefined:Cursor) -> Transaction,
                 count: function(store:string, path='':string, bounds=undefined:Bounds) -> Transaction,
@@ -312,7 +311,7 @@ simpl.add('database', function() {
                 insert: null|function(store:string, path='':string, value:json) -> Transaction,
                 append: null|function(store:string, path='':string, value:json) -> Transaction,
                 delete: null|function(store:string, path='':string) -> Transaction,
-                then: function(callback:function(this:Transaction, json|undefined, ...))
+                then: function(callback:function(this:Transaction, json|undefined, ...)) -> Transaction
               }
               
               A `Transaction` acting on multiple data stores must specify a data store as the first argument to every
@@ -325,11 +324,12 @@ simpl.add('database', function() {
                 insert: null|function(path='':string, value:json) -> ScopedTransaction,
                 append: null|function(path='':string, value:json) -> ScopedTransaction,
                 delete: null|function(path='':string) -> ScopedTransaction,
-                then: function(callback:function(this:ScopedTransaction, json|undefined, ...))
+                then: function(callback:function(this:ScopedTransaction, json|undefined, ...)) -> ScopedTransaction
               }
               
-              All methods except `then` are chainable and execute on the same transaction in parallel. If the
-              transaction is not writable, `put`, `insert`, `append`, and `delete` are null.
+              All methods are chainable and execute on the same transaction in parallel. `then` assigns a callback for
+              the preceding sequence of operations, or throws an error if no operations are pending. If the transaction
+              is not writable, `put`, `insert`, `append`, and `delete` are null.
               
               `path` is a `/`-separated string of array indices and `encodeURIComponent`-encoded object keys denoting
               the path to the desired element within the object store's json data structure; e.g.
@@ -338,7 +338,7 @@ simpl.add('database', function() {
               optional `bounds`). `insert` will splice the given `value` into the parent array at the specified
               position, shifting any subsequent elements forward.
               
-              When all pending operations complete, `callback` is called with the result of each queued operation in
+              When all its pending operations complete, `callback` is called with the result of each queued operation in
               order. More operations can be queued onto the same transaction at that time via `this`.
               
               Results from `put`, `insert`, `append`, and `delete` are error strings or undefined if successful. `get`
@@ -392,7 +392,7 @@ simpl.add('database', function() {
                   }
                 };
               });` */
-          return self = Array.isArray(stores) ? {
+          var self = Array.isArray(stores) ? {
             get: function(store, path, cursor) {
               trans.get(store, path, cursor);
               return self;
@@ -418,7 +418,8 @@ simpl.add('database', function() {
               return self;
             },
             then: function(callback) {
-              cb = callback;
+              trans.then(callback);
+              return self;
             }
           } : {
             get: function(path, cursor) {
@@ -446,9 +447,12 @@ simpl.add('database', function() {
               return self;
             },
             then: function(callback) {
-              cb = callback;
+              trans.then(callback);
+              return self;
             }
           };
+          var trans = transaction(writable ? 'readwrite' : 'readonly', stores, self);
+          return self;
         },
         get: function(path, writable, cursor, store) {
           return self.transaction(writable, store).get(path, cursor);

@@ -134,6 +134,8 @@ function(modules) {
                               this.put('array/4', 4).then(function() {
                                 this.get('array').then(function(result) {
                                   assert(compare(['elem', 1, 2, 3, 4], result), 'database array index resolution');
+                                }).get('array/1').then(function(result) {
+                                  assert(result === 1, 'database multiple transaction callbacks');
                                 });
                               });
                             });
@@ -465,7 +467,7 @@ function(modules) {
       });
     },
     function() {
-      assert(passed == 89, 'tests complete ('+passed+'/89 in '+(Date.now()-start)+'ms)');
+      assert(passed == 90, 'tests complete ('+passed+'/90 in '+(Date.now()-start)+'ms)');
     }
   );
 }
