@@ -41,7 +41,7 @@ simpl.add('database', function() {
   var get = function(store, path, callback, cursor) {
     var next;
     if (cursor === 'shallow') cursor = function() { return false; };
-    if (cursor === 'immediates') cursor = function(p) { return !path.length; };
+    if (cursor === 'immediates') cursor = function(p) { return !p.length; };
     if (typeof cursor != 'function') cursor = function() {};
     store.get(makeKey(path)).onsuccess = function(e) {
       var result = e.target.result;
