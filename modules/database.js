@@ -195,6 +195,12 @@ simpl.add('database', function() {
             trans, self;
         Object.keys(self = {
           get: get,
+          count: function(store, path, callback, bounds) {
+            if (!bounds) bounds = {};
+            store.count(scopedRange(path, bounds.lowerBound, bounds.upperBound, bounds.lowerExclusive, bounds.upperExclusive)).onsuccess = function(e) {
+              callback(e.target.result);
+            };
+          },
           put: function(store, path, callback, value, insert, empty) {
             var parentPath = path.slice(0, -1);
             store.get(makeKey(parentPath)).onsuccess = function(e) {
@@ -251,12 +257,6 @@ simpl.add('database', function() {
               if (parent.type != 'array')
                 return callback('Parent resource is not an array');
               append(store, path, value, callback);
-            };
-          },
-          count: function(store, path, callback, bounds) {
-            if (!bounds) bounds = {};
-            store.count(scopedRange(path, bounds.lowerBound, bounds.upperBound, bounds.lowerExclusive, bounds.upperExclusive)).onsuccess = function(e) {
-              callback(e.target.result);
             };
           },
           delete: function(store, path, callback) {
