@@ -40,6 +40,8 @@ simpl.add('database', function() {
   };
   var get = function(store, path, callback, cursor) {
     var next;
+    if (cursor === 'shallow') cursor = function() { return false; };
+    if (cursor === 'immediates') cursor = function(p) { return !path.length; };
     if (typeof cursor != 'function') cursor = function() {};
     store.get(makeKey(path)).onsuccess = function(e) {
       var result = e.target.result;
@@ -288,7 +290,7 @@ simpl.add('database', function() {
       };
       /** Database: {
             transaction: function(writable=false:boolean, stores='data':[string, ...]|string) -> Transaction|ScopedTransaction,
-            get: function(path='':string, writable=false:boolean, cursor=undefined:Cursor, store='data':string) -> ScopedTransaction,
+            get: function(path='':string, writable=false:boolean, cursor='deep':Cursor, store='data':string) -> ScopedTransaction,
             count: function(path='':string, writable=false:boolean, bounds=undefined:Bounds, store='data':string) -> ScopedTransaction,
             put: function(path='':string, value:json, store='data':string) -> ScopedTransaction,
             insert: function(path='':string, value:json, store='data':string) -> ScopedTransaction,
@@ -305,7 +307,7 @@ simpl.add('database', function() {
         transaction: function(writable, stores) {
           if (stores == null) stores = 'data';
           /** Transaction: {
-                get: function(store:string, path='':string, cursor=undefined:Cursor) -> Transaction,
+                get: function(store:string, path='':string, cursor='deep':Cursor) -> Transaction,
                 count: function(store:string, path='':string, bounds=undefined:Bounds) -> Transaction,
                 put: function(store:string, path='':string, value:json) -> Transaction,
                 insert: function(store:string, path='':string, value:json) -> Transaction,
@@ -318,7 +320,7 @@ simpl.add('database', function() {
               operation. Otherwise, these methods correspond to `ScopedTransaction` methods. */
               
           /** ScopedTransaction: {
-                get: function(path='':string, cursor=undefined:Cursor) -> ScopedTransaction,
+                get: function(path='':string, cursor='deep':Cursor) -> ScopedTransaction,
                 count: function(path='':string, bounds=undefined:Bounds) -> ScopedTransaction,
                 put: function(path='':string, value:json) -> ScopedTransaction,
                 insert: function(path='':string, value:json) -> ScopedTransaction,
@@ -333,7 +335,7 @@ simpl.add('database', function() {
               
               `path` is a `/`-separated string of array indices and `encodeURIComponent`-encoded object keys denoting
               the path to the desired element within the object store's json data structure; e.g.
-              `'users/123/firstName'`. If undefined, `cursor` buffers all data at the requested path as the result of a
+              `'users/123/firstName'`. `cursor` buffers all data at the requested path as the result of a
               `get` operation. `count` returns a count of the number of elements in an object or array at `path` (with
               optional `bounds`). `insert` will splice the given `value` into the parent array at the specified
               position, shifting any subsequent elements forward.
@@ -351,7 +353,7 @@ simpl.add('database', function() {
                 upperExclusive=false: boolean
               } */
               
-          /** Cursor: function(path:[string|number, ...], array:boolean) -> boolean|Action|{
+          /** Cursor: string|function(path:[string|number, ...], array:boolean) -> boolean|Action|{
                 lowerBound=null: string|number,
                 lowerExclusive=false: boolean,
                 upperBound=null: string|number,
@@ -363,19 +365,21 @@ simpl.add('database', function() {
               
           /** Action:function(key:string|number) -> undefined|string
               
-              `Cursor` is a function called for each array or object encountered in the requested json structure. It is
-              called with a `path` array (of strings and/or numeric indices) relative to the requested path (i.e. `[]`
-              represents the path as requested in `get`) and an `array` boolean that is true if the substructure is an
-              array. It returns an `Action` callback or object with a range and `action`, or false to prevent
-              recursion into the structure. `lowerBound` and `upperBound` restrict the keys/indices traversed for this
-              object/array, and the `Action` function is called with each `key` in the requested range, in order. The
-              `Action` callback can optionally return either `'skip'` or `'stop'` to exclude the element at the given
-              key from the structure or to exclude and stop iterating, respectively. If specified, the `value` function
-              receives the value retrieved from each `key` and returns a value to insert into the parent object or
-              array, or undefined to skip insertion.
+              `Cursor` controls how data is traversed and buffered in a `get` request. String values `'shallow'`,
+              `'immediates'`, and `'deep'` control the depth of the returned data object. As a function, `Cursor` is
+              called for each array or object encountered in the requested json structure. It is called with a `path`
+              array (of strings and/or numeric indices) relative to the requested path (i.e. `[]` represents the path as
+              requested in `get`) and an `array` boolean that is true if the substructure is an array. It returns an
+              `Action` callback or object with a range and `action`, or false to prevent recursion into the structure.
+              `lowerBound` and `upperBound` restrict the keys/indices traversed for this object/array, and the `Action`
+              function is called with each `key` in the requested range, in order. The `Action` callback can optionally
+              return either `'skip'` or `'stop'` to exclude the element at the given key from the structure or to
+              exclude and stop iterating, respectively. If specified, the `value` function receives the value retrieved
+              from each `key` and returns a value to insert into the parent object or array, or undefined to skip
+              insertion.
               
               For example, the following call uses a cursor to fetch only the immediate members of the object at the
-              requested path. Object and array values will be empty:
+              requested path (equivalent to `'immediates'`). Object and array values will be empty:
               
              `db.get('path/to/object', false, function(path) {
                 return !path.length;

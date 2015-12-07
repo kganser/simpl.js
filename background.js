@@ -52,13 +52,11 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     return db;
   };
   var restore = function(callback, scope, sparse) {
-    if (!scope) {
-      var exists = function() { return false; };
-      return db.get('apps', false, exists).get('modules', exists).then(function(apps, mods) {
+    if (!scope)
+      return db.get('apps', false, 'shallow').get('modules', 'shallow').then(function(apps, mods) {
         if (apps && mods) return callback();
         restore(callback, apps ? 'modules' : mods ? 'apps' : 'both');
       });
-    }
     var data = {apps: {}, mods: {}}, pending = 0;
     workspace.forEach(function(item) {
       if (scope != 'both' && scope == 'apps' == !item.file) return;
