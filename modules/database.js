@@ -307,10 +307,10 @@ simpl.add('database', function() {
           /** Transaction: {
                 get: function(store:string, path='':string, cursor=undefined:Cursor) -> Transaction,
                 count: function(store:string, path='':string, bounds=undefined:Bounds) -> Transaction,
-                put: null|function(store:string, path='':string, value:json) -> Transaction,
-                insert: null|function(store:string, path='':string, value:json) -> Transaction,
-                append: null|function(store:string, path='':string, value:json) -> Transaction,
-                delete: null|function(store:string, path='':string) -> Transaction,
+                put: function(store:string, path='':string, value:json) -> Transaction,
+                insert: function(store:string, path='':string, value:json) -> Transaction,
+                append: function(store:string, path='':string, value:json) -> Transaction,
+                delete: function(store:string, path='':string) -> Transaction,
                 then: function(callback:function(this:Transaction, json|undefined, ...)) -> Transaction
               }
               
@@ -320,16 +320,16 @@ simpl.add('database', function() {
           /** ScopedTransaction: {
                 get: function(path='':string, cursor=undefined:Cursor) -> ScopedTransaction,
                 count: function(path='':string, bounds=undefined:Bounds) -> ScopedTransaction,
-                put: null|function(path='':string, value:json) -> ScopedTransaction,
-                insert: null|function(path='':string, value:json) -> ScopedTransaction,
-                append: null|function(path='':string, value:json) -> ScopedTransaction,
-                delete: null|function(path='':string) -> ScopedTransaction,
+                put: function(path='':string, value:json) -> ScopedTransaction,
+                insert: function(path='':string, value:json) -> ScopedTransaction,
+                append: function(path='':string, value:json) -> ScopedTransaction,
+                delete: function(path='':string) -> ScopedTransaction,
                 then: function(callback:function(this:ScopedTransaction, json|undefined, ...)) -> ScopedTransaction
               }
               
               All methods are chainable and execute on the same transaction in parallel. `then` assigns a callback for
               the preceding sequence of operations, or throws an error if no operations are pending. If the transaction
-              is not writable, `put`, `insert`, `append`, and `delete` are null.
+              is not writable, `put`, `insert`, `append`, and `delete` throw an error.
               
               `path` is a `/`-separated string of array indices and `encodeURIComponent`-encoded object keys denoting
               the path to the desired element within the object store's json data structure; e.g.
@@ -401,19 +401,23 @@ simpl.add('database', function() {
               trans.count(store, path, bounds);
               return self;
             },
-            put: !writable ? null : function(store, path, value) {
+            put: function(store, path, value) {
+              if (!writable) throw new Error('Transaction is read-only');
               trans.put(store, path, value);
               return self;
             },
-            insert: !writable ? null : function(store, path, value) {
+            insert: function(store, path, value) {
+              if (!writable) throw new Error('Transaction is read-only');
               trans.put(store, path, value, true);
               return self;
             },
-            append: !writable ? null : function(store, path, value) {
+            append: function(store, path, value) {
+              if (!writable) throw new Error('Transaction is read-only');
               trans.append(store, path, value);
               return self;
             },
-            delete: !writable ? null : function(store, path) {
+            delete: function(store, path) {
+              if (!writable) throw new Error('Transaction is read-only');
               trans.delete(store, path);
               return self;
             },
@@ -430,19 +434,23 @@ simpl.add('database', function() {
               trans.count(stores, path, bounds);
               return self;
             },
-            put: !writable ? null : function(path, value) {
+            put: function(path, value) {
+              if (!writable) throw new Error('Transaction is read-only');
               trans.put(stores, path, value);
               return self;
             },
-            insert: !writable ? null : function(path, value) {
+            insert: function(path, value) {
+              if (!writable) throw new Error('Transaction is read-only');
               trans.put(stores, path, value, true);
               return self;
             },
-            append: !writable ? null : function(path, value) {
+            append: function(path, value) {
+              if (!writable) throw new Error('Transaction is read-only');
               trans.append(stores, path, value);
               return self;
             },
-            delete: !writable ? null : function(path) {
+            delete: function(path) {
+              if (!writable) throw new Error('Transaction is read-only');
               trans.delete(stores, path);
               return self;
             },
