@@ -190,7 +190,7 @@ simpl.add('database', function() {
           request.onblocked = function() { onError(null, true); };
         }
       };
-      var transaction = function(type, stores, object) {
+      var transaction = function(writable, stores, object) {
         var group = {pending: 0, values: []},
             trans, self;
         Object.keys(self = {
@@ -266,9 +266,11 @@ simpl.add('database', function() {
         }).forEach(function(name) {
           var method = self[name];
           self[name] = function(store, path, value, insert) {
+            if (!writable && name in {put: 1, append: 1, delete: 1})
+              throw new Error('Transaction is read-only');
             var g = group, i = g.pending++;
             open(stores, function() {
-              if (!trans) trans = db.transaction(stores, type);
+              if (!trans) trans = db.transaction(stores, writable ? 'readwrite' : 'readonly');
               resolvePath(store = trans.objectStore(store), path, function(path, empty) {
                 method(store, path, function(value) {
                   g.values[i] = value;
@@ -406,22 +408,18 @@ simpl.add('database', function() {
               return self;
             },
             put: function(store, path, value) {
-              if (!writable) throw new Error('Transaction is read-only');
               trans.put(store, path, value);
               return self;
             },
             insert: function(store, path, value) {
-              if (!writable) throw new Error('Transaction is read-only');
               trans.put(store, path, value, true);
               return self;
             },
             append: function(store, path, value) {
-              if (!writable) throw new Error('Transaction is read-only');
               trans.append(store, path, value);
               return self;
             },
             delete: function(store, path) {
-              if (!writable) throw new Error('Transaction is read-only');
               trans.delete(store, path);
               return self;
             },
@@ -439,22 +437,18 @@ simpl.add('database', function() {
               return self;
             },
             put: function(path, value) {
-              if (!writable) throw new Error('Transaction is read-only');
               trans.put(stores, path, value);
               return self;
             },
             insert: function(path, value) {
-              if (!writable) throw new Error('Transaction is read-only');
               trans.put(stores, path, value, true);
               return self;
             },
             append: function(path, value) {
-              if (!writable) throw new Error('Transaction is read-only');
               trans.append(stores, path, value);
               return self;
             },
             delete: function(path) {
-              if (!writable) throw new Error('Transaction is read-only');
               trans.delete(stores, path);
               return self;
             },
@@ -463,7 +457,7 @@ simpl.add('database', function() {
               return self;
             }
           };
-          var trans = transaction(writable ? 'readwrite' : 'readonly', stores, self);
+          var trans = transaction(writable, stores, self);
           return self;
         },
         get: function(path, writable, cursor, store) {
