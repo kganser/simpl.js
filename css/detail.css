@@ -18,6 +18,19 @@
   font-size: 15px;
   margin: .5em 0;
 }
+.tags {
+  margin-top: 5px;
+}
+.tags span {
+  display: inline-block;
+  padding: 2px 8px;
+  margin-right: 5px;
+  background: #f7f7f7;
+  color: #666;
+  letter-spacing: 1px;
+  font-size: 10px;
+  text-transform: uppercase;
+}
 button.large {
   display: block;
   font-size: 15px;
