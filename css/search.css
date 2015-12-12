@@ -59,7 +59,6 @@
   margin: 5px 0;
 }
 #page-search aside button {
-  width: 100%;
   margin-top: 20px;
   background: #666;
   color: white;
@@ -87,12 +86,11 @@
   #page-search h3 {
     display: none;
   }
-  #page-search aside div {
+  #page-search aside > div {
     display: inline-block;
     margin: 5px;
   }
   #page-search aside button {
-    width: auto;
     margin: 0 0 0 10px;
   }
 }
