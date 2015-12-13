@@ -27,9 +27,8 @@
   margin-right: 5px;
   background: #f7f7f7;
   color: #666;
+  font-size: 11px;
   letter-spacing: 1px;
-  font-size: 10px;
-  text-transform: uppercase;
 }
 button.large {
   display: block;
