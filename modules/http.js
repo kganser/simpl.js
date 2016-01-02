@@ -179,7 +179,9 @@ simpl.add('http', function(modules) {
             pair = pair.split('=', 2);
             if (pair.length < 2) return;
             var value = pair[1];
-            request.cookie[pair[0]] = decodeURIComponent(value[0] == '"' ? value.slice(1, -1) : value);
+            try {
+              request.cookie[pair[0]] = decodeURIComponent(value[0] == '"' ? value.slice(1, -1) : value);
+            } catch (e) {}
           });
           var o = {length: parseInt(request.headers['Content-Length'], 10) || 0},
               r = onRequest(request, response);
@@ -295,14 +297,16 @@ simpl.add('http', function(modules) {
       var o = {};
       if (query) query.split('&').forEach(function(field) {
         field = field.split('=');
-        var key = decodeURIComponent(field[0].replace(/\+/g, '%20')),
-            value = field[1] && decodeURIComponent(field[1].replace(/\+/g, '%20'));
-        if (!o.hasOwnProperty(key))
-          o[key] = value;
-        else if (Array.isArray(o[key]))
-          o[key].push(value);
-        else
-          o[key] = [o[key], value];
+        try {
+          var key = decodeURIComponent(field[0].replace(/\+/g, '%20')),
+              value = field[1] && decodeURIComponent(field[1].replace(/\+/g, '%20'));
+          if (!o.hasOwnProperty(key))
+            o[key] = value;
+          else if (Array.isArray(o[key]))
+            o[key].push(value);
+          else
+            o[key] = [o[key], value];
+        } catch (e) {}
       });
       return o;
     }
