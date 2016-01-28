@@ -180,9 +180,8 @@ simpl.add('app', function(o) {
           doc: entry.doc,
           log: []
         }}};
-        // TODO: move to position
-        dom(li(name, 1, 0, current.app), current.app ? appList : moduleList);
         entry.tab.parentNode.removeChild(entry.tab);
+        insert(name, 1, 0, current.app);
         navigate(name, 1, current.app, current.panel);
         delete group[current.id];
         if (callback) callback();
@@ -265,6 +264,15 @@ simpl.add('app', function(o) {
           }}
         ];
       }};
+    };
+    var insert = function(name, major, minor, app) {
+      var list = app ? appList : moduleList,
+          group = app ? apps : modules,
+          i = 0;
+      Object.keys(group).forEach(function(n) {
+        if (n < name) i += Object.keys(group[n].versions).length;
+      });
+      return list.insertBefore(dom(li(name, major, minor, app)), list.children[i]);
     };
     dom([
       {nav: [
@@ -445,7 +453,7 @@ simpl.add('app', function(o) {
             } else {
               field.value = '';
               apps[name] = {name: name, versions: {1: {minor: 0, code: boilerplate, config: {}, dependencies: {}, doc: CodeMirror.Doc(boilerplate, {name: 'javascript'}), log: []}}};
-              dom(li(name, 1, null, true), appList).className = 'changed';
+              insert(name, 1, null, true).className = 'changed';
               navigate(name, 1, true);
               code.setCursor(1, 2);
               code.focus();
@@ -478,7 +486,7 @@ simpl.add('app', function(o) {
             } else {
               field.value = '';
               modules[name] = {name: name, versions: {1: {minor: 0, code: boilerplate, dependencies: {}, doc: CodeMirror.Doc(boilerplate, {name: 'javascript'})}}};
-              dom(li(name, 1), moduleList).className = 'changed';
+              insert(name, 1).className = 'changed';
               navigate(name, 1, false, 'code');
               code.setCursor(1, 2);
               code.focus();
