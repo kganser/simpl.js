@@ -215,9 +215,9 @@ simpl.add('app', function(o) {
         if (e.target.status != 200)
           return status('failure', 'Error publishing new version');
         status('success', 'Published');
-        var versions = (current.app ? apps : modules)[current.id].versions,
-            version = upgrade ? Object.keys(versions).length+1 : 'v'+current.version+'.'+entry.minor++;
         if (upgrade) {
+          var versions = (current.app ? apps : modules)[current.id].versions,
+              version = Object.keys(versions).length+1;
           versions[version] = current.app ? {minor: 1, log: []} : {minor: 1};
           (current.app ? appList : moduleList).insertBefore(
             dom(li(current.id, version, 1, current.app)),
@@ -227,8 +227,10 @@ simpl.add('app', function(o) {
           entry.published.push(current.app
             ? {code: entry.code, config: entry.config, dependencies: entry.dependencies}
             : {code: entry.code, dependencies: entry.dependencies});
+          timeline('v'+current.version+'.'+entry.minor++);
+          entry.tab.lastChild.title = current.name+' v'+current.version;
+          entry.tab.lastChild.lastChild.textContent = 'v'+current.version;
           minor.textContent = 'Publish v'+current.version+'.'+entry.minor;
-          timeline(version);
         }
         major.parentNode.style.display = 'inline-block';
         remove.parentNode.style.display = 'none';
