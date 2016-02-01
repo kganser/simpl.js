@@ -71,7 +71,7 @@ simpl.add('app', function(o) {
       var record = (app ? apps : modules)[name];
       if (record) {
         var entry = record.versions[version],
-            first = app ? entry.running ? 'log' : 'code' : 'docs',
+            first = app ? entry.state ? 'log' : 'code' : 'docs',
             next = {settings: first, code: 'settings'}[panel = panel || first] || 'code';
         if (selected) body.classList.remove('show-'+selected.panel);
         if (selected && selected.entry == entry && !refresh) {
@@ -100,7 +100,7 @@ simpl.add('app', function(o) {
             if (app) dom(entry.log.map(logLine), log, true);
             else docs(record.name, entry.code);
           } else if (!refresh && !entry.tab.classList.contains('loading')) {
-            entry.tab.classList.add(selected.panel = 'loading');
+            entry.tab.classList.add(selected.panel = 'loading'); // TODO: avoid possible /loading url
             request(url(selected), function(e) {
               try {
                 if (e.target.status != 200) throw 'error';
@@ -112,7 +112,8 @@ simpl.add('app', function(o) {
                 entry.config = response.config;
                 entry.dependencies = response.dependencies;
                 entry.published = response.published;
-                entry.tab.classList.remove('error', 'loading');
+                entry.tab.classList.remove('loading');
+                if (entry.state != 'error') entry.tab.classList.remove('error');
               } catch (e) {
                 entry.tab.classList.remove('loading');
                 entry.tab.classList.add('error');
@@ -329,7 +330,7 @@ simpl.add('app', function(o) {
                 Object.keys(versions).forEach(function(version) {
                   var entry = versions[version];
                   entry.tab.classList.remove('running', 'error');
-                  entry.running = false;
+                  entry.state = null;
                   entry.log = [];
                 });
               });
@@ -371,24 +372,21 @@ simpl.add('app', function(o) {
                     }
                     break;
                   case 'state':
-                    Object.keys(data).forEach(function(app) {
-                      if (apps[app]) data[app].forEach(function(version) {
-                        if (app = apps[app].versions[version]) {
-                          app.tab.classList.add('running');
-                          app.running = true;
-                        }
-                      });
+                    if (Array.isArray(data)) data.forEach(function(id) {
+                      var i = id.lastIndexOf('@'),
+                          app = apps[id.substr(0, i)],
+                          entry = app && app.versions[id.substr(i+1)];
+                      if (entry) entry.tab.classList.add(entry.state = 'running');
                     });
                     if (selected && selected.app) {
                       log.textContent = '';
-                      navigate(selected.id, selected.version, true, selected.panel == 'log' && !selected.entry.running ? 'code' : selected.panel);
+                      navigate(selected.id, selected.version, true, selected.panel);
                     }
                     appList.classList.remove('disabled');
                     status();
                     break;
                   case 'error':
-                    entry.running = false;
-                    entry.tab.classList.add(data.level = 'error');
+                    entry.tab.classList.add(entry.state = data.level = 'error');
                     entry.tab.classList.remove('running');
                     data.message = [data.message];
                   case 'log':
@@ -407,10 +405,10 @@ simpl.add('app', function(o) {
                     break;
                   case 'run':
                   case 'stop':
-                    entry.running = event == 'run';
-                    entry.tab.classList[entry.running ? 'add' : 'remove']('running');
+                    entry.state = event == 'run' ? 'running' : null;
+                    entry.tab.classList[entry.state ? 'add' : 'remove']('running');
                     entry.tab.classList.remove('error');
-                    if (entry.running) {
+                    if (entry.state) {
                       entry.log = [];
                       if (selected && selected.entry == entry) {
                         log.textContent = '';

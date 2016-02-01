@@ -107,20 +107,16 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     });
   };
   var state = function(user, client) {
-    var state = {}, log = [];
+    var state = [];
     Object.keys(apps).forEach(function(id) {
-      var parts = id.split('@');
-      if (parts[0] == user) {
-        var app = parts[1],
-            version = parseInt(parts[2], 10);
-        if (!state[app]) state[app] = [version];
-        else state[app].push(version);
-        log = log.concat(logs[id]);
-      }
+      var i = id.indexOf('@');
+      if (id.substr(0, i) == user) state.push(id.substr(i+1));
     });
     client.send(JSON.stringify({event: 'state', data: state}));
-    log.forEach(function(log) {
-      client.send(JSON.stringify({event: 'log', data: log}));
+    Object.keys(logs).forEach(function(id) {
+      if (id.split('@', 1)[0] == user) logs[id].forEach(function(e) {
+        client.send(JSON.stringify(e.fatal ? {event: 'error', data: e.fatal} : {event: 'log', data: e}));
+      });
     });
   };
   var run = function(user, name, version, token) {
@@ -150,18 +146,20 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           if (record) return callback(wrap(module.name, record.code, module.version, record.dependencies));
           if (!apps[id]) return;
           apps[id].terminate();
-          delete logs[id];
           delete apps[id];
-          broadcast('error', {app: name, version: version, message: 'Required module not found: '+module.name}, user);
+          var data = {app: name, version: version, message: 'Required module not found: '+module.name};
+          logs[id].push({fatal: data});
+          broadcast('error', data, user);
         }));
       }, function(level, args, module, line, column) {
         var data = {app: name, version: version, level: level, message: args, module: module, line: module ? line : line > lines ? line-lines : undefined, column: column};
         if (logs[id].push(data) > 100) logs[id].unshift();
         broadcast('log', data, user);
       }, function(message, module, line) {
-        delete logs[id];
         delete apps[id];
-        broadcast('error', {app: name, version: version, message: message, module: module, line: module ? line : line > lines ? line-lines : undefined}, user);
+        var data = {app: name, version: version, message: message, module: module, line: module ? line : line > lines ? line-lines : undefined};
+        logs[id].push({fatal: data});
+        broadcast('error', data, user);
       });
       broadcast('run', {app: name, version: version}, user);
     }));
@@ -172,6 +170,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     apps[id].terminate();
     broadcast('stop', {app: name, version: version}, user);
     delete apps[id];
+    delete logs[id];
   };
   var shutdown = function() {
     if (!server) return;
