@@ -130,7 +130,7 @@ simpl.add('app', function(o) {
           }
         }
         body.classList.add('show-'+selected.panel);
-        body.scrollTop = selected.panel == 'log' ? body.scrollHeight : 0;
+        body.lastChild.scrollTop = selected.panel == 'log' ? body.lastChild.scrollHeight : 0;
         entry.view.className = 'view '+next;
         entry.view.title = 'Show '+next[0].toUpperCase()+next.substr(1);
         if (selected.panel == 'code') {
@@ -398,9 +398,10 @@ simpl.add('app', function(o) {
                       line: data.line
                     }) > 1000) entry.log.shift();
                     if (selected && selected.entry == entry) {
-                      var scroll = body.classList.contains('show-log') && (body.scrollTop || document.documentElement.scrollTop) + document.documentElement.clientHeight >= body.scrollHeight;
+                      var panel = body.lastChild,
+                          scroll = body.classList.contains('show-log') && panel.scrollTop + panel.clientHeight >= panel.scrollHeight;
                       dom(logLine(message), log);
-                      if (scroll) document.documentElement.scrollTop = body.scrollTop = body.scrollHeight;
+                      if (scroll) panel.scrollTop = panel.scrollHeight;
                     }
                     break;
                   case 'run':
