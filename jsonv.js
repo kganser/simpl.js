@@ -1,18 +1,23 @@
 simpl.add('jsonv', function(o) {
-  var json = function(data) {
-    var type = Array.isArray(data) ? 'array' : typeof data == 'object' ? data ? 'object' : 'null' : typeof data;
+  var json = function(data, collapsed) {
+    var array, type = typeof data, name = type;
     if (type == 'object') {
-      var data_ = {};
-      Object.keys(data).sort().forEach(function(key) { data_[key] = data[key]; });
-      data = data_;
+      array = Array.isArray(data);
+      type = name = array ? 'array' : data ? type : 'null';
+      if (collapsed) name += ' closed';
+      if (type == 'object') {
+        var data_ = {};
+        Object.keys(data).sort().forEach(function(key) { data_[key] = data[key]; });
+        data = data_;
+      }
     }
-    return {span: {className: 'jsonv-'+type, children: type == 'array'
-      ? {ol: data.map(function(e) { return {li: [{span: {className: 'jsonv-delete', children: '×'}}, json(e)]}; })}
+    return {span: {className: 'jsonv-'+name, children: array
+      ? {ol: data.map(function(e) { return {li: [{span: {className: 'jsonv-delete', children: '×'}}, json(e, collapsed)]}; })}
       : type == 'object'
         ? {ul: Object.keys(data).map(function(key) {
             return {li: [
               {span: {className: 'jsonv-delete', children: '×'}},
-              {span: {className: 'jsonv-key', children: key}}, ': ', json(data[key])
+              {span: {className: 'jsonv-key', children: key}}, ': ', json(data[key], collapsed)
             ]};
           })}
         : String(data)}};
@@ -191,10 +196,11 @@ simpl.add('jsonv', function(o) {
     };
   };
   var click = handler();
-  return function(elem, data, listener) {
+  return function(elem, data, options) {
     if (data === undefined) data = JSON.parse(elem.textContent);
-    if (listener) {
-      listener = handler(typeof listener == 'function' ? listener : function() {}, JSON.parse(JSON.stringify(data)));
+    if (!options) options = {};
+    else if (typeof options != 'object') {
+      var listener = handler(typeof options == 'function' ? options : function() {}, JSON.parse(JSON.stringify(data)));
       elem.classList.add('jsonv-editable');
       elem.addEventListener('keydown', listener);
       elem.addEventListener('blur', listener, true);
@@ -202,11 +208,11 @@ simpl.add('jsonv', function(o) {
     }
     elem.classList.add('jsonv');
     elem.addEventListener('click', listener || click);
-    o.html.dom(json(data), elem, true);
+    o.html.dom(json(data, options.collapsed), elem, true);
     return {
       update: function(data) {
         if (listener) listener.data = JSON.parse(JSON.stringify(data));
-        o.html.dom(json(data), elem, true);
+        o.html.dom(json(data, options.collapsed), elem, true);
       }
     };
   };

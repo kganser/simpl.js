@@ -424,6 +424,20 @@ nav .selected button {
 #log .message {
   float: left;
 }
+#log .jsonv {
+  display: inline-block;
+  vertical-align: top;
+  padding: 0;
+  color: black;
+}
+#log .jsonv-object.closed li:first-child, #log .jsonv-array.closed li:first-child {
+  display: inline-block;
+  padding-left: 0;
+}
+#log .jsonv-object.closed .jsonv-object:before, #log .jsonv-object.closed .jsonv-array:before,
+#log .jsonv-array.closed .jsonv-object:before, #log .jsonv-array.closed .jsonv-array:before {
+  display: none;
+}
 #log .location {
   float: right;
   color: #999;

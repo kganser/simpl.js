@@ -49,15 +49,23 @@ simpl.add('app', function(o) {
       o.xhr(path, options, callback);
     };
     var logLine = function(entry) {
-      var string = entry.message.join(', '),
-          message = [], link;
-      while (link = /\b(https?|ftp):\/\/\S+\b/.exec(string)) {
-        var url = link[0];
-        if (link.index) message.push(string.substr(0, link.index));
-        message.push({a: {href: url, target: '_blank', children: url}});
-        string = string.substr(link.index+url.length);
-      }
-      if (string) message.push(string);
+      var message = [], link;
+      entry.message.forEach(function(part, i) {
+        if (i) message.push(' ');
+        if (typeof part == 'string') {
+          while (link = /\b(https?|ftp):\/\/\S+\b/.exec(part)) {
+            var url = link[0];
+            if (link.index) message.push(part.substr(0, link.index));
+            message.push({a: {href: url, target: '_blank', children: url}});
+            part = part.substr(link.index+url.length);
+          }
+          if (part) message.push(part);
+        } else {
+          message.push({div: function(e) {
+            o.jsonv(e, part, {collapsed: true});
+          }});
+        }
+      });
       return {div: {className: 'entry '+entry.level, children: [
         {div: {className: 'location', children: entry.module+(entry.line ? ':'+entry.line : ''), dataset: {
           module: entry.module,

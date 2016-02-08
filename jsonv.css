@@ -58,8 +58,8 @@
 .jsonv-object ul:after {
   content: "}";
 }
-.jsonv-object.closed ul:before {
-  content: "{…";
+.jsonv-object.closed ul:after, .jsonv-array.closed ul:after {
+  content: "…}";
 }
 .jsonv-array ol:before {
   content: "[";
@@ -67,8 +67,8 @@
 .jsonv-array ol:after {
   content: "]";
 }
-.jsonv-array.closed ol:before {
-  content: "[…";
+.jsonv-array.closed ol:after, .jsonv-object.closed ol:after {
+  content: "…]";
 }
 .jsonv-string:before, .jsonv-string:after {
   content: "\"";
