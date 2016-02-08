@@ -1,0 +1,12 @@
+---
+id: blog
+title: JSON Rendering in the Console
+styles: [common.css, blog.css]
+---
+<h1>Blog</h1>
+<h2>JSON Rendering in the Console</h2>
+<div class="byline">posted February 8, 2016, by <a class="user" href="/users/kganser" style="background-image: url(https://www.gravatar.com/avatar/096ba86215860c96910a66b5b930bcba?s=32)">Klaus</a></div>
+<p>Until now, printing a JSON object to the Simpl.js console using <code>console.log</code> would give you a <code>toString</code> representation:</p>
+<pre>[object Object]</pre>
+<p>Since this was probably not what you wanted, you'd have to explicitly serialize your object with <code>JSON.stringify</code> to see it in the console. Starting with version 0.37, Simpl.js now automatically renders JSON values in the console using <a href="http://kganser.com/jsonv">jsonv</a>, the same interactive JSON UI used in the configuration editor and the <a href="/apps/simpljs/Database%20Admin">Database Admin</a> tool. Here's a preview of an object printed to the console (initially collapsed):</p>
+<p style="text-align: center"><img src="/img/console-jsonv-collapsed.png" alt="collapsed"><br><img src="/img/console-jsonv-expanded.png" alt="expanded"></p>
