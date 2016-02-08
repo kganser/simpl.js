@@ -166,11 +166,11 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
   };
   var stop = function(user, name, version) {
     var id = [user, name, version].join('@');
-    if (!apps[id]) return;
+    if (!apps[id]) return id;
     apps[id].terminate();
     broadcast('stop', {app: name, version: version}, user);
     delete apps[id];
-    delete logs[id];
+    return id;
   };
   var shutdown = function() {
     if (!server) return;
@@ -308,7 +308,10 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           } else if (parts.length == 3 && method == 'DELETE') {
             return forward(uri, function(callback) {
               db.delete(uri).then(callback);
-            }, response.ok, method);
+            }, function(data, session) {
+              if (app) delete logs[stop(session && session.username || '', decodeURIComponent(parts[1]), 1)];
+              response.ok();
+            }, method);
           } else if (parts[4] == 'config' && method == 'PUT') {
             return request.slurp(function(body) {
               if (body === undefined) return response.error();
