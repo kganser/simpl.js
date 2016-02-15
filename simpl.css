@@ -438,6 +438,15 @@ nav .selected button {
 #log .jsonv-array.closed .jsonv-object:before, #log .jsonv-array.closed .jsonv-array:before {
   display: none;
 }
+#log .jsonv .closed li:after {
+  content: ",…";
+}
+#log .jsonv-object.closed ul:after, #log .jsonv-array.closed ul:after {
+  content: "}";
+}
+#log .jsonv-array.closed ol:after, #log .jsonv-object.closed ol:after {
+  content: "]";
+}
 #log .location {
   float: right;
   color: #999;
