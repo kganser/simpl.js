@@ -121,19 +121,19 @@ function(modules) {
               this.insert('array/2', 2).then(function() {
                 this.get('array').then(function(result) {
                   assert(compare(['elem', 1, 2, null], result), 'database insert');
-                  this.append('array', 3).then(function() {
+                  this.append('array', {object: {}}).then(function() {
                     this.get('array').then(function(result) {
-                      assert(compare(['elem', 1, 2, null, 3], result), 'database append');
+                      assert(compare(['elem', 1, 2, null, {object: {}}], result), 'database append');
                       this.delete('object').then(function() {
                         this.get().get('object').get('object/boolean').then(function(all, deleted, child) {
-                          assert(compare({array: ['elem', 1, 2, null, 3], string: 'value'}, all) && deleted === undefined && child === undefined,
+                          assert(compare({array: ['elem', 1, 2, null, {object: {}}], string: 'value'}, all) && deleted === undefined && child === undefined,
                             'database delete record');
                           this.delete('array/3').then(function() {
                             this.get('array').then(function(result) {
-                              assert(compare(['elem', 1, 2, 3], result), 'database delete array element');
+                              assert(compare(['elem', 1, 2, {object: {}}], result), 'database delete array element');
                               this.put('array/4', 4).then(function() {
                                 this.get('array').then(function(result) {
-                                  assert(compare(['elem', 1, 2, 3, 4], result), 'database array index resolution');
+                                  assert(compare(['elem', 1, 2, {object: {}}, 4], result), 'database array index resolution');
                                 }).get('array/1').then(function(result) {
                                   assert(result === 1, 'database multiple transaction callbacks');
                                 });
@@ -149,20 +149,25 @@ function(modules) {
             });
           });
           db.get('', true).then(function(result) {
-            assert(compare({array: ['elem', 1, 2, 3, 4], string: 'value'}, result),
+            assert(compare({array: ['elem', 1, 2, {object: {}}, 4], string: 'value'}, result),
               'database write transaction after write transaction');
             var i = 1;
             this.get('', function(path, array) {
-              assert(!path.length && !array && i == 1 || path.length == 1 && path[0] === 'array' && array && i == 2,
-                'database cursor arguments '+i++);
-              return path.length ? {
+              assert(i == 1 && !path.length && !array
+                  || i == 2 && path.length == 1 && path[0] === 'array' && array
+                  || i == 5 && compare(path, ['array', 3]) && !array
+                  || i == 6 && compare(path, ['array', 3, 'object']) && !array,
+                'database cursor arguments '+(i++ > 2 ? i-3 : i-1));
+              return array ? {
                 action: function(key) {
                   if (key == 1) return 'skip';
                   if (key > 3) return 'stop';
                 },
                 value: function(key, value) {
-                  assert(i == 3 && key === 0 && value === 'elem' || i == 4 && key === 2 && value === 2 || i == 5 && key == 3 && value === 3,
-                    'database cursor values '+(i++-2));
+                  assert(i == 3 && key === 0 && value === 'elem'
+                      || i == 4 && key === 2 && value === 2
+                      || i == 7 && key == 3 && compare(value, {object: {}}),
+                    'database cursor values '+(i++ > 4 ? i-5 : i-3));
                   if (i == 4) return value;
                   if (i == 5) return 3;
                 }
@@ -171,7 +176,7 @@ function(modules) {
                 upperExclusive: true
               };
             }).then(function(result) {
-              assert(i == 6 && compare({array: ['elem', undefined, 3]}, result), 'database cursor result');
+              assert(i == 8 && compare({array: ['elem', undefined, 3]}, result), 'database cursor result');
               this.put(encodeURIComponent('e$caped "stríng"'), "'válue'").then(function() {
                 this.get().then(function(value) {
                   assert('e$caped "stríng"' in value && value['e$caped "stríng"'] === "'válue'",
@@ -467,7 +472,7 @@ function(modules) {
       });
     },
     function() {
-      assert(passed == 90, 'tests complete ('+passed+'/90 in '+(Date.now()-start)+'ms)');
+      assert(passed == 92, 'tests complete ('+passed+'/92 in '+(Date.now()-start)+'ms)');
     }
   );
 }
