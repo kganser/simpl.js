@@ -48,27 +48,35 @@ simpl.add('database', function() {
       if (!result) return next || callback();
       (next = function(result, parent, path, callback) {
         var value = result.value,
-            type = result.type,
-            pending = 1,
-            index = 0;
+            type = result.type;
         if (type != 'object' && type != 'array')
           return callback(value);
         var array = type == 'array',
-            c = cursor(path, array);
+            c = cursor(path, array),
+            pending = 1,
+            index = 0;
         value = array ? [] : {};
-        if (c === false) return callback(value);
-        if (!c || typeof c != 'object') c = {action: c || {}};
+        var cb = function() {
+          // descending arrays are traversed in ascending order, then reversed
+          if (!--pending) callback(array && c.descending ? value.reverse() : value);
+        };
+        if (c === false) return cb();
+        if (!c || typeof c != 'object') c = {action: c};
         if (typeof c.action != 'function') c.action = function() {};
-        store.openCursor(
+        if (array && c.lowerBound >= 0 && c.lowerExclusive) c.lowerBound++;
+        if (array && c.upperBound >= 0 && c.upperExclusive) c.upperExclusive--;
+        (array ? store.openCursor(scopedRange(parent)) : store.openCursor( // TODO: fix for numeric bounds in arrays
           scopedRange(parent, c.lowerBound, c.upperBound, c.lowerExclusive, c.upperExclusive),
           c.descending ? 'prev' : 'next'
-        ).onsuccess = function(e) {
+        )).onsuccess = function(e) {
           var cursor = e.target.result;
-          if (!cursor) return --pending || callback(value);
+          if (!cursor || array && index > c.upperBound) return cb();
+          if (array && !index && c.lowerBound)
+            return cursor.advance(c.lowerBound);
           var result = cursor.value,
-              key = array ? index++ : result.key,
-              action = c.action(key);
-          if (action == 'stop') return --pending || callback(value);
+              key = array ? index++ : result.key;
+          var action = c.action(key);
+          if (action == 'stop') return cb();
           if (action != 'skip') {
             pending++;
             if (!array) value[key] = undefined;
@@ -76,7 +84,7 @@ simpl.add('database', function() {
               if (c.value) child = c.value(key, child);
               if (child !== undefined) value[key] = child;
               else if (!array) delete value[key];
-              if (!--pending) callback(value);
+              cb();
             });
           }
           cursor.continue();
@@ -260,8 +268,9 @@ simpl.add('database', function() {
             };
           },
           delete: function(store, path, callback) {
-            store.delete(makeKey(path));
-            deleteChildren(store, path, callback);
+            var pending = 2, cb = function() { if (!--pending) callback(); };
+            deleteChildren(store, path, cb);
+            store.delete(makeKey(path)).onsuccess = cb;
           }
         }).forEach(function(name) {
           var method = self[name];
