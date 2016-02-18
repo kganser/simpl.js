@@ -65,7 +65,7 @@ simpl.add('database', function() {
         if (typeof c.action != 'function') c.action = function() {};
         if (array && c.lowerBound >= 0 && c.lowerExclusive) c.lowerBound++;
         if (array && c.upperBound >= 0 && c.upperExclusive) c.upperExclusive--;
-        (array ? store.openCursor(scopedRange(parent)) : store.openCursor( // TODO: fix for numeric bounds in arrays
+        (array ? store.openCursor(scopedRange(parent)) : store.openCursor(
           scopedRange(parent, c.lowerBound, c.upperBound, c.lowerExclusive, c.upperExclusive),
           c.descending ? 'prev' : 'next'
         )).onsuccess = function(e) {
@@ -225,30 +225,45 @@ simpl.add('database', function() {
               if (empty) { // array slot
                 append(store, parentPath, value, callback);
               } else if (insert) {
-                var i = 0, lastShiftKey = key;
+                var i = 0, last;
                 store.openCursor(scopedRange(parentPath, key)).onsuccess = function(e) {
                   var cursor = e.target.result;
-                  if (cursor && cursor.value.key == key+i++) {
-                    // all contiguous keys after desired position must be shifted by one
-                    lastShiftKey = cursor.value.key;
-                    return cursor.continue();
+                  if (cursor) last = cursor.value.key;
+                  if (!cursor && last != null || last > key+i++) {
+                    // shift subsequent keys by one
+                    store.openCursor(scopedRange(parentPath, key, last, false, !!cursor), 'prev').onsuccess = function(e) {
+                      cursor = e.target.result;
+                      if (!cursor) return put(store, path, value, callback);
+                      var result = cursor.value,
+                          type = result.type,
+                          key = result.key,
+                          parent = result.parent,
+                          pending = 2,
+                          cb = function() { if (!--pending) cursor.continue(); };
+                      store.delete([parent, key]).onsuccess = cb;
+                      store.put({parent: parent, key: key+1, type: type, value: result.value}).onsuccess = cb;
+                      (function shiftChildren(from, to, type) {
+                        if (type != 'object' && type != 'array') return;
+                        pending++;
+                        store.openCursor(scopedRange(from)).onsuccess = function(e) {
+                          var cursor = e.target.result;
+                          if (!cursor) return cb();
+                          pending += 2;
+                          result = cursor.value;
+                          type = result.type;
+                          key = result.key;
+                          store.delete([from, key]).onsuccess = cb;
+                          store.put({parent: to, key: key, type: type, value: result.value}).onsuccess = cb;
+                          shiftChildren(from+'/'+encodeURIComponent(key), to+'/'+encodeURIComponent(key), type);
+                          cursor.continue();
+                        };
+                      }(parent+'/'+key, parent+'/'+(key+1), type));
+                    };
+                  } else if (cursor) {
+                    cursor.continue();
+                  } else {
+                    put(store, path, value, callback);
                   }
-                  // found last key to shift; now shift subsequent elements' keys
-                  var pending = 1,
-                      cb = function() { if (!--pending) callback(); };
-                  store.openCursor(scopedRange(parentPath, key, lastShiftKey), 'prev').onsuccess = function(e) {
-                    cursor = e.target.result;
-                    if (!cursor) return put(store, path, value, cb);
-                    var index = cursor.value.key,
-                        currentPath = parentPath.concat([index]);
-                    pending++;
-                    get(store, currentPath, function(result) { // TODO: delete/put within cursor
-                      deleteChildren(store, currentPath, function() {
-                        put(store, parentPath.concat([index+1]), result, cb);
-                        cursor.continue();
-                      });
-                    });
-                  };
                 };
               } else {
                 deleteChildren(store, path, function() {
