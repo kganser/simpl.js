@@ -242,22 +242,25 @@ simpl.add('database', function() {
                           cb = function() { if (!--pending) cursor.continue(); };
                       store.delete([parent, key]).onsuccess = cb;
                       store.put({parent: parent, key: key+1, type: type, value: result.value}).onsuccess = cb;
-                      (function shiftChildren(from, to, type) {
+                      (function shiftChildren(pathFrom, pathTo, type) {
                         if (type != 'object' && type != 'array') return;
                         pending++;
-                        store.openCursor(scopedRange(from)).onsuccess = function(e) {
+                        store.openCursor(scopedRange(pathFrom)).onsuccess = function(e) {
                           var cursor = e.target.result;
                           if (!cursor) return cb();
                           pending += 2;
-                          result = cursor.value;
-                          type = result.type;
-                          key = result.key;
-                          store.delete([from, key]).onsuccess = cb;
-                          store.put({parent: to, key: key, type: type, value: result.value}).onsuccess = cb;
-                          shiftChildren(from+'/'+encodeURIComponent(key), to+'/'+encodeURIComponent(key), type);
+                          var result = cursor.value,
+                              type = result.type,
+                              key = result.key,
+                              from = pathFrom.concat([key]),
+                              to = pathTo.concat([key]);
+                          key = makeKey(to);
+                          store.delete(makeKey(pathFrom)).onsuccess = cb;
+                          store.put({parent: key[0], key: key[1], type: type, value: result.value}).onsuccess = cb;
+                          shiftChildren(from, to, type);
                           cursor.continue();
                         };
-                      }(parent+'/'+key, parent+'/'+(key+1), type));
+                      }(parentPath.concat([key]), parentPath.concat([key+1]), type));
                     };
                   } else if (cursor) {
                     cursor.continue();

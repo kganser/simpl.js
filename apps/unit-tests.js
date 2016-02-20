@@ -108,7 +108,7 @@ function(modules) {
       });
     },
     function(next) {
-      var data = {array: ['elem', 1, null], object: {boolean: true}, string: 'value'},
+      var data = {array: ['elem', 1, {a: null, b: [1,2,3]}], object: {boolean: true}, string: 'value'},
           db = modules.database.open('unit-tests', data);
       db.get().get('array').then(function(root, array) {
         assert(compare(root, data), 'database get root');
@@ -120,13 +120,13 @@ function(modules) {
               assert(result === false, 'database put');
               this.insert('array/2', 2).then(function() {
                 this.get('array').then(function(result) {
-                  assert(compare(['elem', 1, 2, null], result), 'database insert');
+                  assert(compare(['elem', 1, 2, {a: null, b: [1,2,3]}], result), 'database insert');
                   this.append('array', {object: {}}).then(function() {
                     this.get('array').then(function(result) {
-                      assert(compare(['elem', 1, 2, null, {object: {}}], result), 'database append');
+                      assert(compare(['elem', 1, 2, {a: null, b: [1,2,3]}, {object: {}}], result), 'database append');
                       this.delete('object').then(function() {
                         this.get().get('object').get('object/boolean').then(function(all, deleted, child) {
-                          assert(compare({array: ['elem', 1, 2, null, {object: {}}], string: 'value'}, all) && deleted === undefined && child === undefined,
+                          assert(compare({array: ['elem', 1, 2, {a: null, b: [1,2,3]}, {object: {}}], string: 'value'}, all) && deleted === undefined && child === undefined,
                             'database delete record');
                           this.delete('array/3').then(function() {
                             this.get('array').then(function(result) {
@@ -159,9 +159,9 @@ function(modules) {
                   || i == 6 && compare(path, ['array', 3, 'object']) && !array,
                 'database cursor arguments '+(i++ > 2 ? i-3 : i-1));
               return array ? {
+                upperBound: 3,
                 action: function(key) {
                   if (key == 1) return 'skip';
-                  if (key > 3) return 'stop';
                 },
                 value: function(key, value) {
                   assert(i == 3 && key === 0 && value === 'elem'
