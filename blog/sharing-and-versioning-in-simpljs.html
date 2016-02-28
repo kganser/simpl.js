@@ -1,6 +1,6 @@
 ---
 id: blog
-title: Isomorphic Javascript in Simpl.js
+title: Sharing and Versioning in Simpl.js
 styles: [common.css, blog.css, prettify.css]
 scripts: [prettify.js]
 ---
@@ -11,7 +11,7 @@ scripts: [prettify.js]
 <h3>Namespacing</h3>
 <p>Apps and modules from other users appear as linked entries in your workspace when installed.</p>
 <p class="images"><img src="/img/namespace-module.png" alt="namespaced modules"><img src="/img/namespace-dependency.png" alt="namespaced dependencies"></p>
-<p>When importing a linked module as a dependency in your own app or module, you must use its <code>@<em>username</em></code>-namespaced property name in your code:</p>
+<p>When importing a linked module as a dependency in your own app or module, you must use its <code>@<em>username</em></code>-namespaced property name in your code.</p>
 <pre class="prettyprint">
 var bytes = modules['string@simpljs'].toUTF8Buffer('Hello World');
 </pre>
@@ -20,4 +20,4 @@ var bytes = modules['string@simpljs'].toUTF8Buffer('Hello World');
 <p>Linked apps and modules from other users are pegged at their major version number, but are automatically upgraded to their latest minor version. This gives the author of the app or module the ability to push changes to any user who has installed it, and the responsibility to ensure that it remains backward-compatible.</p>
 <p>If you want to prevent minor version upgrades from the author, or if you want to make changes to the code yourself, you must <em>fork</em> the app or module. Simply make a change to it in the code editor, save, and you will be prompted to save the entry as your own app or module.</p>
 <p class="images"><img src="/img/version-fork.png" alt="version forking"></p>
-<p>Notice that you won't need the <code>@<em>username</em></code> namespace in your dependent code to access a module that you own, and you should update your dependencies on all client apps and modules.</p>
+<p>You won't need the <code>@<em>username</em></code> namespace to access your new module from any of your own apps or modules. After forking a module, remember also to update any existing dependencies to point to your new code.</p>
