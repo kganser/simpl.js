@@ -8,3 +8,14 @@
 #page-blog main ul li {
   margin: .5em 0;
 }
+p.images {
+  margin: -5px;
+}
+p.images img {
+  display: inline-block;
+  vertical-align: top;
+  margin: 5px;
+  padding: 4px;
+  border: 1px solid #ddd;
+  max-width: 90%;
+}
