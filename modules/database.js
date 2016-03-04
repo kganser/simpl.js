@@ -11,41 +11,6 @@ simpl.add('database', function() {
     upper = upper == null ? [parent+'\0'] : [parent, upper];
     return IDBKeyRange.bound(lower, upper, le, ue);
   };
-  var resolvePath = function(store, path, callback) {
-    // substitute array indices in path with numeric keys;
-    // if path represents an empty array slot, second argument to callback is next available index
-    path = path ? path.split('/').map(decodeURIComponent) : [];
-    (function advance(i, next) {
-      while (i < path.length && !/^(0|[1-9][0-9]*)$/.test(path[i])) i++;
-      if (i == path.length) return callback(path, next);
-      var position = parseInt(path[i]),
-          last = i == path.length-1;
-      store.get(makeKey(path.slice(0, i))).onsuccess = function(e) {
-        var result = e.target.result;
-        if (!result) return callback(path);
-        if (result.type != 'array') return advance(i+1);
-        // set to numeric index initially, and to key if element is found
-        path[i] = position;
-        store.openCursor(scopedRange(path.slice(0, i))).onsuccess = function(e) {
-          var cursor = e.target.result;
-          if (cursor) {
-            if (position) {
-              if (last) {
-                position--;
-                next = cursor.value.key+1;
-                return cursor.continue();
-              }
-              cursor.advance(position);
-              return position = 0;
-            }
-            path[i] = cursor.value.key;
-            last = false;
-          }
-          advance(i+1, last ? next || 0 : null);
-        };
-      };
-    }(0));
-  };
   var get = function(store, path, callback, cursor) {
     var next;
     if (cursor === 'shallow') cursor = function() { return false; };
@@ -309,7 +274,42 @@ simpl.add('database', function() {
             var g = group, i = g.pending++;
             open(stores, function() {
               if (!trans) trans = db.transaction(stores, writable ? 'readwrite' : 'readonly');
-              resolvePath(store = trans.objectStore(store), path, function(path, next) {
+              store = trans.objectStore(store);
+              path = path ? path.split('/').map(decodeURIComponent) : [];
+              // resolve path: substitute array indices in path with numeric keys;
+              // if path represents an empty array slot, second argument to callback is next available index
+              (function(callback) {
+                (function advance(i, next) {
+                  while (i < path.length && !/^(0|[1-9][0-9]*)$/.test(path[i])) i++;
+                  if (i == path.length) return callback(next);
+                  var position = parseInt(path[i]),
+                      last = i == path.length-1;
+                  store.get(makeKey(path.slice(0, i))).onsuccess = function(e) {
+                    var result = e.target.result;
+                    if (!result) return callback();
+                    if (result.type != 'array') return advance(i+1);
+                    // set to numeric index initially, and to key if element is found
+                    path[i] = position;
+                    store.openCursor(scopedRange(path.slice(0, i))).onsuccess = function(e) {
+                      var cursor = e.target.result;
+                      if (cursor) {
+                        if (position) {
+                          if (last) {
+                            position--;
+                            next = cursor.value.key+1;
+                            return cursor.continue();
+                          }
+                          cursor.advance(position);
+                          return position = 0;
+                        }
+                        path[i] = cursor.value.key;
+                        last = false;
+                      }
+                      advance(i+1, last ? next || 0 : null);
+                    };
+                  };
+                }(0));
+              }(function(next) {
                 method(store, path, function(value) {
                   g.values[i] = value;
                   if (!--g.pending && g.callback) {
@@ -317,7 +317,7 @@ simpl.add('database', function() {
                     g = null;
                   }
                 }, value, next);
-              });
+              }));
             });
           };
         });
