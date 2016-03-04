@@ -11,60 +11,6 @@ simpl.add('database', function() {
     upper = upper == null ? [parent+'\0'] : [parent, upper];
     return IDBKeyRange.bound(lower, upper, le, ue);
   };
-  var get = function(store, path, callback, cursor) {
-    var next;
-    if (cursor === 'shallow') cursor = function() { return false; };
-    if (cursor === 'immediates') cursor = function(p) { return !p.length; };
-    if (typeof cursor != 'function') cursor = function() {};
-    store.get(makeKey(path)).onsuccess = function(e) {
-      var result = e.target.result;
-      if (!result) return next || callback();
-      (next = function(result, parent, path, callback) {
-        var value = result.value,
-            type = result.type;
-        if (type != 'object' && type != 'array')
-          return callback(value);
-        var array = type == 'array',
-            c = cursor(path, array),
-            pending = 1,
-            index = 0;
-        value = array ? [] : {};
-        var cb = function() {
-          // descending arrays are traversed in ascending order, then reversed
-          if (!--pending) callback(array && c.descending ? value.reverse() : value);
-        };
-        if (c === false) return cb();
-        if (!c || typeof c != 'object') c = {action: c};
-        if (typeof c.action != 'function') c.action = function() {};
-        if (array && c.lowerBound >= 0 && c.lowerExclusive) c.lowerBound++;
-        if (array && c.upperBound >= 0 && c.upperExclusive) c.upperExclusive--;
-        (array ? store.openCursor(scopedRange(parent)) : store.openCursor(
-          scopedRange(parent, c.lowerBound, c.upperBound, c.lowerExclusive, c.upperExclusive),
-          c.descending ? 'prev' : 'next'
-        )).onsuccess = function(e) {
-          var cursor = e.target.result;
-          if (!cursor || array && index > c.upperBound) return cb();
-          if (array && !index && c.lowerBound)
-            return cursor.advance(c.lowerBound);
-          var result = cursor.value,
-              key = array ? index++ : result.key;
-          var action = c.action(key);
-          if (action == 'stop') return cb();
-          if (action != 'skip') {
-            pending++;
-            if (!array) value[key] = undefined;
-            next(result, parent.concat([result.key]), path.concat([key]), function(child) {
-              if (c.value) child = c.value(key, child);
-              if (child !== undefined) value[key] = child;
-              else if (!array) delete value[key];
-              cb();
-            });
-          }
-          cursor.continue();
-        };
-      })(result, path, [], callback);
-    };
-  };
   var put = function(store, path, value, callback) {
     // { key: (key or index relative to parent)
     //   parent: (path of parent entry)
@@ -169,7 +115,60 @@ simpl.add('database', function() {
         var group = {pending: 0, values: []},
             trans, self;
         Object.keys(self = {
-          get: get,
+          get: function(store, path, callback, cursor) {
+            var next;
+            if (cursor === 'shallow') cursor = function() { return false; };
+            if (cursor === 'immediates') cursor = function(p) { return !p.length; };
+            if (typeof cursor != 'function') cursor = function() {};
+            store.get(makeKey(path)).onsuccess = function(e) {
+              var result = e.target.result;
+              if (!result) return next || callback();
+              (next = function(result, parent, path, callback) {
+                var value = result.value,
+                    type = result.type;
+                if (type != 'object' && type != 'array')
+                  return callback(value);
+                var array = type == 'array',
+                    c = cursor(path, array),
+                    pending = 1,
+                    index = 0;
+                value = array ? [] : {};
+                var cb = function() {
+                  // descending arrays are traversed in ascending order, then reversed
+                  if (!--pending) callback(array && c.descending ? value.reverse() : value);
+                };
+                if (c === false) return cb();
+                if (!c || typeof c != 'object') c = {action: c};
+                if (typeof c.action != 'function') c.action = function() {};
+                if (array && c.lowerBound >= 0 && c.lowerExclusive) c.lowerBound++;
+                if (array && c.upperBound >= 0 && c.upperExclusive) c.upperExclusive--;
+                (array ? store.openCursor(scopedRange(parent)) : store.openCursor(
+                  scopedRange(parent, c.lowerBound, c.upperBound, c.lowerExclusive, c.upperExclusive),
+                  c.descending ? 'prev' : 'next'
+                )).onsuccess = function(e) {
+                  var cursor = e.target.result;
+                  if (!cursor || array && index > c.upperBound) return cb();
+                  if (array && !index && c.lowerBound)
+                    return cursor.advance(c.lowerBound);
+                  var result = cursor.value,
+                      key = array ? index++ : result.key;
+                  var action = c.action(key);
+                  if (action == 'stop') return cb();
+                  if (action != 'skip') {
+                    pending++;
+                    if (!array) value[key] = undefined;
+                    next(result, parent.concat([result.key]), path.concat([key]), function(child) {
+                      if (c.value) child = c.value(key, child);
+                      if (child !== undefined) value[key] = child;
+                      else if (!array) delete value[key];
+                      cb();
+                    });
+                  }
+                  cursor.continue();
+                };
+              })(result, path, [], callback);
+            };
+          },
           count: function(store, path, callback, bounds) {
             if (!bounds) bounds = {};
             store.count(scopedRange(path, bounds.lowerBound, bounds.upperBound, bounds.lowerExclusive, bounds.upperExclusive)).onsuccess = function(e) {
