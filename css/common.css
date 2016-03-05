@@ -275,7 +275,7 @@ aside {
   margin: 0 0 60px -200px;
 }
 pre {
-  margin: 8px 0;
+  margin: 1em 0;
   padding: 4px 7px;
   background: #f7f7f7;
   border: solid 1px #ddd;
@@ -326,11 +326,11 @@ a.user.large {
   aside {
     float: none;
     width: auto;
-    margin: 0 0 10px 0;
+    margin: 0;
   }
-  a.button.large {
+  aside a.button.large {
     display: inline-block;
-    padding-right: 10px;
-    margin: 0 10px 0 0;
+    margin: 0 10px 10px 0;
+    min-width: 95px;
   }
 }
