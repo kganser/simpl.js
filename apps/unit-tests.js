@@ -177,13 +177,19 @@ function(modules) {
               };
             }).then(function(result) {
               assert(i == 8 && compare({array: ['elem', undefined, 3]}, result), 'database cursor result');
-              this.put(encodeURIComponent('e$caped "stríng"'), "'válue'").then(function() {
-                this.get().then(function(value) {
-                  assert('e$caped "stríng"' in value && value['e$caped "stríng"'] === "'válue'",
-                    'database put/get encoded paths, unicode values');
-                  db.close();
-                  modules.database.delete('unit-tests', function(error, blocked) {
-                    if (!blocked) next(assert(!error, 'database delete'));
+              i = 1;
+              this.get('array', {lowerBound: 1, upperBound: 2, action: function(key) {
+                assert(key == i, 'database cursor action key '+i++);
+              }}).then(function(result) {
+                assert(i == 3 && compare([1, 2], result), 'database cursor object');
+                this.put(encodeURIComponent('e$caped "stríng"'), "'válue'").then(function() {
+                  this.get().then(function(value) {
+                    assert('e$caped "stríng"' in value && value['e$caped "stríng"'] === "'válue'",
+                      'database put/get encoded paths, unicode values');
+                    db.close();
+                    modules.database.delete('unit-tests', function(error, blocked) {
+                      if (!blocked) next(assert(!error, 'database delete'));
+                    });
                   });
                 });
               });
@@ -472,7 +478,7 @@ function(modules) {
       });
     },
     function() {
-      assert(passed == 92, 'tests complete ('+passed+'/92 in '+(Date.now()-start)+'ms)');
+      assert(passed == 95, 'tests complete ('+passed+'/95 in '+(Date.now()-start)+'ms)');
     }
   );
 }
