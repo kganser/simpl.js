@@ -387,6 +387,12 @@ nav .selected button {
 #code .CodeMirror-matchingbracket {
   background: yellow;
 }
+#code .cm-matchhighlight {
+  background: rgba(217, 217, 217, .5);
+}
+#code .CodeMirror-focused .cm-matchhighlight {
+  background: rgba(215, 212, 240, .5);
+}
 .show-settings #main, .show-log #main, .show-docs #main {
   background: transparent;
 }
