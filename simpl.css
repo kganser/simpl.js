@@ -427,9 +427,6 @@ nav .selected button {
   clear: both;
   height: 0;
 }
-#log .message {
-  float: left;
-}
 #log .jsonv {
   display: inline-block;
   vertical-align: top;
@@ -437,7 +434,7 @@ nav .selected button {
   color: black;
 }
 #log .jsonv-object.closed li:first-child, #log .jsonv-array.closed li:first-child {
-  display: inline-block;
+  display: inline;
   padding-left: 0;
 }
 #log .jsonv-object.closed .jsonv-object:before, #log .jsonv-object.closed .jsonv-array:before,
