@@ -6,7 +6,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       encode = o.string.base64FromBuffer,
       decode = o.string.base64ToBuffer,
       utf8 = o.string.fromUTF8Buffer,
-      apps = {}, logs = {}, clients = {}, services = {}, ping;
+      apps = {}, logs = {}, clients = {}, services = {}, csrf, ping;
   
   var signature = function(value) {
     try {
@@ -14,9 +14,9 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       return encode(mac(value), true);
     } catch (e) {}
   };
-  var token = function() {
+  var token = function(signed) {
     var rand = crypto.getRandomValues(new Uint8Array(24));
-    return encode(rand, true)+'.'+signature(rand);
+    return encode(rand, true)+(signed ? '.'+signature(rand) : '');
   };
   var verify = function(signed) {
     if (typeof signed != 'string') return;
@@ -36,7 +36,8 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     });
   };
   var authenticate = function(sid, callback) {
-    if (!verify(sid)) return callback(null, true);
+    if (sid == csrf) return callback(null, true);
+    if (!verify(sid)) return callback();
     db.get('sessions/'+sid).then(callback);
   };
   var gcSessions = function(db) {
@@ -106,13 +107,13 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       });
     });
   };
-  var state = function(user, client) {
-    var state = [];
-    Object.keys(apps).forEach(function(id) {
+  var state = function(user, client, local) {
+    if (local) client.send(JSON.stringify({event: 'token', data: csrf}));
+    client.send(JSON.stringify({event: 'state', data: Object.keys(apps).reduce(function(apps, id) {
       var i = id.indexOf('@');
-      if (id.substr(0, i) == user) state.push(id.substr(i+1));
-    });
-    client.send(JSON.stringify({event: 'state', data: state}));
+      if (id.substr(0, i) == user) apps.push(id.substr(i+1));
+      return apps;
+    }, [])}));
     Object.keys(logs).forEach(function(id) {
       if (id.split('@', 1)[0] == user) logs[id].forEach(function(e) {
         client.send(JSON.stringify(e.fatal ? {event: 'error', data: e.fatal} : {event: 'log', data: e}));
@@ -212,6 +213,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         return launcher.postMessage({action: 'stop'});
       }
       
+      csrf = token();
       o.http.serve({port: command.port}, function(request, response) {
         
         var match, sid;
@@ -221,8 +223,8 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         var forward = function(path, fallback, callback, method, data, text) {
           sid = path == 'workspace' ? request.cookie.sid : request.query.sid;
           authenticate(sid, function(session, local) {
-            if (local) return fallback(callback);
-            if (!session) return logout();
+            if (local || !session && !method) return fallback(callback);
+            if (!session) return response.generic(401);
             api(path, session.access_token, function(status, data) {
               if (status != 200) return logout(); // TODO: handle certain error statuses
               callback(data, {username: session.username, name: session.name, email: session.email});
@@ -361,7 +363,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
               redirect = request.query.redirect || '/';
           if (!secret) return response.generic(303, {Location: 'https://simpljs.com/launch'});
           return authenticate(sid = request.cookie.sid, function(session) {
-            if (!session) sid = token();
+            if (!session) sid = token(true);
             else if (session.secret == secret) return response.generic(303, {Location: redirect});
             gcSessions(db).put('sessions/'+sid, {
               secret: secret,
@@ -386,7 +388,8 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           }, 'url');
         if (request.path == '/connect')
           return authenticate(request.query.sid, function(session, local) {
-            if (!session && !local) return response.generic(401);
+            if (!session && !local && request.headers.Origin != 'http://'+request.headers.Host)
+              return response.generic(401);
             var socketId = response.socket.socketId,
                 user = session ? session.username : '',
                 token = session && session.access_token;
@@ -415,7 +418,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                     command = message.command;
                 if (instance) return ws && ws.send(data);
                 if (command == 'connect')
-                  return state(user, client);
+                  return state(user, client, !session);
                 if (command == 'stop' || command == 'restart')
                   stop(user, message.app, message.version);
                 if (command == 'run' || command == 'restart')
@@ -423,6 +426,8 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
               };
             });
           });
+        if (request.path == '/token')
+          return response.end(csrf);
         if (/^\/((apps|modules)\/[^\/]+\/\d+\/(code|settings|log|docs))?$/.test(request.path))
           return forward('workspace', function(callback) {
             db.get('', false, function(path) {
@@ -471,7 +476,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                   {script: {src: '/jsonv.js'}},
                   {script: {src: '/app.js'}},
                   {script: function(apps, modules, user, token) {
-                    if (!apps) return [data.apps, data.modules, session, sid || null];
+                    if (!apps) return [data.apps, data.modules, session, sid || csrf];
                     simpl.use({app: 0}, function(o) {
                       o.app(apps, modules, user, token, document.body);
                     });
@@ -510,7 +515,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
   var ws, port, path = '', launcher = false;
 
   chrome.app.runtime.onLaunched.addListener(function(source) {
-    var args = ((source || {}).url || '').match(/^https?:\/\/(?:test.)?simpljs.com\/launch-([^\/]+)(.*)/),
+    var args = ((source || {}).url || '').match(/^https?:\/\/simpljs.com\/launch-([^\/]+)(.*)/),
         headless = args && args[1] == 'headless';
     path = args && !headless ? '/login?token='+args[1]+'&redirect='+args[2] : '';
     if (launcher.focus) {

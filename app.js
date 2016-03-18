@@ -44,9 +44,8 @@ simpl.add('app', function(o) {
         callback = options;
         options = {};
       }
-      if (token) path += (~path.indexOf('?') ? '&sid=' : '?sid=')+token;
       options.responseType = 'json';
-      o.xhr(path, options, callback);
+      o.xhr(path+(~path.indexOf('?') ? '&sid=' : '?sid=')+token, options, callback);
     };
     var logLine = function(entry) {
       var message = [], link;
@@ -345,7 +344,7 @@ simpl.add('app', function(o) {
               if (socket) return send('connect');
               if (!window.WebSocket) return status('WebSockets are not supported in this browser.', 'fatal');
               clearInterval(timer);
-              socket = new WebSocket('ws://'+location.host+'/connect'+(token ? '?sid='+token : ''));
+              socket = new WebSocket('ws://'+location.host+'/connect?sid='+token);
               socket.onopen = function() {
                 retries = 0;
                 status();
@@ -378,6 +377,9 @@ simpl.add('app', function(o) {
                         break;
                       }
                     }
+                    break;
+                  case 'token':
+                    token = data;
                     break;
                   case 'state':
                     if (Array.isArray(data)) data.forEach(function(id) {
