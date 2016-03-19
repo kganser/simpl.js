@@ -378,14 +378,31 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           });
         }
         if (request.path == '/logout')
-          return logout();
+          return request.cookie.sid ? logout() : response.generic(301, {Location: '/'});
+        if (request.path == '/token')
+          return response.end(csrf);
         if (request.path == '/restore' && request.method == 'POST')
           return request.slurp(function(body) {
+            if (body.sid != csrf) return response.generic(401);
             var full = body.scope == 'full';
             restore(function() {
               return response.generic(303, {Location: '/'});
             }, full ? 'both' : 'modules', !full);
           }, 'url');
+        if (request.path == '/action' && request.method == 'POST')
+          return request.slurp(function(body) {
+            authenticate(body && body.sid, function(session, local) {
+              var command = body.command,
+                  user = session ? session.username : '',
+                  token = session && session.access_token;
+              if (!token && !local) return response.generic(401);
+              if (command == 'stop' || command == 'restart')
+                stop(user, body.app, body.version);
+              if (command == 'run' || command == 'restart')
+                run(user, body.app, body.version, token);
+              response.generic(200);
+            });
+          }, 'json');
         if (request.path == '/connect')
           return authenticate(request.query.sid, function(session, local) {
             if (!session && !local && request.headers.Origin != 'http://'+request.headers.Host)
@@ -426,8 +443,6 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
               };
             });
           });
-        if (request.path == '/token')
-          return response.end(csrf);
         if (/^\/((apps|modules)\/[^\/]+\/\d+\/(code|settings|log|docs))?$/.test(request.path))
           return forward('workspace', function(callback) {
             db.get('', false, function(path) {

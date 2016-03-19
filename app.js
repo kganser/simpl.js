@@ -536,6 +536,7 @@ simpl.add('app', function(o) {
             {a: {id: 'google', target: '_blank', href: 'https://www.google.com/+Simpljs', children: icons.google}}
           ]},
           !user && {form: {method: 'post', action: '/restore', children: [
+            {input: {type: 'hidden', name: 'sid', value: token}},
             {button: {className: 'revert', type: 'submit', name: 'scope', value: 'modules', children: [icons.revert, 'Restore Modules'], onclick: function(e) {
               if (!confirm('This will delete and restore all preinstalled modules in your workspace. Are you sure?'))
                 e.preventDefault();
