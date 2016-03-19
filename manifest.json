@@ -5,7 +5,7 @@
   "description": "Simpl.js lets you write and run full-stack javascript apps in your browser",
   "offline_enabled": true,
   "icons": {"128": "icon.png"},
-  "version": "0.39",
+  "version": "0.40",
   "minimum_chrome_version": "33",
   "permissions": [
     "unlimitedStorage",
