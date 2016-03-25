@@ -262,9 +262,9 @@ footer:after {
 .form label span {
   float: left;
   text-align: right;
-  margin-left: -100px;
+  margin-left: -120px;
   padding: 3px 0;
-  width: 90px;
+  width: 110px;
 }
 .form label .value {
   padding: 3px 0;
