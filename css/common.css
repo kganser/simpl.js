@@ -82,7 +82,7 @@ button, input[type=submit], a.button {
 }
 button[type=submit], input[type=submit] {
   padding: 5px 10px;
-  margin-top: 10px;
+  margin: 10px 10px 0 0;
 }
 button[disabled], input[disabled] {
   cursor: auto;
@@ -112,7 +112,7 @@ button:hover, a.button:hover {
   color: white;
   background: #666;
 }
-a.button.red:hover, button.red:hover, .error {
+a.button.red:hover, button.red:hover, .error, button[type=submit].red {
   color: white;
   background: #c33;
 }
@@ -226,17 +226,21 @@ footer:after {
   height: 100%;
   background: #33c;
 }
-#github {
+#github, .github a:hover {
   background: black;
+  color: white;
 }
-#facebook, a.facebook:hover {
+#facebook, a.facebook:hover, .facebook a:hover {
   background: #3b5998;
+  color: white;
 }
-#twitter, a.twitter:hover {
+#twitter, a.twitter:hover, .twitter a:hover {
   background: #55acee;
+  color: white;
 }
-#google, a.google:hover {
+#google, a.google:hover, .google a:hover {
   background: #d73d32;
+  color: white;
 }
 .form {
   display: inline-block;
@@ -246,7 +250,7 @@ footer:after {
   margin: 0 0 20px 0;
   padding: 20px 50px 20px 120px;
 }
-.form label, .form div {
+.form label {
   display: block;
   margin-bottom: 5px;
 }
@@ -255,12 +259,15 @@ footer:after {
   margin: 0;
   padding: 0;
 }
-.form label span, .form div label {
+.form label span {
   float: left;
   text-align: right;
   margin-left: -100px;
   padding: 3px 0;
   width: 90px;
+}
+.form label .value {
+  padding: 3px 0;
 }
 .form p {
   margin: 0 -30px 0 -100px;
@@ -268,6 +275,10 @@ footer:after {
 .form .error {
   margin: -20px -50px 20px -120px;
   display: none;
+}
+#exp-month {
+  margin-right: 5px;
+  width: 2em;
 }
 aside {
   width: 170px;

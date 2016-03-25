@@ -1,17 +1,23 @@
-#page-account form {
-  min-width: 250px
+#page-account .form {
+  width: 250px;
+  margin-bottom: 0;
 }
-#accounts button {
-  margin-top: -2px;
+.form#accounts {
+  padding: 20px 40px;
+  width: 340px;
+  text-align: center;
 }
-#accounts a {
+#accounts span {
   display: inline-block;
-  padding: 3px 0;
+  margin: 0 10px 10px 0;
 }
-#cancel {
-  background: #c33;
-  color: white;
-  margin-left: 10px;
+#accounts .remove {
+  position: relative;
+  top: -1px;
+  padding: 4px 5px 6px;
+}
+#accounts .inactive .remove {
+  display: none;
 }
 #avatar {
   padding-top: 0;
