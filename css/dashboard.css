@@ -23,16 +23,15 @@
 #page-dashboard .source svg {
   margin: 0;
 }
-#add-server {
-  margin-right: 5px;
+.controls a.button {
+  margin: 0 5px 0 0;
 }
-.controls {
+li .controls {
   float: right;
   text-align: right;
   margin-top: -5px;
-  padding: 0;
 }
-.controls button, .controls a.button {
+li .controls button, li .controls a.button {
   margin: 0 0 5px 5px;
 }
 #page-dashboard .controls span {
