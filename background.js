@@ -555,7 +555,15 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         e.target.getElementById('action').click();
         if (ws) return;
         ws = true;
-        o.xhr('http://169.254.169.254/latest/user-data', {responseType: 'json'}, function(e) {
+        (function(callback) {
+          o.xhr('http://169.254.169.254/computeMetadata/v1/instance/attributes/?recursive=true', {
+            responseType: 'json',
+            headers: {'Metadata-Flavor': 'Google'}
+          }, function(e) {
+            if (e.target.status == 200) return callback(e);
+            o.xhr('http://169.254.169.254/latest/user-data', {responseType: 'json'}, callback);
+          });
+        }(function(e) {
           try {
             var token = e.target.response.token,
                 user = e.target.response.user;
@@ -593,7 +601,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             };
           };
           connect();
-        });
+        }));
       };
     });
   });
