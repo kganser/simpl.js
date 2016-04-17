@@ -60,6 +60,7 @@ button, input, textarea {
   font: inherit;
 }
 .form select {
+  background: white;
   border-radius: 0;
   border: none;
   padding: 2px 0;
@@ -175,6 +176,9 @@ footer {
 }
 footer div {
   float: right;
+}
+footer div a {
+  margin-left: 10px;
 }
 footer:after {
   content: "";
