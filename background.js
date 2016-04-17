@@ -564,12 +564,12 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             o.xhr('http://169.254.169.254/latest/user-data', {responseType: 'json'}, callback);
           });
         }(function(e) {
-          try {
-            var token = e.target.response.token,
-                user = e.target.response.user;
-          } catch (e) { return; }
-          var connections, client, retries = 0;
-          var connect = function() {
+          e = e.target.response;
+          var token = e && e.token,
+              user = e && e.user,
+              connections, client, retries = 0;
+          if (!token || !user) return;
+          (function connect() {
             ws = new WebSocket('wss://api.simpljs.com/connect?access_token='+token);
             ws.onopen = function() {
               connections = 0;
@@ -599,8 +599,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
               if (retries < 6) retries++;
               setTimeout(connect, (1 << retries) * 1000);
             };
-          };
-          connect();
+          }());
         }));
       };
     });
