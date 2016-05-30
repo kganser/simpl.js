@@ -35,8 +35,14 @@ function(modules) {
         function(cb) { setTimeout(function() { cb(pass = pass === 3 && 5); }, 10); },
         function(cb) { setTimeout(function() { cb(pass = pass === 2 && 3, 4); }, 0); },
         function(a, b) {
-          next(assert(pass === 5 && a === 5 && typeof b == 'object' && b.length == 2 && b[0] === 3 && b[1] === 4,
-            'async join with async functions, multiple callback args'));
+          assert(pass === 5 && a === 5 && typeof b == 'object' && b.length == 2 && b[0] === 3 && b[1] === 4,
+            'async join with async functions, multiple callback args');
+          var once = modules.async.once(function(callback) {
+            setTimeout(function() { callback(++pass); }, 10);
+          });
+          once(function(value) { if (pass === 6 && value === 6) pass++; });
+          once(function(value) { if (pass === 7 && value === 6) pass++; });
+          setTimeout(function() { once(function(value) { next(assert(pass === 8 && value === 6, 'async once')); }); }, 15);
         }
       );
     },
@@ -478,7 +484,7 @@ function(modules) {
       });
     },
     function() {
-      assert(passed == 95, 'tests complete ('+passed+'/95 in '+(Date.now()-start)+'ms)');
+      assert(passed == 96, 'tests complete ('+passed+'/96 in '+(Date.now()-start)+'ms)');
     }
   );
 }
