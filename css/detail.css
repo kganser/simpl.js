@@ -2,6 +2,10 @@
   padding-left: 210px;
   max-width: 700px;
 }
+#page-detail section {
+  float: right;
+  width: 100%;
+}
 #page-detail h1 {
   font-size: 24px;
   font-weight: 500;
@@ -30,10 +34,10 @@
   letter-spacing: 1px;
 }
 button.large {
-  display: block;
   font-size: 15px;
   line-height: 30px;
   width: 100%;
+  max-width: 170px;
   padding: 10px 20px 10px 0;
   margin: 0 0 10px 0;
 }
