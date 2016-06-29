@@ -3,7 +3,7 @@
   max-width: 700px;
 }
 #page-detail section {
-  float: right;
+  display: inline-block;
   width: 100%;
 }
 #page-detail h1 {
