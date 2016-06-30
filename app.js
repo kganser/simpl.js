@@ -313,7 +313,7 @@ simpl.add('app', function(o) {
         ]}},
         {div: {id: 'connection', children: [
           {span: function(e) {
-            var socket, server, unload, timer, countdown, retries = 0;
+            var socket, server, unload, countdown, retries = 0;
             var status = function(message, className) {
               e.parentNode.className = message ? className || 'info' : null;
               e.textContent = message;
@@ -343,7 +343,7 @@ simpl.add('app', function(o) {
               });
               if (socket) return send('connect');
               if (!window.WebSocket) return status('WebSockets are not supported in this browser.', 'fatal');
-              clearInterval(timer);
+              clearInterval(countdown);
               socket = new WebSocket('ws://'+location.host+'/connect?sid='+token);
               socket.onopen = function() {
                 retries = 0;
@@ -435,10 +435,10 @@ simpl.add('app', function(o) {
                 server = socket = null;
                 if (unload) return;
                 if (retries == 6) return status('Disconnected', 'error');
-                countdown = 1 << retries++;
-                status('Reconnecting in '+countdown);
-                timer = setInterval(function() {
-                  if (--countdown) status('Reconnecting in '+countdown);
+                var seconds = 1 << retries++;
+                status('Reconnecting in '+seconds);
+                countdown = setInterval(function() {
+                  if (--seconds) status('Reconnecting in '+seconds);
                   else connect();
                 }, 1000);
               };
