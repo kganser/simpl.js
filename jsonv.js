@@ -1,41 +1,37 @@
 simpl.add('jsonv', function(o) {
-  var json = function(data, collapsed) {
-    var array, type = typeof data, name = type;
+  var json = function(data, options, path) {
+    var type = typeof data, name = type;
     if (type == 'object') {
-      array = Array.isArray(data);
-      type = name = array ? 'array' : data ? type : 'null';
-      if (collapsed) name += ' closed';
-      if (type == 'object') {
-        var data_ = {};
-        Object.keys(data).sort().forEach(function(key) { data_[key] = data[key]; });
-        data = data_;
-      }
+      type = name = Array.isArray(data) ? 'array' : data ? type : 'null';
+      if (options.collapsed(path)) name += ' closed';
     }
-    return {span: {className: 'jsonv-'+name, children: array
-      ? {ol: data.map(function(e) { return {li: [{span: {className: 'jsonv-delete', children: '×'}}, json(e, collapsed)]}; })}
-      : type == 'object'
-        ? {ul: Object.keys(data).map(function(key) {
-            return {li: [
-              {span: {className: 'jsonv-delete', children: '×'}},
-              {span: {className: 'jsonv-key', children: key}}, ': ', json(data[key], collapsed)
-            ]};
-          })}
-        : String(data)}};
+    return {span: {className: 'jsonv-'+name, children:
+      type == 'array' ? {ol: data.map(function(e, i) {
+        return {li: [{span: {className: 'jsonv-delete', children: '×'}}, json(e, options, path.concat([i]))]};
+      })} :
+      type == 'object' ? {ul: Object.keys(data).sort().map(function(key) {
+        return {li: [
+          {span: {className: 'jsonv-delete', children: '×'}},
+          {span: {className: 'jsonv-key', children: key}}, ': ', json(data[key], options, path.concat([key]))
+        ]};
+      })} :
+      String(data)
+    }};
   };
   var scalars = {'jsonv-string': 1, 'jsonv-number': 1, 'jsonv-boolean': 1, 'jsonv-null': 1},
       compounds = {LI: 1, OL: 1, UL: 1};
   // TODO: implement sort on arrays
   // TODO: pending request indicator
   // TODO: pagination for objects, arrays
-  var handler = function(listener, data, self) {
+  var handler = function(editor, data, self) {
     return self = {
       data: data,
       object: function(elem) {
         return elem.parentNode.parentNode.parentNode.className == 'jsonv-object';
       },
-      parent: function() {
+      parent: function(path) {
         var parent = self.data;
-        self.path.slice(0, -1).forEach(function(key) { parent = parent[key]; });
+        path.slice(0, -1).forEach(function(key) { parent = parent[key]; });
         return parent;
       },
       cancel: function(elem) {
@@ -58,9 +54,9 @@ simpl.add('jsonv', function(o) {
         } else {
           var method = 'insert',
               object = self.object(elem),
-              value = elem.textContent,
+              value = elem.innerHTML.replace(/<br\s*\/?>/ig, '\n').replace(/<[^>]>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'),
               item = elem.parentNode,
-              parent = self.parent(),
+              parent = self.parent(self.path),
               key = self.path.pop();
           try { value = JSON.parse(value); } catch (e) {}
           if (self.origType || object) {
@@ -73,7 +69,7 @@ simpl.add('jsonv', function(o) {
           } else {
             parent.splice(key, 0, value);
           }
-          listener(method, self.path.concat([key]).map(encodeURIComponent).join('/'), value);
+          editor.listener(method, self.path.concat([key]).map(encodeURIComponent).join('/'), value);
           // reset must be done before DOM changes (?) to prevent double-submit on keydown and blur
           self.path = self.origType = self.origValue = null;
           item.children[1].contentEditable = false;
@@ -90,6 +86,16 @@ simpl.add('jsonv', function(o) {
           elem.parentNode.replaceChild(o.html.dom(json(value)), elem);
         }
       },
+      locate: function(item, root) {
+        var path = [];
+        while (item != root) {
+          path.unshift(item.children[1].className == 'jsonv-key'
+            ? item.children[1].textContent
+            : Array.prototype.indexOf.call(item.parentNode.children, item));
+          item = item.parentNode.parentNode.parentNode; // li/root > span > ul/ol > li
+        }
+        return path;
+      },
       handleEvent: function(e) {
         var t = e.target,
             c = t.className;
@@ -97,9 +103,19 @@ simpl.add('jsonv', function(o) {
           case 'click':
             if (c == 'jsonv-object' || c == 'jsonv-array') {
               t.classList.add('closed');
+              if (editor) editor.listener('collapse', self.locate(t.parentNode, e.currentTarget));
             } else if (c == 'jsonv-object closed' || c == 'jsonv-array closed') {
               t.classList.remove('closed');
-            } else if (listener && t.contentEditable != 'true' && (c in scalars || c == 'jsonv-delete' || t.tagName in compounds)) {
+              var path = self.locate(t.parentNode, e.currentTarget);
+              // TODO: loading
+              if (editor) editor.listener('expand', path, function(err, data) {
+                if (!err) { // TODO: err
+                  t.parentNode.replaceChild(o.html.dom(json(data, editor, path)), t);
+                  if (path.length) self.parent(path)[path.pop()] = data;
+                  else self.data = data;
+                }
+              });
+            } else if (editor && t.contentEditable != 'true' && (c in scalars || c == 'jsonv-delete' || t.tagName in compounds)) {
               var item = t;
               if (t.tagName in compounds) {
                 if (item.tagName == 'LI') item = t.parentNode;
@@ -123,26 +139,19 @@ simpl.add('jsonv', function(o) {
                 self.origValue = t.textContent;
                 if (c == 'jsonv-string') t.textContent = JSON.stringify(t.textContent);
               }
-              if (c != 'jsonv-delete') {
-                t.contentEditable = true;
-                t.focus();
-                document.execCommand('selectAll', false, null);
-              }
-              self.path = [];
-              while (item != e.currentTarget) {
-                self.path.unshift(item.children[1].className == 'jsonv-key'
-                  ? item.children[1].textContent
-                  : Array.prototype.indexOf.call(item.parentNode.children, item));
-                item = item.parentNode.parentNode.parentNode; // li/root > span > ul/ol > li
-              }
+              self.path = self.locate(item, e.currentTarget);
               if (c == 'jsonv-delete') {
-                listener('delete', self.path.map(encodeURIComponent).join('/'));
-                var parent = self.parent(),
+                editor.listener('delete', self.path.map(encodeURIComponent).join('/'));
+                var parent = self.parent(self.path),
                     key = self.path.pop();
                 if (typeof key == 'number') parent.splice(key, 1);
                 else delete parent[key];
                 self.path = self.origType = self.origValue = null;
                 t.parentNode.parentNode.removeChild(t.parentNode);
+              } else {
+                t.contentEditable = true;
+                t.focus();
+                document.execCommand('selectAll', false, null);
               }
             }
             break;
@@ -154,7 +163,8 @@ simpl.add('jsonv', function(o) {
                 key = c == 'jsonv-key';
             if (esc || !t.textContent && (tab || enter || key && colon)) { // cancel
               e.preventDefault();
-              self.cancel(t);
+              t.textContent = '';
+              t.blur();
             } else if (!key && (tab || enter) && !e.shiftKey) { // submit
               e.preventDefault();
               self.submit(t);
@@ -199,20 +209,23 @@ simpl.add('jsonv', function(o) {
   return function(elem, data, options) {
     if (data === undefined) data = JSON.parse(elem.textContent);
     if (!options) options = {};
-    else if (typeof options != 'object') {
-      var listener = handler(typeof options == 'function' ? options : function() {}, JSON.parse(JSON.stringify(data)));
+    else {
+      options.listener = typeof options == 'function' ? options : options.listener || function() {};
+      var listener = handler(options, JSON.parse(JSON.stringify(data)));
       elem.classList.add('jsonv-editable');
       elem.addEventListener('keydown', listener);
       elem.addEventListener('blur', listener, true);
       elem.addEventListener('focus', listener, true);
     }
+    if (typeof options.collapsed != 'function')
+      options.collapsed = options.collapsed ? function() { return true; } : function() {};
     elem.classList.add('jsonv');
     elem.addEventListener('click', listener || click);
-    o.html.dom(json(data, options.collapsed), elem, true);
+    o.html.dom(json(data, options, []), elem, true);
     return {
       update: function(data) {
         if (listener) listener.data = JSON.parse(JSON.stringify(data));
-        o.html.dom(json(data, options.collapsed), elem, true);
+        o.html.dom(json(data, options, []), elem, true);
       }
     };
   };

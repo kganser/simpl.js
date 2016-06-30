@@ -10,7 +10,7 @@ function(modules) {
           };
       switch (request.method) {
         case 'GET':
-          return db.get(path).then(function(object) {
+          return db.get(path, false, 'immediates').then(function(object) {
             if (object === undefined) response.generic(404);
             response.end(JSON.stringify(object), 'json');
           });
@@ -32,7 +32,7 @@ function(modules) {
           return response.generic(404);
         response.end(e.target.response, (request.path.match(/\.([^.]*)$/) || [])[1]);
       });
-    db.get().then(function(data) {
+    db.get('', false, 'immediates').then(function(data) {
       response.end(modules.html.markup([
         {'!doctype': {html: null}},
         {head: [
@@ -47,14 +47,55 @@ function(modules) {
           {script: {src: '/jsonv.js'}},
           {script: function() {
             simpl.use({jsonv: 0}, function(modules) {
-              var elem = document.getElementById('value');
-              modules.jsonv(elem, undefined, function(method, path, data) {
-                console.log(method, path, data);
-                var request = new XMLHttpRequest();
-                request.open(method, '/'+path);
-                request.setRequestHeader('Accept', 'application/json');
-                request.setRequestHeader('Content-Type', 'application/json');
-                request.send(JSON.stringify(data));
+              var open = {}, loaded = {};
+              var entry = function(map, path) {
+                for (var entry = map, i = 0; entry && i < path.length; i++)
+                  entry = entry[path[i]];
+                return entry;
+              };
+              var stringify = function(map) {
+                var keys = Object.keys(map);
+                return keys.length
+                  ? keys.length == 1
+                    ? '/'+encodeURIComponent(keys[0])+stringify(map[keys[0]])
+                    : '['+keys.map(function(key) {
+                        return encodeURIComponent(key)+stringify(map[key]);
+                      }).join(',')+']'
+                  : '';
+              };
+              modules.jsonv(document.getElementById('value'), undefined, {
+                listener: function(method, path, data) {
+                  //console.log(method, path);
+                  var request = new XMLHttpRequest();
+                  if (method == 'expand' || method == 'collapse') {
+                    var parentPath = path.slice(0, -1),
+                        parent = entry(open, parentPath),
+                        key = path[path.length-1];
+                    if (key == null) return;
+                    if (method == 'expand') parent[key] = {};
+                    else delete parent[key]; // collapsing parent node collapses child nodes as well
+                    //history.pushState(null, '', location.pathname+stringify(open).replace(/^\/?/, '?'));
+                    if (method == 'expand') {
+                      var parent = entry(loaded, parentPath);
+                      if (!parent || parent[key]) return;
+                      parent[key] = {};
+                      method = 'get';
+                      path = path.map(encodeURIComponent).join('/');
+                      request.responseType = 'json';
+                      request.onload = function() {
+                        data(false, request.response); // TODO: err
+                      };
+                    } else return;
+                  }
+                  request.open(method, '/'+path);
+                  request.setRequestHeader('Accept', 'application/json');
+                  request.setRequestHeader('Content-Type', 'application/json');
+                  request.send(method == 'get' ? undefined : JSON.stringify(data));
+                  return true;
+                },
+                collapsed: function(path) {
+                  return !entry(open, path);
+                }
               });
             });
           }}
