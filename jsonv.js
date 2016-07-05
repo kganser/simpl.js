@@ -224,8 +224,20 @@ simpl.add('jsonv', function(o) {
     o.html.dom(json(data, options, []), elem, true);
     return {
       update: function(data) {
-        if (listener) listener.data = JSON.parse(JSON.stringify(data));
-        o.html.dom(json(data, options, []), elem, true);
+        if (data !== undefined) {
+          if (listener) listener.data = JSON.parse(JSON.stringify(data));
+          o.html.dom(json(data, options, []), elem, true);
+        } else if (elem.firstChild) {
+          (function collapse(span, path) {
+            var c = span.classList, o = c.contains('jsonv-object');
+            if (o || c.contains('jsonv-array')) {
+              c.toggle('closed', options.collapsed(path));
+              Array.prototype.slice.call(span.firstChild.children).forEach(function(li, i) {
+                collapse(li.lastChild, path.concat([o ? li.children[1].textContent : i]));
+              });
+            }
+          }(elem.firstChild, []));
+        }
       }
     };
   };

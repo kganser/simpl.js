@@ -2,6 +2,25 @@ function(modules) {
 
   var db = modules.database.open(config.database);
   
+  // uri    := path? branch?
+  // branch := '[' path branch? ( ',' path branch? )+ ']'
+  // path   := segment ( '/' segment )*
+  var parse = function(path) {
+    var i, map = {}, stack = [], node = map;
+    while (path) {
+      if (i = path.search(/[[\],]/)) {
+        stack.push(node);
+        (i > 0 ? path.substr(0, i) : path).split('/').forEach(function(segment) {
+          node = node[decodeURIComponent(segment)] = {};
+        });
+      }
+      if (i < 0) break;
+      if (path[i] != '[') node = stack.pop();
+      path = path.substr(i+1);
+    }
+    return map;
+  };
+  
   modules.http.serve({port: config.port}, function(request, response) {
     if (request.headers.Accept == 'application/json' || request.query.format == 'json') {
       var path = request.path.substr(1),
@@ -32,40 +51,68 @@ function(modules) {
           return response.generic(404);
         response.end(e.target.response, (request.path.match(/\.([^.]*)$/) || [])[1]);
       });
-    db.get('', false, 'immediates').then(function(data) {
+    try {
+      var map = parse(request.uri.split('?', 2)[1] || '');
+    } catch (e) {
+      return response.generic(301, {Location: request.path});
+    }
+    db.get('', false, function(path) {
+      var node = map;
+      return !path.some(function(segment) {
+        return !(node = node[segment+'']);
+      });
+    }).then(function(data) {
       response.end(modules.html.markup([
         {'!doctype': {html: null}},
         {head: [
-          {title: 'Database Editor'},
+          {title: 'Database Admin'},
           {meta: {charset: 'utf-8'}},
           {link: {rel: 'stylesheet', href: '/jsonv.css'}}
         ]},
         {body: [
-          {pre: {id: 'value', 'class': 'json', children: JSON.stringify(data, null, 2)}},
+          {pre: {id: 'value', children: JSON.stringify(data, null, 2)}},
           {script: {src: '/simpl.js'}},
           {script: {src: '/modules/html.js'}},
           {script: {src: '/jsonv.js'}},
           {script: function() {
+            var entry = function(map, path) {
+              for (var entry = map, i = 0; entry && i < path.length; i++)
+                entry = entry[path[i]];
+              return entry;
+            };
+            var stringify = function(map) {
+              var keys = Object.keys(map);
+              return !keys.length ? ''
+                : keys.length == 1 ? '/'+encodeURIComponent(keys[0])+stringify(map[keys[0]])
+                : '['+keys.map(function(key) {
+                    return encodeURIComponent(key)+stringify(map[key]);
+                  }).join(',')+']';
+            };
+            var parse = function(path) {
+              var i, map = {}, stack = [], node = map;
+              while (path) {
+                if (i = path.search(/[[\],]/)) {
+                  stack.push(node);
+                  (i > 0 ? path.substr(0, i) : path).split('/').forEach(function(segment) {
+                    node = node[decodeURIComponent(segment)] = {};
+                  });
+                }
+                if (i < 0) break;
+                if (path[i] != '[') node = stack.pop();
+                path = path.substr(i+1);
+              }
+              return map;
+            };
+            var ui, query = location.search.replace('?', ''),
+                open = parse(query),
+                loaded = parse(query);
+            window.onpopstate = function() {
+              open = parse(location.search.replace('?', ''));
+              if (ui) ui.update();
+            };
             simpl.use({jsonv: 0}, function(modules) {
-              var open = {}, loaded = {};
-              var entry = function(map, path) {
-                for (var entry = map, i = 0; entry && i < path.length; i++)
-                  entry = entry[path[i]];
-                return entry;
-              };
-              var stringify = function(map) {
-                var keys = Object.keys(map);
-                return keys.length
-                  ? keys.length == 1
-                    ? '/'+encodeURIComponent(keys[0])+stringify(map[keys[0]])
-                    : '['+keys.map(function(key) {
-                        return encodeURIComponent(key)+stringify(map[key]);
-                      }).join(',')+']'
-                  : '';
-              };
-              modules.jsonv(document.getElementById('value'), undefined, {
+              ui = modules.jsonv(document.getElementById('value'), undefined, {
                 listener: function(method, path, data) {
-                  //console.log(method, path);
                   var request = new XMLHttpRequest();
                   if (method == 'expand' || method == 'collapse') {
                     var parentPath = path.slice(0, -1),
@@ -73,8 +120,8 @@ function(modules) {
                         key = path[path.length-1];
                     if (key == null) return;
                     if (method == 'expand') parent[key] = {};
-                    else delete parent[key]; // collapsing parent node collapses child nodes as well
-                    //history.pushState(null, '', location.pathname+stringify(open).replace(/^\/?/, '?'));
+                    else delete parent[key];
+                    history.pushState(null, '', location.pathname+stringify(open).replace(/^\/?/, '?'));
                     if (method == 'expand') {
                       var parent = entry(loaded, parentPath);
                       if (!parent || parent[key]) return;
