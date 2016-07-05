@@ -417,7 +417,7 @@ simpl.add('app', function(o) {
                   case 'run':
                   case 'stop':
                     entry.state = event == 'run' ? 'running' : null;
-                    entry.tab.classList[entry.state ? 'add' : 'remove']('running');
+                    entry.tab.classList.toggle('running', event == 'run');
                     entry.tab.classList.remove('error');
                     if (entry.state) {
                       entry.log = [];
