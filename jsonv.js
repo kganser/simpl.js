@@ -69,9 +69,7 @@ simpl.add('jsonv', function(o) {
           } else {
             parent.splice(key, 0, value);
           }
-          editor.listener(method, self.path.concat([key]).map(encodeURIComponent).join('/'), value);
-          // reset must be done before DOM changes (?) to prevent double-submit on keydown and blur
-          self.path = self.origType = self.origValue = null;
+          editor.listener(method, self.path.concat([key]), value);
           item.children[1].contentEditable = false;
           if (object) { // move into position alphabetically
             var list = item.parentNode,
@@ -83,7 +81,8 @@ simpl.add('jsonv', function(o) {
               list.insertBefore(list.removeChild(item), list.children[i]);
             }
           }
-          elem.parentNode.replaceChild(o.html.dom(json(value)), elem);
+          elem.parentNode.replaceChild(o.html.dom(json(value, editor, self.path)), elem);
+          self.path = self.origType = self.origValue = null;
         }
       },
       locate: function(item, root) {
@@ -108,8 +107,11 @@ simpl.add('jsonv', function(o) {
               t.classList.remove('closed');
               var path = self.locate(t.parentNode, e.currentTarget);
               // TODO: loading
-              if (editor) editor.listener('expand', path, function(err, data) {
-                if (!err) { // TODO: err
+              if (editor) editor.listener('expand', path, undefined, function(error, data) {
+                if (error) {
+                  t.classList.add('closed');
+                  editor.listener('collapse', path);
+                } else {
                   t.parentNode.replaceChild(o.html.dom(json(data, editor, path)), t);
                   if (path.length) self.parent(path)[path.pop()] = data;
                   else self.data = data;
@@ -141,7 +143,7 @@ simpl.add('jsonv', function(o) {
               }
               self.path = self.locate(item, e.currentTarget);
               if (c == 'jsonv-delete') {
-                editor.listener('delete', self.path.map(encodeURIComponent).join('/'));
+                editor.listener('delete', self.path);
                 var parent = self.parent(self.path),
                     key = self.path.pop();
                 if (typeof key == 'number') parent.splice(key, 1);
@@ -209,8 +211,8 @@ simpl.add('jsonv', function(o) {
   return function(elem, data, options) {
     if (data === undefined) data = JSON.parse(elem.textContent);
     if (!options) options = {};
-    else {
-      options.listener = typeof options == 'function' ? options : options.listener || function() {};
+    else if (typeof options == 'function') options = {listener: options};
+    if (options.listener) {
       var listener = handler(options, JSON.parse(JSON.stringify(data)));
       elem.classList.add('jsonv-editable');
       elem.addEventListener('keydown', listener);
