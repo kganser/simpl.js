@@ -236,7 +236,7 @@ simpl.add('database', function() {
                             from = pathFrom.concat([key]),
                             to = pathTo.concat([key]);
                         key = makeKey(to);
-                        store.delete(makeKey(pathFrom)).onsuccess = cb;
+                        store.delete(makeKey(from)).onsuccess = cb;
                         store.put({parent: key[0], key: key[1], type: type, value: result.value}).onsuccess = cb;
                         shiftChildren(from, to, type);
                         cursor.continue();
