@@ -163,12 +163,21 @@ function(modules) {
                     }
                   } else {
                     [openParent, loadedParent].forEach(function(parent) {
-                      if (method == 'insert' || method == 'put') {
-                        if (method == 'insert') Object.keys(parent).sort(function(a, b) {
-                          return +a > +b;
-                        }).some(function(k) {
-                          if (+k < key) return true;
-                          parent[+k+1] = parent[k];
+                      var keys = typeof key == 'number' && Object.keys(parent).map(function(k) { return +k; }).sort();
+                      if (method == 'delete') {
+                        if (keys) {
+                          keys.forEach(function(k) {
+                            if (k < key) return;
+                            if (k > key) parent[k-1] = parent[k];
+                            delete parent[k];
+                          });
+                        } else {
+                          delete parent[key];
+                        }
+                      } else {
+                        if (method == 'insert') keys.reverse().some(function(k) {
+                          if (k < key) return true;
+                          parent[k+1] = parent[k];
                           delete parent[k];
                         });
                         (function expand(o, parent, key) {
@@ -177,8 +186,6 @@ function(modules) {
                           if (Array.isArray(o)) o.forEach(function(data, i) { expand(data, p, i); });
                           else Object.keys(o).forEach(function(k) { expand(o[k], p, k); });
                         }(data, parent, key));
-                      } else {
-                        delete parent[key];
                       }
                     });
                   }
