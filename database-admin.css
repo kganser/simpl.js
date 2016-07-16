@@ -1,0 +1,25 @@
+body {
+  font: 13px sans-serif;
+  -webkit-text-size-adjust: none;
+}
+#icons {
+  display: none;
+}
+svg {
+  width: 1.2em;
+  height: 1.2em;
+  margin: 0 5px;
+  vertical-align: bottom;
+  fill: #aaa;
+}
+.databases {
+  list-style: none;
+  padding: 0;
+  line-height: 1.5;
+}
+.databases a {
+  text-decoration: none;
+}
+.databases a:hover svg, a:focus svg, a:active svg {
+  fill: #666;
+}
