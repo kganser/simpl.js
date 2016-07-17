@@ -3,7 +3,7 @@ simpl.add('jsonv', function(o) {
     var type = typeof data, name = type;
     if (type == 'object') {
       type = name = Array.isArray(data) ? 'array' : data ? type : 'null';
-      if (options.collapsed(path)) name += ' closed';
+      if (type != 'null' && options.collapsed(path)) name += ' closed';
     }
     return {span: {className: 'jsonv-'+name, children:
       type == 'array' ? {ol: data.map(function(e, i) {
@@ -29,6 +29,9 @@ simpl.add('jsonv', function(o) {
       object: function(elem) {
         return elem.parentNode.parentNode.parentNode.className == 'jsonv-object';
       },
+      clean: function(html) {
+        return html.replace(/<br\s*\/?>/ig, '\n').replace(/<[^>]>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+      },
       parent: function(path) {
         var parent = self.data;
         path.slice(0, -1).forEach(function(key) { parent = parent[key]; });
@@ -50,31 +53,31 @@ simpl.add('jsonv', function(o) {
         if (self.origType && elem.textContent == origJson) { // value unchanged
           elem.textContent = self.origValue;
           elem.contentEditable = false;
-          self.path = self.origType = self.origValue = null;
         } else {
           var method = 'insert',
               object = self.object(elem),
-              value = elem.innerHTML.replace(/<br\s*\/?>/ig, '\n').replace(/<[^>]>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'),
+              value = self.clean(elem.innerHTML),
               item = elem.parentNode,
               parent = self.parent(self.path),
               key = self.path.pop();
           try { value = JSON.parse(value); } catch (e) {}
           if (self.origType || object) {
             if (!self.origType) {
-              key = item.children[1].textContent;
-              var swap = key in parent;
+              key = self.clean(item.children[1].innerHTML);
+              var replace = key in parent;
             }
             method = 'put';
             parent[key] = value;
           } else {
             parent.splice(key, 0, value);
           }
-          editor.listener(method, self.path.concat([key]), value);
+          self.path.push(key);
+          editor.listener(method, self.path, value);
           item.children[1].contentEditable = false;
           if (object) { // move into position alphabetically
             var list = item.parentNode,
                 i = Object.keys(parent).sort().indexOf(key);
-            if (swap) {
+            if (replace) {
               list.removeChild(item);
               elem = list.children[i].children[2];
             } else if (item != list.children[i]) {
@@ -82,14 +85,14 @@ simpl.add('jsonv', function(o) {
             }
           }
           elem.parentNode.replaceChild(o.html.dom(json(value, editor, self.path)), elem);
-          self.path = self.origType = self.origValue = null;
         }
+        self.path = self.origType = self.origValue = null;
       },
       locate: function(item, root) {
         var path = [];
         while (item != root) {
           path.unshift(item.children[1].className == 'jsonv-key'
-            ? item.children[1].textContent
+            ? self.clean(item.children[1].innerHTML)
             : Array.prototype.indexOf.call(item.parentNode.children, item));
           item = item.parentNode.parentNode.parentNode; // li/root > span > ul/ol > li
         }
