@@ -180,6 +180,7 @@ function(modules) {
                           parent[k+1] = parent[k];
                           delete parent[k];
                         });
+                        delete parent[key];
                         (function expand(o, parent, key) {
                           if (!o || typeof o != 'object') return;
                           var p = parent[key] = {};
