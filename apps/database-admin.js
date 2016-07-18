@@ -3,6 +3,14 @@ function(modules) {
   // uri    := path? branch?
   // branch := '[' path branch? ( ',' path branch? )+ ']'
   // path   := segment ( '/' segment )*
+  var stringify = function(map) {
+    var keys = Object.keys(map);
+    return !keys.length ? ''
+      : keys.length == 1 ? '/'+encodeURIComponent(keys[0])+stringify(map[keys[0]])
+      : '['+keys.map(function(key) {
+          return encodeURIComponent(key)+stringify(map[key]);
+        }).join(',')+']';
+  };
   var parse = function(path) {
     var i, map = {}, stack = [], node = map;
     while (path) {
@@ -92,18 +100,23 @@ function(modules) {
       return response.generic(501);
     }
     try {
-      var map = parse(request.uri.split('?', 2)[1] || '');
+      var state = request.uri.split('?', 2)[1] || '',
+          expanded = parse(state),
+          actual = {};
     } catch (e) {
       return response.generic(301, {Location: request.path});
     }
     open(function(db) {
-      // TODO: redirect if all expanded keys are not traversed
       db.get('', false, function(path) {
-        var node = map;
+        var e = expanded, a = actual;
         return !path.some(function(segment) {
-          return !(node = node[segment+'']);
+          if (!(e = e[segment += ''])) return true;
+          a = a[segment] = a[segment] || {};
         });
       }).then(function(data) {
+        actual = stringify(actual).replace(/^\//, '?');
+        if (state != actual.substr(1))
+          return response.generic(303, {Location: request.path+actual});
         response.end(template([
           {pre: {id: 'value', children: JSON.stringify(data, null, 2)}},
           {script: {src: '/static/simpl.js'}},
