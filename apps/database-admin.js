@@ -3,7 +3,7 @@ function(modules) {
   // uri    := path? branch?
   // branch := '[' path branch? ( ',' path branch? )+ ']'
   // path   := segment ( '/' segment )*
-  var stringify = function(map) {
+  var stringify = function stringify(map) {
     var keys = Object.keys(map);
     return !keys.length ? ''
       : keys.length == 1 ? '/'+encodeURIComponent(keys[0])+stringify(map[keys[0]])
@@ -49,6 +49,7 @@ function(modules) {
       callback(names.contains(name) ? modules.database.open(name) : null);
     });
   };
+  var s = stringify, p = parse;
   
   modules.http.serve({port: config.port}, function(request, response) {
     if (request.path == '/')
@@ -122,35 +123,15 @@ function(modules) {
           {script: {src: '/static/simpl.js'}},
           {script: {src: '/static/modules/html.js'}},
           {script: {src: '/static/jsonv.js'}},
-          {script: function() {
+          {script: function(stringify, p_) {
+            if (!stringify) return [s, p];
+            var parse = function() {
+              return p_(location.search.substr(1));
+            };
             var entry = function(map, path) {
               for (var entry = map, i = 0; entry && i < path.length; i++)
                 entry = entry[path[i]];
               return entry;
-            };
-            var stringify = function(map) {
-              var keys = Object.keys(map);
-              return !keys.length ? ''
-                : keys.length == 1 ? '/'+encodeURIComponent(keys[0])+stringify(map[keys[0]])
-                : '['+keys.map(function(key) {
-                    return encodeURIComponent(key)+stringify(map[key]);
-                  }).join(',')+']';
-            };
-            var parse = function() {
-              var i, map = {}, stack = [], node = map,
-                  path = location.search.substr(1);
-              while (path) {
-                if (i = path.search(/[[\],]/)) {
-                  stack.push(node);
-                  (i > 0 ? path.substr(0, i) : path).split('/').forEach(function(segment) {
-                    node = node[decodeURIComponent(segment)] = {};
-                  });
-                }
-                if (i < 0) break;
-                if (path[i] != '[') node = stack.pop();
-                path = path.substr(i+1);
-              }
-              return map;
             };
             var ui, open = parse(), loaded = parse();
             window.onpopstate = function() {

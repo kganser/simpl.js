@@ -103,7 +103,7 @@ simpl.add('html', function() {
         case 'function':
           var args;
           return ('('+node+'('+(node.length && (args = node()) !== undefined ? Array.isArray(args) && node.length >= args.length ? args : [args] : [])
-            .map(function(arg) { return JSON.stringify(arg); }).join(',')+'));').replace(/<\/(script)>/ig, '<\\/$1>');
+            .map(function(arg) { return typeof arg == 'function' ? arg : JSON.stringify(arg); }).join(',')+'));').replace(/<\/(script)>/ig, '<\\/$1>');
         case 'string':
           return node.replace(/&/g, '&amp;').replace(/</g, '&lt;');
         case 'number':
@@ -222,10 +222,6 @@ simpl.add('html', function() {
               model.insert(value);
             });
           }
-          return model;
-        },
-        sort: function(compare) { // persist sort order?
-          // TODO
           return model;
         },
         view: function(parent) {
