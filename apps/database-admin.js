@@ -3,12 +3,12 @@ function(modules) {
   // uri    := path? branch?
   // branch := '[' path branch? ( ',' path branch? )+ ']'
   // path   := segment ( '/' segment )*
-  var stringify = function stringify(map) {
+  var stringify = function stringify(map, prefix) {
     var keys = Object.keys(map);
     return !keys.length ? ''
-      : keys.length == 1 ? '/'+encodeURIComponent(keys[0])+stringify(map[keys[0]])
+      : keys.length == 1 ? (prefix || '')+encodeURIComponent(keys[0])+stringify(map[keys[0]], '/')
       : '['+keys.map(function(key) {
-          return encodeURIComponent(key)+stringify(map[key]);
+          return encodeURIComponent(key)+stringify(map[key], '/');
         }).join(',')+']';
   };
   var parse = function(path) {
@@ -115,9 +115,9 @@ function(modules) {
           a = a[segment] = a[segment] || {};
         });
       }).then(function(data) {
-        actual = stringify(actual).replace(/^\//, '?');
-        if (state != actual.substr(1))
-          return response.generic(303, {Location: request.path+actual});
+        actual = stringify(actual);
+        if (state != actual)
+          return response.generic(303, {Location: request.path+(actual && '?'+actual)});
         response.end(template([
           {pre: {id: 'value', children: JSON.stringify(data, null, 2)}},
           {script: {src: '/static/simpl.js'}},
@@ -185,8 +185,8 @@ function(modules) {
                       }
                     });
                   }
-                  var state = stringify(open).replace(/^\//, '?');
-                  if (state != location.search) history.pushState(null, '', location.pathname+state);
+                  var state = stringify(open);
+                  if (state != location.search) history.pushState(null, '', location.pathname+(state && '?'+state));
                   if (!method) return;
                   var request = new XMLHttpRequest();
                   if (method == 'get') request.responseType = 'json';
