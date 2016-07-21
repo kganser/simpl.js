@@ -16,6 +16,21 @@
 .jsonv li:last-child:after {
   display: none;
 }
+.jsonv .loading {
+  opacity: .5;
+}
+.jsonv .error:before {
+  content: "Error";
+  color: white;
+  background: #a00;
+  height: auto;
+  padding: 0 2px;
+  border: none;
+  cursor: default;
+}
+.jsonv .error:after {
+  display: none;
+}
 .jsonv .jsonv-delete {
   display: none;
   width: .95em;

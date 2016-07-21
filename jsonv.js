@@ -21,7 +21,6 @@ simpl.add('jsonv', function(o) {
   var scalars = {'jsonv-string': 1, 'jsonv-number': 1, 'jsonv-boolean': 1, 'jsonv-null': 1},
       compounds = {LI: 1, OL: 1, UL: 1};
   // TODO: implement sort on arrays
-  // TODO: pending request indicator
   // TODO: pagination for objects, arrays
   var handler = function(editor, data, self) {
     return self = {
@@ -72,8 +71,14 @@ simpl.add('jsonv', function(o) {
             parent.splice(key, 0, value);
           }
           self.path.push(key);
-          editor.listener(method, self.path, value);
           item.children[1].contentEditable = false;
+          if (editor.listener(method, self.path, value, function(error) {
+            item.classList.remove('loading');
+            if (error) {
+              item.classList.add('error');
+              item.innerHTML = '';
+            }
+          })) item.classList.add('loading');
           if (object) { // move into position alphabetically
             var list = item.parentNode,
                 i = Object.keys(parent).sort().indexOf(key);
@@ -109,8 +114,8 @@ simpl.add('jsonv', function(o) {
             } else if (c == 'jsonv-object closed' || c == 'jsonv-array closed') {
               t.classList.remove('closed');
               var path = self.locate(t.parentNode, e.currentTarget);
-              // TODO: loading
-              if (editor) editor.listener('expand', path, undefined, function(error, data) {
+              if (editor && editor.listener('expand', path, undefined, function(error, data) {
+                t.classList.remove('loading');
                 if (error) {
                   t.classList.add('closed');
                   editor.listener('collapse', path);
@@ -119,7 +124,7 @@ simpl.add('jsonv', function(o) {
                   if (path.length) self.parent(path)[path.pop()] = data;
                   else self.data = data;
                 }
-              });
+              })) t.classList.add('loading');
             } else if (editor && t.contentEditable != 'true' && (c in scalars || c == 'jsonv-delete' || t.tagName in compounds)) {
               var item = t;
               if (t.tagName in compounds) {
@@ -146,7 +151,7 @@ simpl.add('jsonv', function(o) {
               }
               self.path = self.locate(item, e.currentTarget);
               if (c == 'jsonv-delete') {
-                editor.listener('delete', self.path);
+                editor.listener('delete', self.path, undefined, function() {});
                 var parent = self.parent(self.path),
                     key = self.path.pop();
                 if (typeof key == 'number') parent.splice(key, 1);

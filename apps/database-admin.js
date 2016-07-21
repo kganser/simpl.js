@@ -171,6 +171,7 @@ function(modules) {
                       if (method = loadedParent && !loadedParent[key] && 'get')
                         loadedParent[key] = {};
                     } else {
+                      // TODO: preserve expansion state of substructure?
                       delete openParent[key];
                       method = null;
                     }
@@ -203,18 +204,15 @@ function(modules) {
                       }
                     });
                   }
-                  var state = stringify(open).replace(/^\/?/, '?');
+                  var state = stringify(open).replace(/^\//, '?');
                   if (state != location.search) history.pushState(null, '', location.pathname+state);
                   if (!method) return;
                   var request = new XMLHttpRequest();
                   if (method == 'get') request.responseType = 'json';
                   request.onload = request.onerror = function() {
                     var error = request.status != 200;
-                    if (callback) callback(error, request.response); // TODO: callback will exist
-                    if (error) {
-                      alert('An error occurred'); // TODO: improved UI
-                      delete loadedParent[key];
-                    }
+                    callback(error, request.response);
+                    if (error) delete loadedParent[key];
                   };
                   request.open(method, location.pathname+'/'+path.map(encodeURIComponent).join('/'));
                   request.setRequestHeader('Accept', 'application/json');
