@@ -27,12 +27,25 @@ function(modules) {
     return map;
   };
   var template = function(body, db) {
+    var css = {
+      body: {font: '13px sans-serif', webkitTextSizeAdjust: 'none'},
+      svg: {width: '1.2em', height: '1.2em', margin: '0 5px', verticalAlign: 'bottom', fill: '#aaa'},
+      '#icons': {display: 'none'},
+      '.databases': {listStyle: 'none', padding: 0, lineHeight: 1.5},
+      '.databases a': {textDecoration: 'none'},
+      '.databases a:hover svg, a:focus svg, a:active svg': {fill: '#666'}
+    };
     return modules.html.markup([
       {'!doctype': {html: null}},
       {head: [
         {title: (db ? db+' - ' : '')+'Database Admin'},
         {meta: {charset: 'utf-8'}},
-        {link: {rel: 'stylesheet', href: '/static/database-admin.css'}},
+        {style: Object.keys(css).map(function(selector) {
+          var attrs = css[selector];
+          return selector+'{'+Object.keys(attrs).map(function(property) {
+            return property.replace(/([a-z])([A-Z])/g, '$1-$2').replace(/^(webkit|moz|o|ms)-/, '-$1-').toLowerCase()+':'+attrs[property];
+          }).join(';')+'}';
+        }).join('')},
         db && {link: {rel: 'stylesheet', href: '/static/jsonv.css'}}
       ]},
       {body: [
