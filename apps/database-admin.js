@@ -56,10 +56,10 @@ function(modules) {
       ]}
     ]);
   };
-  var dbs = function(callback, name) {
+  var dbs = function(callback, name, error) {
     modules.database.list(function(names) {
       if (!name) return callback(Array.prototype.slice.call(names));
-      callback(names.contains(name) ? modules.database.open(name) : null);
+      callback(names.contains(name) ? modules.database.open(name, undefined, undefined, error) : null);
     });
   };
   var s = stringify, p = parse;
@@ -83,7 +83,9 @@ function(modules) {
       dbs(function(db) {
         if (!db) return response.generic(404);
         callback(db);
-      }, name = decodeURIComponent(name));
+      }, name = decodeURIComponent(name), function(e) {
+        response.end(e.message, 500);
+      });
     };
     if (json) {
       var respond = function(error) {
