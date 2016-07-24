@@ -272,13 +272,13 @@ simpl.add('database', function() {
                 }
               };
               if (onError) {
-                request.onerror = function(e) { onError(e.target.error, false); };
+                request.onerror = function() { onError(request.error, false); };
                 request.onblocked = function() { onError(null, true); };
               }
             }(function() {
               if (!trans) try {
                 trans = db.transaction(stores, writable ? 'readwrite' : 'readonly');
-                if (onError) trans.onerror = onError;
+                if (onError) trans.onerror = function() { onError(trans.error, false); };
               } catch (e) {
                 if (onError) return onError(e, false);
                 throw e;
