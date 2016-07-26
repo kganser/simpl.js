@@ -30,10 +30,14 @@ function(modules) {
     var css = {
       body: {font: '13px sans-serif', webkitTextSizeAdjust: 'none'},
       svg: {width: '1.2em', height: '1.2em', margin: '0 5px', verticalAlign: 'bottom', fill: '#aaa'},
+      input: {outline: 'none', border: 'solid 1px #ececec', height: '23px', padding: '0 5px'},
+      button: {outline: 'none', border: 'none', background: '#3c3', color: 'white', cursor: 'pointer', height: '25px'},
+      'button.delete': {background: 'transparent', color: '#aaa', height: '15px', padding: 0, height: '17px', width: '20px'},
+      'button.delete:hover': {background: '#c5201c', color: 'white'},
       '#icons': {display: 'none'},
       '.databases': {listStyle: 'none', padding: 0, lineHeight: 1.5},
       '.databases a': {textDecoration: 'none'},
-      '.databases a:hover svg, a:focus svg, a:active svg': {fill: '#666'}
+      'a:hover svg, a:focus svg, a:active svg': {fill: '#666'}
     };
     return modules.html.markup([
       {'!doctype': {html: null}},
@@ -65,12 +69,37 @@ function(modules) {
   var s = stringify, p = parse;
   
   modules.http.serve({port: config.port}, function(request, response) {
-    if (request.path == '/')
+    if (request.path == '/') {
+      if (request.method == 'POST')
+        return request.slurp(function(body) {
+          var db, done = function() {
+            if (db) db.close();
+            response.generic(303, {Location: '/'});
+          };
+          if (body.action == 'delete' && body.name)
+            return modules.database.delete(body.name, done);
+          if (body.action == 'add' && body.name)
+            return (db = modules.database.open(body.name)).put('', {}).then(done);
+          done();
+        }, 'url');
       return dbs(function(dbs) {
-        response.end(template([{ul: {class: 'databases', children: dbs.map(function(name) {
-          return {li: [{a: {href: '/'+encodeURIComponent(name), children: [{svg: [{use: {'xlink:href': '#icon-database'}}]}, name]}}]};
-        })}}]), 'html');
+        response.end(template([
+          {ul: {class: 'databases', children: dbs.map(function(name) {
+            return {li: [
+              {form: {method: 'post', onsubmit: 'return confirm("Permanently delete database '+name+'?");', children: [
+                {input: {type: 'hidden', name: 'action', value: 'delete'}},
+                {button: {type: 'submit', class: 'delete', name: 'name', value: name, children: '×'}},
+                {a: {href: '/'+encodeURIComponent(name), children: [{svg: [{use: {'xlink:href': '#icon-database'}}]}, name]}}
+              ]}}
+            ]};
+          })}},
+          {form: {method: 'post', onsubmit: 'if (!this.name.value) { alert("Please specify a database name."); this.name.focus(); return false; }', children: [
+            {input: {placeholder: 'New Database', name: 'name'}},
+            {button: {type: 'submit', name: 'action', value: 'add', children: 'Add'}}
+          ]}}
+        ]), 'html');
       });
+    }
     var name = request.path.match(/^\/([^/]*)/)[1],
         path = request.path.substr(name.length+2),
         json = request.headers.Accept == 'application/json' || request.query.format == 'json';
@@ -88,13 +117,11 @@ function(modules) {
       });
     };
     if (json) {
-      var respond = function(error) {
-        response.end(error ? '403 '+error : '200 Success', null, error ? 403 : 200);
-      };
       switch (request.method) {
         case 'GET':
           return open(function(db) {
             db.get(path, false, 'immediates').then(function(object) {
+              db.close();
               if (object === undefined) response.generic(404);
               response.end(JSON.stringify(object), 'json');
             });
@@ -105,12 +132,18 @@ function(modules) {
           return request.slurp(function(body) {
             if (body === undefined) return response.generic(415);
             open(function(db) {
-              db[{PUT: 'put', POST: 'append', INSERT: 'insert'}[request.method]](path, body).then(respond);
+              db[{PUT: 'put', POST: 'append', INSERT: 'insert'}[request.method]](path, body).then(function(error) {
+                db.close();
+                response.end(error ? '403 '+error : '200 Success', null, error ? 403 : 200);
+              });
             });
           }, 'json');
         case 'DELETE':
           return open(function(db) {
-            db.delete(path).then(respond);
+            db.delete(path).then(function(error) {
+              db.close();
+              response.end(error ? '403 '+error : '200 Success', null, error ? 403 : 200);
+            });
           });
       }
       return response.generic(501);
@@ -130,6 +163,7 @@ function(modules) {
           a = a[segment] = a[segment] || {};
         });
       }).then(function(data) {
+        db.close();
         actual = stringify(actual);
         if (state != actual)
           return response.generic(303, {Location: request.path+(actual && '?'+actual)});
