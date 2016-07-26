@@ -692,8 +692,7 @@ simpl.add('app', function(o) {
               config = o.jsonv(e, selected ? selected.entry.config : null, function(method, path, data) {
                 var current = selected,
                     config = selected.entry.config;
-                path.split('/').map(decodeURIComponent).forEach(function(key, i, path) {
-                  if (Array.isArray(config)) key = parseInt(key, 10);
+                path.forEach(function(key, i, path) {
                   if (i < path.length-1) config = config[key];
                   else if (method == 'put') config[key] = data;
                   else if (method == 'insert') config.splice(key, 0, data);
