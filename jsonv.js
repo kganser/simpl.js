@@ -48,8 +48,7 @@ simpl.add('jsonv', function(o) {
       },
       submit: function(elem) {
         if (!self.path) return;
-        var origJson = self.origType == 'jsonv-string' ? JSON.stringify(self.origValue) : self.origValue;
-        if (self.origType && elem.textContent == origJson) { // value unchanged
+        if (self.origType && elem.textContent == self.origValue) { // value unchanged
           elem.textContent = self.origValue;
           elem.contentEditable = false;
         } else {
@@ -147,7 +146,10 @@ simpl.add('jsonv', function(o) {
                 item = t.parentNode;
                 self.origType = c;
                 self.origValue = t.textContent;
-                if (c == 'jsonv-string') t.textContent = JSON.stringify(t.textContent);
+                try {
+                  if (c == 'jsonv-string' && JSON.parse(t.textContent))
+                    self.origValue = t.textContent = JSON.stringify(t.textContent);
+                } catch (e) {}
               }
               self.path = self.locate(item, e.currentTarget);
               if (c == 'jsonv-delete') {
