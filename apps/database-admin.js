@@ -68,7 +68,8 @@ function(modules) {
       callback(names.contains(name) ? modules.database.open(name, undefined, undefined, error) : null);
     });
   };
-  var s = stringify, p = parse;
+  var csrf = modules.string.base64FromBuffer(crypto.getRandomValues(new Uint8Array(24)), true),
+      s = stringify, p = parse;
   
   modules.http.serve({port: config.port}, function(request, response) {
     if (request.path == '/') {
@@ -78,6 +79,8 @@ function(modules) {
             if (db) db.close();
             response.generic(303, {Location: '/'});
           };
+          if (body.token != csrf)
+            return response.generic(403);
           if (body.action == 'delete' && body.name)
             return modules.database.delete(body.name, done);
           if (body.action == 'add' && body.name)
@@ -89,6 +92,7 @@ function(modules) {
           {ul: {class: 'databases', children: dbs.map(function(name) {
             return {li: [
               {form: {method: 'post', onsubmit: 'return confirm("Permanently delete database '+name+'?");', children: [
+                {input: {type: 'hidden', name: 'token', value: csrf}},
                 {input: {type: 'hidden', name: 'action', value: 'delete'}},
                 {button: {type: 'submit', class: 'delete', name: 'name', value: name, children: '×'}},
                 {a: {href: '/'+encodeURIComponent(name), children: [{svg: [{use: {'xlink:href': '#icon-database'}}]}, name]}}
@@ -97,6 +101,7 @@ function(modules) {
           })}},
           {form: {method: 'post', onsubmit: 'if (!this.name.value) { alert("Please specify a database name."); this.name.focus(); return false; }', children: [
             {input: {placeholder: 'New Database', name: 'name'}},
+            {input: {type: 'hidden', name: 'token', value: csrf}},
             {button: {type: 'submit', name: 'action', value: 'add', children: 'Add'}}
           ]}}
         ]), 'html');
@@ -131,6 +136,8 @@ function(modules) {
         case 'PUT':
         case 'POST':
         case 'INSERT':
+          if (request.headers.Authorization != csrf)
+            return response.generic(403);
           return request.slurp(function(body) {
             if (body === undefined) return response.generic(415);
             open(function(db) {
@@ -141,6 +148,8 @@ function(modules) {
             });
           }, 'json');
         case 'DELETE':
+          if (request.headers.Authorization != csrf)
+            return request.generic(403);
           return open(function(db) {
             db.delete(path).then(function(error) {
               db.close();
@@ -175,8 +184,8 @@ function(modules) {
           {script: {src: '/static/simpl.js'}},
           {script: {src: '/static/modules/html.js'}},
           {script: {src: '/static/jsonv.js'}},
-          {script: function(stringify, p_) {
-            if (!stringify) return [s, p];
+          {script: function(stringify, p_, token) {
+            if (!stringify) return [s, p, csrf];
             var parse = function() {
               return p_(location.search.substr(1));
             };
@@ -250,6 +259,7 @@ function(modules) {
                   request.open(method, location.pathname+'/'+path.map(encodeURIComponent).join('/'));
                   request.setRequestHeader('Accept', 'application/json');
                   request.setRequestHeader('Content-Type', 'application/json');
+                  request.setRequestHeader('Authorization', token);
                   request.send(method == 'get' ? undefined : JSON.stringify(data));
                   return true;
                 },
