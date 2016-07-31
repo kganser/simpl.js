@@ -29,15 +29,17 @@ function(modules) {
   var template = function(body, db) {
     var css = {
       body: {font: '13px sans-serif', webkitTextSizeAdjust: 'none'},
-      svg: {width: '1.2em', height: '1.2em', margin: '0 5px', verticalAlign: 'bottom', fill: '#aaa'},
+      svg: {width: '1.2em', height: '1.2em', margin: '0 .5em', verticalAlign: 'bottom', fill: '#aaa'},
       input: {outline: 'none', border: 'solid 1px #ececec', height: '23px', padding: '0 5px'},
       button: {outline: 'none', border: 'none', background: '#3c3', color: 'white', cursor: 'pointer', padding: '0 8px', height: '25px'},
       'button.delete': {background: 'transparent', color: '#aaa', padding: '0 5px', height: '17px'},
       'button.delete:hover': {background: '#c5201c', color: 'white'},
       '#icons': {display: 'none'},
       '.databases': {listStyle: 'none', padding: 0, lineHeight: 1.5},
-      '.databases a': {textDecoration: 'none'},
-      'a:hover svg, a:focus svg, a:active svg': {fill: '#666'}
+      '.databases a, a.home': {textDecoration: 'none', color: '#1c00cf'},
+      'a.home:before': {content: '""', display: 'inline-block', border: '0 solid transparent', borderWidth: '.35em .6em .35em 0', borderRightColor: '#aaa'},
+      'a:hover svg, a:focus svg, a:active svg': {fill: '#5a5a5a'},
+      'a.home:hover:before, a.home:focus:before, a.home:active:before': {borderRightColor: '#5a5a5a'}
     };
     return modules.html.markup([
       {'!doctype': {html: null}},
@@ -168,6 +170,7 @@ function(modules) {
         if (state != actual)
           return response.generic(303, {Location: request.path+(actual && '?'+actual)});
         response.end(template([
+          {a: {href: '/', class: 'home', children: [{svg: [{use: {'xlink:href': '#icon-database'}}]}, name]}},
           {pre: {id: 'value', children: JSON.stringify(data, null, 2)}},
           {script: {src: '/static/simpl.js'}},
           {script: {src: '/static/modules/html.js'}},
