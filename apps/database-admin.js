@@ -104,7 +104,10 @@ function(modules) {
             {input: {type: 'hidden', name: 'token', value: csrf}},
             {button: {type: 'submit', name: 'action', value: 'add', children: 'Add'}}
           ]}}
-        ]), 'html');
+        ]), {
+          'Content-Type': 'text/html',
+          'X-CSRF-Token': csrf
+        });
       });
     }
     var name = request.path.match(/^\/([^/]*)/)[1],
@@ -146,7 +149,7 @@ function(modules) {
                 response.end(error ? '403 '+error : '200 Success', null, error ? 403 : 200);
               });
             });
-          }, 'json');
+          }, request.headers['Content-Type'] == 'application/json' ? 'json' : 'utf8', 51200);
         case 'DELETE':
           if (request.headers.Authorization != csrf)
             return request.generic(403);
