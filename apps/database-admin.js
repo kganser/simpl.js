@@ -41,7 +41,7 @@ function(modules) {
       'a:hover svg, a:focus svg, a:active svg': {fill: '#5a5a5a'},
       'a.home:hover:before, a.home:focus:before, a.home:active:before': {borderRightColor: '#5a5a5a'}
     };
-    return modules.html.markup([
+    return html.markup([
       {'!doctype': {html: null}},
       {head: [
         {title: (db ? db+' - ' : '')+'Database Admin'},
@@ -63,15 +63,20 @@ function(modules) {
     ]);
   };
   var dbs = function(callback, name, error) {
-    modules.database.list(function(names) {
+    database.list(function(names) {
       if (!name) return callback(Array.prototype.slice.call(names));
-      callback(names.contains(name) ? modules.database.open(name, undefined, undefined, error) : null);
+      callback(names.contains(name) ? database.open(name, undefined, undefined, error) : null);
     });
   };
-  var csrf = modules.string.base64FromBuffer(crypto.getRandomValues(new Uint8Array(24)), true),
+  var database = modules.database || modules['database@simpljs'],
+      html = modules.html || modules['html@simpljs'],
+      http = modules.http || modules['http@simpljs'],
+      string = modules.string || modules['string@simpljs'],
+      xhr = modules.xhr || modules['xhr@simpljs'],
+      csrf = string.base64FromBuffer(crypto.getRandomValues(new Uint8Array(24)), true),
       s = stringify, p = parse;
   
-  modules.http.serve({port: config.port}, function(request, response) {
+  http.serve({port: config.port}, function(request, response) {
     if (request.path == '/') {
       if (request.method == 'POST')
         return request.slurp(function(body) {
@@ -82,9 +87,9 @@ function(modules) {
           if (body.token != csrf)
             return response.generic(403);
           if (body.action == 'delete' && body.name)
-            return modules.database.delete(body.name, done);
+            return database.delete(body.name, done);
           if (body.action == 'add' && body.name)
-            return (db = modules.database.open(body.name)).put('', {}).then(done);
+            return (db = database.open(body.name)).put('', {}).then(done);
           done();
         }, 'url');
       return dbs(function(dbs) {
@@ -114,7 +119,7 @@ function(modules) {
         path = request.path.substr(name.length+2),
         json = request.headers.Accept == 'application/json' || request.query.format == 'json';
     if (!json && (path || name == 'favicon.ico'))
-      return modules.xhr(location.origin+'/'+path, {responseType: 'arraybuffer'}, function(e) {
+      return xhr(location.origin+'/'+path, {responseType: 'arraybuffer'}, function(e) {
         if (e.target.status != 200) return response.generic(404);
         response.end(e.target.response, (path.match(/\.([^.]*)$/) || [])[1]);
       });

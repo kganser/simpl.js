@@ -1,10 +1,15 @@
 function(modules) {
   
-  var db = modules.database.open('simple-login', {sessions: {}, users: {}}),
-      encode = modules.string.base64FromBuffer,
-      decode = modules.string.base64ToBuffer,
-      utf8 = modules.string.toUTF8Buffer,
-      mac = modules.crypto.hmac(utf8(config.sessionKey));
+  var modcrypto = modules.crypto || modules['crypto@simpljs'],
+      database = modules.database || modules['database@simpljs'],
+      html = modules.html || modules['html@simpljs'],
+      http = modules.http || modules['http@simpljs'],
+      string = modules.string || modules['string@simpljs'],
+      db = database.open('simple-login', {sessions: {}, users: {}}),
+      encode = string.base64FromBuffer,
+      decode = string.base64ToBuffer,
+      utf8 = string.toUTF8Buffer,
+      mac = modcrypto.hmac(utf8(config.sessionKey));
   
   var token = function() {
     var rand = crypto.getRandomValues(new Uint8Array(24));
@@ -17,12 +22,12 @@ function(modules) {
     } catch (e) {}
   };
   var pbkdf2 = function(password, salt) {
-    return encode(modules.crypto.pbkdf2(utf8(password), salt));
+    return encode(modcrypto.pbkdf2(utf8(password), salt));
   };
   
-  modules.http.serve({port: config.port}, function(request, response) {
+  http.serve({port: config.port}, function(request, response) {
     var render = function(body, status) {
-      response.end(modules.html.markup([
+      response.end(html.markup([
         {'!doctype': {html: null}},
         {html: [
           {head: [{title: 'Simple Login'}]},

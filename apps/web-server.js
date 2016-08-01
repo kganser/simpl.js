@@ -1,8 +1,9 @@
 function(modules) {
 
-  var hits = 0;
+  var http = modules.http || modules['http@simpljs'],
+      hits = 0;
   
-  modules.http.serve({port: config.port}, function(request, response) {
+  http.serve({port: config.port}, function(request, response) {
   
     if (request.path == '/')
       return response.end('<h1>My First Web App</h1>'+(++hits)+' hits', 'html');
