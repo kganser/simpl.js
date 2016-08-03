@@ -242,6 +242,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           var uri = request.path.substr(1),
               parts = uri.split('/'),
               app = parts[0] == 'apps',
+              name = decodeURIComponent(parts[1]),
               method = request.method;
           
           if (parts.length > 2) parts[2]--;
@@ -286,7 +287,10 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                   : this.append(path+'/published', record.published[0])
                 ).then(callback);
               });
-            }, response.ok, method);
+            }, function(data, session) {
+              if (app) delete logs[stop(session && session.username || '', name, parts[3]+1)];
+              response.ok();
+            }, method);
           } else if (parts.length == 4) {
             if (method == 'GET')
               return forward(uri, function(callback) {
@@ -311,7 +315,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             return forward(uri, function(callback) {
               db.delete(uri).then(callback);
             }, function(data, session) {
-              if (app) delete logs[stop(session && session.username || '', decodeURIComponent(parts[1]), 1)];
+              if (app) delete logs[stop(session && session.username || '', name, 1)];
               response.ok();
             }, method);
           } else if (parts[4] == 'config' && method == 'PUT') {
