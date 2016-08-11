@@ -64,8 +64,8 @@ function(modules) {
   };
   var dbs = function(callback, name, error) {
     database.list(function(names) {
-      if (!name) return callback(Array.prototype.slice.call(names));
-      callback(names.contains(name) ? database.open(name, undefined, undefined, error) : null);
+      if (!name) return callback(names);
+      callback(~names.indexOf(name) ? database.open(name, undefined, undefined, error) : null);
     });
   };
   var database = modules.database || modules['database@simpljs'],

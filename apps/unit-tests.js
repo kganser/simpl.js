@@ -105,9 +105,8 @@ function(modules) {
         'crypto pbkdf2');
       
       modules.database.list(function(dbs) {
-        assert(typeof dbs == 'object' && dbs.toString() == '[object DOMStringList]',
-          'database list: '+Array.prototype.slice.call(dbs).join(', '));
-        if (!dbs.contains('unit-tests')) return next();
+        assert(Array.isArray(dbs), 'database list: '+dbs.join(', '));
+        if (!~dbs.indexOf('unit-tests')) return next();
         modules.database.delete('unit-tests', function(error, blocked) {
           if (!blocked && !error) next();
         });

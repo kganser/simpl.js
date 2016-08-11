@@ -55,7 +55,7 @@ simpl.add('database', function() {
     /** database: {
           open: function(database:string, upgrade=`{}`:json|function(UpgradeTransaction), version=1:number, onError=undefined:function(error:DOMError, blocked:boolean)) -> Database,
           delete: function(database:string, callback:function(error:undefined|DOMError, blocked:boolean)),
-          list: function(callback:function(DOMStringList))
+          list: function(callback:function(array))
         }
         
         Database is backed by `indexedDB`. An upgrade transaction runs on `open` if the database version is less than
