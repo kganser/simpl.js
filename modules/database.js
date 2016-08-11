@@ -549,7 +549,7 @@ simpl.add('database', function() {
     },
     list: function(callback) {
       indexedDB.webkitGetDatabaseNames().onsuccess = function(e) {
-        callback(e.target.result);
+        callback(Array.prototype.slice.call(e.target.result));
       };
     }
   };
