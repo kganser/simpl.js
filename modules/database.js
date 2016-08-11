@@ -155,16 +155,16 @@ simpl.add('database', function() {
           insert: function(store, path, callback, value, next) {
             var parentPath = path.slice(0, -1),
                 key = path[path.length-1],
-                i = 0, last;
+                last = key,
+                i = 1;
             if (typeof key != 'number')
               return callback('Resource is not an array item');
             if (next == null) {
-              store.openCursor(scopedRange(parentPath, key)).onsuccess = function(e) {
+              store.openCursor(scopedRange(parentPath, key+1)).onsuccess = function(e) {
                 var cursor = e.target.result;
-                if (cursor) last = cursor.value.key;
-                if (!cursor && last != null || last > key+i++) {
+                if (!cursor || (last = cursor.value.key) > key+i++) {
                   // shift subsequent keys by one
-                  store.openCursor(scopedRange(parentPath, key, last, false, !!cursor), 'prev').onsuccess = function(e) {
+                  store.openCursor(scopedRange(parentPath, key, last), 'prev').onsuccess = function(e) {
                     cursor = e.target.result;
                     if (!cursor) return put(store, path, value, callback);
                     var result = cursor.value,
@@ -195,7 +195,7 @@ simpl.add('database', function() {
                       };
                     }(parentPath.concat([key]), parentPath.concat([key+1]), type));
                   };
-                } else if (cursor) {
+                } else {
                   cursor.continue();
                 }
               };
