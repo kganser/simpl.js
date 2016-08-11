@@ -162,7 +162,7 @@ simpl.add('database', function() {
             if (next == null) {
               store.openCursor(scopedRange(parentPath, key+1)).onsuccess = function(e) {
                 var cursor = e.target.result;
-                if (!cursor || (last = cursor.value.key) > key+i++) {
+                if (!cursor || cursor.value.key > key+i) {
                   // shift subsequent keys by one
                   store.openCursor(scopedRange(parentPath, key, last), 'prev').onsuccess = function(e) {
                     cursor = e.target.result;
@@ -196,6 +196,7 @@ simpl.add('database', function() {
                     }(parentPath.concat([key]), parentPath.concat([key+1]), type));
                   };
                 } else {
+                  last = key+i++;
                   cursor.continue();
                 }
               };
