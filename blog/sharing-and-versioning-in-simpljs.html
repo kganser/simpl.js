@@ -15,9 +15,14 @@ scripts: [prettify.js]
 <pre class="prettyprint">
 var bytes = modules['string@simpljs'].toUTF8Buffer('Hello World');
 </pre>
+<p>When using your own modules as dependencies, the namespace will not be present. As long as your module name is a valid javascript identifier, you'll be able to access it with dot instead of bracket notation:</p>
+<pre class="prettyprint">
+var bytes = modules.mystring.toUTF8Buffer('Hello World');
+</pre>
+<p></p>
 <h3>Versioning</h3>
 <p>Simpl.js enforces a simple major-minor versioning scheme. Major versions of an app or module can be developed simultaneously, with minor versions of each representing backward-compatible enhancements.</p>
 <p>Linked apps and modules from other users are pegged at their major version number, but are automatically upgraded to their latest minor version. This gives the author of the app or module the ability to push changes to any user who has installed it, and the responsibility to ensure that it remains backward-compatible.</p>
 <p>If you want to prevent minor version upgrades from the author, or if you want to make changes to the code yourself, you must <em>fork</em> the app or module. Simply make a change to it in the code editor, save, and you will be prompted to save the entry as your own app or module.</p>
 <p class="images"><img src="/img/version-fork.png" alt="version forking"></p>
-<p>You won't need the <code>@<em>username</em></code> namespace to access your new module from any of your own apps or modules. After forking a module, remember also to update any existing dependencies to point to your new code.</p>
+<p>You won't need the <code>@<em>username</em></code> namespace to access your new module from any of your own apps or modules. After forking an app or module, remember also to update the dependency names in its code as appropriate, either removing or adding namespaces to account for the new scope of ownership.</p>
