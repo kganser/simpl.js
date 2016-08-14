@@ -194,17 +194,23 @@ function(modules) {
           {script: {src: '/static/jsonv.js'}},
           {script: function(stringify, p_, token) {
             if (!stringify) return [s, p, csrf];
-            var parse = function() {
-              return p_(location.search.substr(1));
+            var parse = function(padded) {
+              var map = p_(location.search.substr(1));
+              return padded ? function pad(map) {
+                return Object.keys(map).reduce(function(o, key) {
+                  o[key] = {open: true, children: pad(map[key])};
+                  return o;
+                }, {});
+              }(map) : map;
             };
-            var entry = function(map, path) {
-              for (var entry = map, i = 0; entry && i < path.length; i++)
-                entry = entry[path[i]];
+            var entry = function(map, path, padded) {
+              for (var entry = padded ? {open: true, children: map} : map, i = 0; entry && i < path.length; i++)
+                entry = padded ? entry.children[path[i]] : entry[path[i]];
               return entry;
             };
-            var ui, open = parse(), loaded = parse();
+            var ui, loaded = parse(), open = parse(true);
             window.onpopstate = function() {
-              open = parse();
+              open = parse(true);
               if (ui) ui.update();
             };
             simpl.use({jsonv: 0}, function(modules) {
@@ -212,21 +218,21 @@ function(modules) {
                 listener: function(method, path, data, callback) {
                   var parent = path.slice(0, -1),
                       key = path[path.length-1],
-                      openParent = entry(open, parent),
+                      openParent = entry(open, parent, true).children,
                       loadedParent = entry(loaded, parent);
                   if (method == 'expand' || method == 'collapse') {
                     if (key == null) return;
                     if (method == 'expand') {
-                      openParent[key] = {};
+                      if (openParent[key]) openParent[key].open = true;
+                      else openParent[key] = {open: true, children: {}};
                       if (method = loadedParent && !loadedParent[key] && 'get')
                         loadedParent[key] = {};
                     } else {
-                      // TODO: preserve expansion state of substructure?
-                      delete openParent[key];
+                      openParent[key].open = false;
                       method = null;
                     }
                   } else {
-                    [openParent, loadedParent].forEach(function(parent) {
+                    [loadedParent, openParent].forEach(function(parent, open) {
                       var keys = typeof key == 'number' && Object.keys(parent).map(function(k) { return +k; }).sort();
                       if (method == 'delete') {
                         if (keys) {
@@ -245,16 +251,22 @@ function(modules) {
                           delete parent[k];
                         });
                         delete parent[key];
-                        (function expand(o, parent, key) {
+                        (function expand(o) {
                           if (!o || typeof o != 'object') return;
-                          var p = parent[key] = {};
+                          var p = parent[key] = open ? {open: true, children: {}} : {};
+                          if (open) p = p.children;
                           if (Array.isArray(o)) o.forEach(function(data, i) { expand(data, p, i); });
                           else Object.keys(o).forEach(function(k) { expand(o[k], p, k); });
                         }(data, parent, key));
                       }
                     });
                   }
-                  var state = stringify(open);
+                  var state = stringify(function prune(map) {
+                    return Object.keys(map).reduce(function(o, key) {
+                      if (map[key].open) o[key] = prune(map[key].children);
+                      return o;
+                    }, {});
+                  }(open));
                   if (state != location.search) history.pushState(null, '', location.pathname+(state && '?'+state));
                   if (!method) return;
                   var request = new XMLHttpRequest();
@@ -272,7 +284,7 @@ function(modules) {
                   return true;
                 },
                 collapsed: function(path) {
-                  return !entry(open, path);
+                  return !(entry(open, path, true) || {}).open;
                 }
               });
             });
