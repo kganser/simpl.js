@@ -251,7 +251,7 @@ function(modules) {
                           delete parent[k];
                         });
                         delete parent[key];
-                        (function expand(o) {
+                        (function expand(o, parent, key) {
                           if (!o || typeof o != 'object') return;
                           var p = parent[key] = open ? {open: true, children: {}} : {};
                           if (open) p = p.children;
