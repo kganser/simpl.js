@@ -2,6 +2,11 @@
   float: right;
   padding: 3px 0;
 }
+#price {
+  font-size: 16px;
+  margin: 10px 0;
+  text-align: center;
+}
 .disclosure {
   font-size: 11px;
   line-height: 14px;
