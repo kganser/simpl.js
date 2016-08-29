@@ -21,6 +21,11 @@
   width: 20px;
   color: #666;
 }
+#page-search aside {
+  width: 170px;
+  float: left;
+  margin: 0 0 60px -200px;
+}
 #search {
   width: 100%;
   box-sizing: border-box;

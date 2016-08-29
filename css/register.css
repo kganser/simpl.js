@@ -1,3 +1,35 @@
+#page-register main {
+  overflow: hidden;
+}
+#page-register form {
+  margin-right: 40px;
+}
+#page-register aside {
+  display: inline-block;
+  width: 100%;
+  max-width: 400px;
+}
+#page-register aside div {
+  background-size: 120%;
+  background-position: 10px 10px;
+  background-repeat: no-repeat;
+  box-shadow: inset 0 0 10px rgba(0,0,0,.3);
+  height: 130px;
+}
+aside #profile {
+  background-image: url(/img/profile.png);
+}
+aside #gallery {
+  background-image: url(/img/gallery.png);
+}
+aside #servers {
+  background-image: url(/img/servers.png);
+  background-position: -30px 10px;
+}
+#page-register aside p {
+  font: 500 17px "Segoe UI", ArialMT, sans-serif;
+  margin: 5px 0 30px;
+}
 .compare {
   float: right;
   padding: 3px 0;

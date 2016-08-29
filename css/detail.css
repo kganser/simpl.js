@@ -2,6 +2,11 @@
   padding-left: 210px;
   max-width: 700px;
 }
+#page-detail aside {
+  width: 170px;
+  float: left;
+  margin: 0 0 60px -200px;
+}
 #page-detail section {
   display: inline-block;
   width: 100%;

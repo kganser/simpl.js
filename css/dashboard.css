@@ -2,6 +2,11 @@
   padding-left: 210px;
   max-width: 700px;
 }
+#page-dashboard aside {
+  width: 170px;
+  float: left;
+  margin: 0 0 60px -200px;
+}
 #page-dashboard form {
   display: block;
   background: transparent;

@@ -284,11 +284,6 @@ footer:after {
   margin-right: 5px;
   width: 2em;
 }
-aside {
-  width: 170px;
-  float: left;
-  margin: 0 0 60px -200px;
-}
 pre {
   margin: 1em 0;
   padding: 4px 7px;
