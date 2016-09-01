@@ -84,6 +84,9 @@
     margin: 0 0 2px 0;
   }
   #page-search aside {
+    width: auto;
+    float: none;
+    margin: 0;
     padding-bottom: 5px;
     background: #f7f7f7;
     text-align: center;

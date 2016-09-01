@@ -72,4 +72,14 @@ button.large svg {
   #page-detail main {
     padding-left: 10px;
   }
+  #page-detail aside {
+    float: none;
+    width: auto;
+    margin: 0;
+  }
+  #page-detail aside a.button.large {
+    display: inline-block;
+    margin: 0 10px 10px 0;
+    min-width: 95px;
+  }
 }
