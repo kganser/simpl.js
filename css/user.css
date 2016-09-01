@@ -3,6 +3,7 @@
   max-width: 670px;
 }
 #page-user aside {
+  float: left;
   width: 200px;
   margin-left: -230px;
   font-size: 14px;
