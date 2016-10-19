@@ -1,0 +1,28 @@
+---
+id: blog
+title: Writing Modular Web Apps
+description: Virtual hosting is a simple concept, and it lends itself well to the the Simpl.js app/module structure.
+styles: [common.css, blog.css, prettify.css]
+scripts: [prettify.js]
+---
+<h1>Blog</h1>
+<h2>Writing Modular Web Apps</h2>
+<div class="byline">posted October 19, 2016, by <a class="user" href="/users/kganser" style="background-image: url(https://www.gravatar.com/avatar/096ba86215860c96910a66b5b930bcba?s=32)">Klaus</a></div>
+<p>If you want to write a web app that is easy to share with others, consider writing it as a module instead of as an app. This way, users who want to run a web server on one port with multiple apps can run your web app within a virtual host:</p>
+<pre class="prettyprint">
+var vendorApp = modules.vendor(config.vendor),
+    mainApp = modules.main(config.main);
+
+modules.http.serve({port: config.port}, function() {
+  var args = [].slice.call(arguments);
+  switch (request.headers.Host) {
+    case 'vendor.app.com':
+      return vendorApp.apply(null, args);
+    default:
+      return mainApp.apply(null, args);
+  }
+});
+</pre>
+<p>The app shown above is a basic virtual host implementation, which is the most common way of running a multi-tenant server. It simply routes requests to a web app based on the HTTP <code>Host</code> header.</p>
+<p>Since a web app module is not responsible for starting the web server itself, it no longer needs a port number config setting or even a dependency on <code>http</code>. Other config settings should be provided by the host app on initialization, as shown above. This keeps all config settings in the host app, and encourages sensible defaults when writing your web app module. Be sure to read the post on <a href="/blog/tips-for-app-configuration">tips for app configuration</a>, which apply equally to config options for initializing a module.</p>
+<p>Virtual hosting is a simple concept, and it lends itself well to the the Simpl.js app/module structure. It also saves you the trouble of learning the custom config languages that come with standard web servers like Apache and NGINX.</p>
