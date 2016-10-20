@@ -24,6 +24,18 @@ modules.http.serve({port: config.port}, function() {
   }
 });
 </pre>
-<p>The app shown above is a basic virtual host implementation, which is the most common way of running a multi-tenant server. It simply routes requests to a web app based on the HTTP <code>Host</code> header.</p>
+<p>The app shown above is a basic virtual host implementation, which is the most common way of running a multi-tenant web server. It simply routes requests to a web app based on the HTTP <code>Host</code> header. The web app module (<code>modules.vendor</code> or <code>modules.main</code> above) would then look something like this:</p>
+<pre class="prettyprint">
+function(config) {
+  return function(request, response) {
+    switch (request.path) {
+      case '/':
+        return response.end('Hello World');
+      default:
+        return response.generic(404);
+    }
+  };
+};
+</pre>
 <p>Since a web app module is not responsible for starting the web server itself, it no longer needs a port number config setting or even a dependency on <code>http</code>. Other config settings should be provided by the host app on initialization, as shown above. This keeps all config settings in the host app, and encourages sensible defaults when writing your web app module. Be sure to read the post on <a href="/blog/tips-for-app-configuration">tips for app configuration</a>, which apply equally to config options for initializing a module.</p>
-<p>Virtual hosting is a simple concept, and it lends itself well to the Simpl.js app/module structure. It also saves you the trouble of learning the custom config languages that come with standard web servers like Apache and NGINX.</p>
+<p>Virtual hosting is a simple concept, and it lends itself well to the Simpl.js app/module structure. Using Simpl.js to implement virtual hosting also saves you the trouble of learning the custom config languages that come with standard web servers like Apache and NGINX.</p>
