@@ -4,6 +4,10 @@ var bg = chrome.runtime.connect(),
     port = document.getElementById('port'),
     info = document.getElementById('info');
 port.focus();
+link.onclick = function(e) {
+  e.preventDefault();
+  chrome.browser.openTab({url: this.getAttribute('href')});
+};
 bg.onMessage.addListener(function(message) {
   var started = message.action == 'start';
   if (!message.error) {
