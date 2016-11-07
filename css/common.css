@@ -332,11 +332,6 @@ a.user.large {
   padding: 5px 10px;
   border: solid 1px #ddd;
 }
-#preview {
-  display: none;
-  width: 240px;
-  height: 100px;
-  background-color: #ececec;
-  background-size: cover;
-  background-position: center;
+.imgupload .preview {
+  margin-bottom: 5px;
 }
