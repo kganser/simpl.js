@@ -283,7 +283,7 @@ function(modules) {
                 assert(i++ == 10 && e.target.status == 413,
                   'http request body too large error');
                 modules.xhr(host+'/first', {headers: {'X-Large-Header': large}}, function(e) {
-                  assert(i++ < 13 && e.target.status == 413,
+                  assert(i++ < 13 && e.target.status == 431,
                     'http request header too large error');
                   if (i == 13) next(server);
                 });

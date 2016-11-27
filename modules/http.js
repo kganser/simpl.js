@@ -90,8 +90,8 @@ simpl.add('http', function(modules) {
         maxHeaderSize=8192: number
       }
 
-      If a request's header exceeds `maxHeaderSize` bytes, the server responds with a generic `413 Request Entity Too
-      Large` and disconnects the client socket. */
+      If a request's header exceeds `maxHeaderSize` bytes, the server responds with a generic `431 Request Header Fields
+      Too Large` and disconnects the client socket. */
   
   /** RequestCallback: function(request:Request, response:Response) -> function(data:ArrayBuffer, remaining:number)|null
       
@@ -100,7 +100,7 @@ simpl.add('http', function(modules) {
       to generate this function. */
   
   /** Request: {
-        slurp: function(callback:function(body:ArrayBuffer|string|object|json), format=null:string, maxSize=4096:number) -> function(data:ArrayBuffer, remaining:number),
+        slurp: function(callback:function(body:ArrayBuffer|string|object|json), format=null:string, maxSize=8192:number) -> function(data:ArrayBuffer, remaining:number),
         protocol: string,
         method: string,
         uri: string,
@@ -168,7 +168,7 @@ simpl.add('http', function(modules) {
             headers: {},
             cookie: {},
             slurp: function(callback, format, maxSize) {
-              return slurp(callback, format, maxSize || 4096, function() { response.generic(413); });
+              return slurp(callback, format, maxSize || 8192, function() { response.generic(413); });
             }
           };
           headers.forEach(function(line) {
@@ -201,7 +201,7 @@ simpl.add('http', function(modules) {
               headers += latin1decode(buffer);
               var split = headers.indexOf('\r\n\r\n', offset-3);
               if (split == -1 && headers.length-3 > maxHeaderSize || split > maxHeaderSize)
-                return socket.send(message(413, null, self.statusMessage(413), false, false, true), socket.disconnect);
+                return socket.send(message(431, null, self.statusMessage(431), false, false, true), socket.disconnect);
               if (split > -1) {
                 request = dispatch(headers.substr(0, split).split('\r\n'));
                 remaining = request.length;
@@ -257,6 +257,7 @@ simpl.add('http', function(modules) {
         415: 'Unsupported Media Type',
         416: 'Requested Range Not Satisfiable',
         417: 'Expectation Failed',
+        431: 'Request Header Fields Too Large',
         500: 'Internal Server Error',
         501: 'Not Implemented',
         502: 'Bad Gateway',
