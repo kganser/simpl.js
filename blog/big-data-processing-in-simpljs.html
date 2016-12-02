@@ -1,0 +1,98 @@
+---
+id: blog
+title: Big Data Processing in Simpl.js
+description: Simpl.js can be used to process large data sets that don't fit into memory, but doing so requires stream processing features and techniques.
+styles: [common.css, blog.css, prettify.css]
+scripts: [prettify.js]
+---
+<h1>Blog</h1>
+<h2>Big Data Processing in Simpl.js</h2>
+<div class="byline">posted November 28, 2016, by <a class="user" href="/users/kganser" style="background-image: url(https://www.gravatar.com/avatar/096ba86215860c96910a66b5b930bcba?s=32)">Klaus</a></div>
+<p>Simpl.js can be used to process large data sets that don't fit into memory, but doing so requires stream processing features and techniques described here.</p>
+<h3>Online Data Sources</h3>
+<p>HTTP is itself a streaming protocol. When <a href="https://en.wikipedia.org/wiki/Chunked_transfer_encoding">chunked transfer encoding</a> is used, HTTP does not require <code>Content-Length</code> to be known or specified in an exchange header. In addition, the HTTP <code>Range</code> header supported by many web servers allows media to be downloaded piecemeal, and thus facilitates the parallel processing of data formats that otherwise allow it.<p>
+<p>Importantly, the new <code><a href="https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API">fetch</a></code> API standard in browsers allows streaming HTTP data to be read and processed as such in javascript, meaning that an entire response will not be buffered in memory. Below is some sample code that uses the <code>fetch</code> response's reader stream to parse a raw byte stream into JSON. This large file contains <a href="https://en.wikipedia.org/wiki/GeoJSON">geojson</a> data of zip code regions in the United States.</p>
+<pre class="prettyprint">
+var parser = jsonstream(function(feature) {
+  // TODO: process feature object
+}, {parentPath: 'features'});
+
+fetch('https://raw.githubusercontent.com/jgoodall/us-maps/master/geojson/zcta5.json').then(function(response) {
+  if (!response.ok) return console.error(response.statusText);
+  
+  var reader = response.body.getReader();
+  
+  reader.read().then(function process(part) {
+    if (part.done) return console.log('done');
+    parser.write(part.value.buffer);
+    reader.read().then(process);
+  });
+});
+</pre>
+<p>Notice that <code>reader.read()</code> and <code>process</code> are called repeatedly, and the resulting <code>ArrayBuffer</code> pieces are fed into <a href="/modules/kganser/jsonstream">jsonstream</a>, a streaming JSON parser, which is configured to emit each child of the JSON document's <code>features</code> key in turn. This is a complete streaming pipeline for processing large JSON documents in Simpl.js and in the browser.</p>
+<h3>Large File Uploads</h3>
+<p>To process data from a large file in a filesystem, Simpl.js supports the same streaming functionality through a web-based form file upload.</p>
+<p>A modern, javascript-enabled client can send a <code><a href="https://developer.mozilla.org/en-US/docs/Web/API/File">File</a></code> as the body of an <code>XMLHttpRequest</code>, making it unnecessary to parse a multipart request body.</p>
+<pre class="prettyprint">
+&lt;form method="post" action="/upload">
+  &lt;input type="file" name="file">
+  &lt;button>Upload&lt;/button>
+&lt;/form>
+&lt;script>
+  document.forms[0].onsubmit = function(e) {
+    e.preventDefault();
+    
+    var file = this.file.files[0];
+    if (!file) return;
+    
+    // Use request.upload.onprogress for better UX with large files
+    var request = new XMLHttpRequest();
+    request.open('POST', '/upload');
+    request.send(file);
+  };
+&lt;/script>
+</pre>
+<p>The back-end could then simply forward its bytes to a stream parser as before:</p>
+<pre class="prettyprint">
+if (request.path == '/upload')
+  return function(data, remaining) {
+    if (remaining) {
+      parser.write(data);
+    } else {
+      parser.close();
+      response.ok();
+    }
+  };
+</pre>
+<p>To accept uploads without client-side javascript, use a streaming <code>multipart/form-data</code> parser like <a href="/modules/kganser/formdata">formdata</a>:
+<pre class="prettyprint">
+&lt;form method="post" action="/upload" enctype="multipart/form-data">
+  &lt;input type="file" name="file">
+  &lt;button>Upload&lt;/button>
+&lt;/form>
+</pre>
+<pre class="prettyprint">
+if (request.path == '/upload')
+  return formdata(request, function(data, headers, name) {
+    if (name == 'file')
+      parser.write(data);
+  }, function(error) {
+    parser.close();
+    response.generic(error || 200);
+  });
+</pre>
+<h3>Throttling Input Streams</h3>
+<p>When performing slow or asynchronous work on large file streams, it is necessary to throttle incoming data by repeatedly pausing and unpausing the connection socket. This prevents new incoming data from exhausting available memory and system resources while previous data is being processed. Below is an example of a JSON stream parser configured to load values into a database while using a counter to effectively throttle incoming traffic.</p>
+<pre class="prettyprint">
+var counter = 0;
+
+var parser = jsonstream(function(value, key) {
+  if (!counter++)
+    response.socket.setPaused(true);
+  db.put(key, value).then(function() {
+    if (!--counter)
+      response.socket.setPaused(false);
+  });
+}, {parentPath: 'features'});
+</pre>
+<p>A similar effect can be achieved when streaming input from a call to <code>fetch</code>: simply use a counter to issue subsequent calls to <code>reader.read()</code>.</p>
