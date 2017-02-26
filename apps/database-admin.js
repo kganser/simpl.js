@@ -30,8 +30,8 @@ function(modules) {
     var css = {
       body: {font: '13px sans-serif', webkitTextSizeAdjust: 'none'},
       svg: {width: '1.2em', height: '1.2em', margin: '0 .5em', verticalAlign: 'bottom', fill: '#aaa'},
-      input: {outline: 'none', border: 'solid 1px #ececec', height: '23px', padding: '0 5px'},
-      button: {outline: 'none', border: 'none', background: '#3c3', color: 'white', cursor: 'pointer', padding: '0 8px', height: '25px'},
+      'form input': {outline: 'none', border: 'solid 1px #ececec', height: '23px', padding: '0 5px'},
+      'form button': {outline: 'none', border: 'none', background: '#3c3', color: 'white', cursor: 'pointer', padding: '0 8px', height: '25px'},
       'button.delete': {background: 'transparent', color: '#aaa', padding: '0 5px', height: '17px'},
       'button.delete:hover': {background: '#c5201c', color: 'white'},
       '#icons': {display: 'none'},
@@ -73,8 +73,7 @@ function(modules) {
       http = modules.http || modules['http@simpljs'],
       string = modules.string || modules['string@simpljs'],
       xhr = modules.xhr || modules['xhr@simpljs'],
-      csrf = string.base64FromBuffer(crypto.getRandomValues(new Uint8Array(24)), true),
-      s = stringify, p = parse;
+      csrf = string.base64FromBuffer(crypto.getRandomValues(new Uint8Array(24)), true);
   
   http.serve({port: config.port}, function(request, response) {
     if (request.path == '/') {
@@ -135,10 +134,25 @@ function(modules) {
       switch (request.method) {
         case 'GET':
           return open(function(db) {
-            db.get(path, false, 'immediates').then(function(object) {
+            var i = 0, after = request.query.after;
+            db.get(path, false, function(path, array) {
+              if (path.length) return false;
+              if (array) {
+                after = Math.max(parseInt(after, 10), -1);
+                if (isNaN(after) || after < 0) after = null;
+              }
+              var action = function() {
+                if (i++ == 100) return 'stop';
+              };
+              return after == null ? action : { // null bound possible?
+                lowerBound: after,
+                lowerExclusive: true,
+                action: action
+              };
+            }).then(function(object) {
               db.close();
               if (object === undefined) response.generic(404);
-              response.end(JSON.stringify(object), 'json');
+              response.end(JSON.stringify({data: object, remaining: i > 100}), 'json');
             });
           });
         case 'PUT':
@@ -176,11 +190,18 @@ function(modules) {
     }
     open(function(db) {
       db.get('', false, function(path) {
-        var e = expanded, a = actual;
+        var e = expanded, a = actual, i = 0;
         return !path.some(function(segment) {
           if (!(e = e[segment += ''])) return true;
           a = a[segment] = a[segment] || {};
-        });
+        }) && {
+          action: function() {
+            if (i++ == 100) return 'stop';
+          },
+          value: function(key, value) {
+            return key == null ? {data: value, remaining: i > 100} : value;
+          }
+        };
       }).then(function(data) {
         db.close();
         actual = stringify(actual);
@@ -188,106 +209,91 @@ function(modules) {
           return response.generic(303, {Location: request.path+(actual && '?'+actual)});
         response.end(template([
           {a: {href: '/', class: 'home', children: [{svg: [{use: {'xlink:href': '#icon-database'}}]}, name]}},
-          {pre: {id: 'value', children: JSON.stringify(data, null, 2)}},
-          {script: {src: '/static/simpl.js'}},
-          {script: {src: '/static/modules/html.js'}},
+          {pre: {id: 'value'}},
           {script: {src: '/static/jsonv.js'}},
-          {script: function(stringify, p_, token) {
-            if (!stringify) return [s, p, csrf];
-            var parse = function(padded) {
-              var map = p_(location.search.substr(1));
-              return padded ? function pad(map) {
-                return Object.keys(map).reduce(function(o, key) {
-                  o[key] = {open: true, children: pad(map[key])};
-                  return o;
-                }, {});
-              }(map) : map;
+          {script: function(d, s, p, token) {
+            if (!s) return [data, stringify, parse, csrf];
+            var pad = function(o) {
+              return o && typeof o == 'object' ? o.data ? {
+                data: Array.isArray(o.data) ? o.data.map(pad)
+                  : Object.keys(o.data).reduce(function(a, b) { a[b] = pad(o.data[b]); return a; }, {}),
+                remaining: o.remaining
+              } : {data: o, remaining: true, collapsed: true} : o;
             };
-            var entry = function(map, path, padded) {
-              for (var entry = padded ? {open: true, children: map} : map, i = 0; entry && i < path.length; i++)
-                entry = padded ? entry.children[path[i]] : entry[path[i]];
+            var entry = function(path) {
+              for (var entry = d, i = 0; entry.data && i < path.length; i++)
+                entry = entry.data[path[i]];
               return entry;
             };
-            var ui, loaded = parse(), open = parse(true);
-            window.onpopstate = function() {
-              open = parse(true);
-              if (ui) ui.update();
-            };
-            simpl.use({jsonv: 0}, function(modules) {
-              ui = modules.jsonv(document.getElementById('value'), undefined, {
-                listener: function(method, path, data, callback) {
-                  var parent = path.slice(0, -1),
-                      key = path[path.length-1],
-                      openParent = entry(open, parent, true).children,
-                      loadedParent = entry(loaded, parent);
-                  if (method == 'expand' || method == 'collapse') {
-                    if (key == null) return;
-                    if (method == 'expand') {
-                      if (openParent[key]) openParent[key].open = true;
-                      else openParent[key] = {open: true, children: {}};
-                      if (method = loadedParent && !loadedParent[key] && 'get')
-                        loadedParent[key] = {};
-                    } else {
-                      openParent[key].open = false;
-                      method = null;
-                    }
-                  } else {
-                    [loadedParent, openParent].forEach(function(parent, open) {
-                      var keys = typeof key == 'number' && Object.keys(parent).map(function(k) { return +k; }).sort();
-                      if (method == 'delete') {
-                        if (keys) {
-                          keys.forEach(function(k) {
-                            if (k < key) return;
-                            if (k > key) parent[k-1] = parent[k];
-                            delete parent[k];
-                          });
-                        } else {
-                          delete parent[key];
-                        }
-                      } else {
-                        if (method == 'insert') keys.reverse().some(function(k) {
-                          if (k < key) return true;
-                          parent[k+1] = parent[k];
-                          delete parent[k];
-                        });
-                        delete parent[key];
-                        (function expand(o, parent, key) {
-                          if (!o || typeof o != 'object') return;
-                          var p = parent[key] = open ? {open: true, children: {}} : {};
-                          if (open) p = p.children;
-                          if (Array.isArray(o)) o.forEach(function(data, i) { expand(data, p, i); });
-                          else Object.keys(o).forEach(function(k) { expand(o[k], p, k); });
-                        }(data, parent, key));
-                      }
-                    });
-                  }
-                  var state = stringify(function prune(map) {
-                    return Object.keys(map).reduce(function(o, key) {
-                      if (map[key].open) o[key] = prune(map[key].children);
-                      return o;
-                    }, {});
-                  }(open));
-                  if (state != location.search) history.pushState(null, '', location.pathname+(state && '?'+state));
-                  if (!method) return;
-                  var request = new XMLHttpRequest();
-                  if (method == 'get') request.responseType = 'json';
-                  request.onload = request.onerror = function() {
-                    var error = request.status != 200;
-                    callback(error, request.response);
-                    if (error) delete loadedParent[key];
-                  };
-                  request.open(method, location.pathname+'/'+path.map(encodeURIComponent).join('/'));
-                  request.setRequestHeader('Accept', 'application/json');
-                  request.setRequestHeader('Content-Type', 'application/json');
-                  request.setRequestHeader('Authorization', token);
-                  request.send(method == 'get' ? undefined : JSON.stringify(data));
-                  return true;
-                },
-                collapsed: function(path) {
-                  return !(entry(open, path, true) || {}).open;
+            var editor = jsonv(document.getElementById('value'), d = pad(d), {
+              editor: true,
+              metadata: true,
+              listener: function(method, path, value, callback) {
+                var parent = entry(path.slice(0, -1)).data,
+                    key = path[path.length-1];
+                if (method == 'toggle') {
+                  if (key == null) return;
+                  var item = parent[key];
+                  method = !item.loaded;
+                  item.collapsed = !value;
+                  item.loaded = true;
+                } else if (method == 'delete') {
+                  if (typeof key == 'number') parent.splice(key, 1);
+                  else delete parent[key];
+                } else if (method == 'insert' || method == 'put') {
+                  value = function inflate(v) {
+                    return !v || typeof v != 'object' ? v : {data: Array.isArray(v) ? v.map(inflate)
+                      : Object.keys(v).reduce(function(a, b) { a[b] = inflate(v[b]); return a; }, {})};
+                  }(value);
+                  if (method == 'insert') parent.splice(key, 0, value);
+                  else parent[key] = value;
                 }
-              });
+                var state = s(function prune(data) {
+                  return Object.keys(data).reduce(function(o, key) {
+                    var v = data[key];
+                    if (v && typeof v == 'object' && !v.collapsed) o[key] = prune(v.data);
+                    return o;
+                  }, {});
+                }(d.data)).replace(/.+/, '?$&');
+                // TODO: replaceState for delete, insert on arrays
+                if (state != location.search) history.pushState(null, '', location.pathname+state);
+                if (typeof method == 'boolean') return method;
+                var request = new XMLHttpRequest();
+                if (method == 'get') request.responseType = 'json';
+                request.onload = request.onerror = function() {
+                  var error = request.status != 200;
+                  if (!error && method == 'get') {
+                    // TODO: check that item has not been deleted (in jsonv also?)
+                    var value = pad(request.response),
+                        data = value && value.data || {},
+                        item = key == null ? parent : parent[key].data;
+                    if (Array.isArray(data)) [].push.apply(item, data);
+                    else Object.keys(data).forEach(function(key) { item[key] = data[key]; });
+                  }
+                  if (callback) callback(error, value);
+                };
+                request.open(method, location.pathname+'/'+path.map(encodeURIComponent).join('/')+(method == 'get' && value != null ? '?after='+encodeURIComponent(value) : ''));
+                request.setRequestHeader('Accept', 'application/json');
+                request.setRequestHeader('Content-Type', 'application/json');
+                request.setRequestHeader('Authorization', token);
+                request.send(method == 'get' ? undefined : JSON.stringify(value));
+              }
             });
+            window.onpopstate = function() {
+              // assumes state changes using data currently in memory
+              editor.toggle([], true);
+              (function compare(path, a, b) {
+                Object.keys(a).forEach(function(key) {
+                  var state = a[key], next = b[key];
+                  if (!state || typeof state != 'object') return;
+                  if (state.collapsed != !next) {
+                    editor.toggle(path.concat([key]));
+                    state.collapsed = !next;
+                  }
+                  if (next) compare(path.concat([key]), state.data, next);
+                });
+              }([], d.data, p(location.search.substr(1))));
+            };
           }}
         ], name), 'html');
       });
