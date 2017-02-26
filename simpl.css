@@ -440,25 +440,37 @@ nav .selected button {
 #log .jsonv {
   display: inline-block;
   vertical-align: top;
-  padding: 0;
   color: black;
+}
+#log .jsonv-object.closed ul, #log .jsonv-array.closed ol {
+  display: inline;
+}
+#log .jsonv .closed li {
+  display: none;
 }
 #log .jsonv-object.closed li:first-child, #log .jsonv-array.closed li:first-child {
   display: inline;
   padding-left: 0;
 }
-#log .jsonv-object.closed .jsonv-object:before, #log .jsonv-object.closed .jsonv-array:before,
-#log .jsonv-array.closed .jsonv-object:before, #log .jsonv-array.closed .jsonv-array:before {
+#log .jsonv-object.closed .jsonv-object, #log .jsonv-object.closed .jsonv-array,
+#log .jsonv-array.closed .jsonv-object, #log .jsonv-array.closed .jsonv-array {
+  margin-left: 0;
+}
+#log .jsonv-object.closed .jsonv-object .jsonv-toggle, #log .jsonv-object.closed .jsonv-array .jsonv-toggle,
+#log .jsonv-array.closed .jsonv-object .jsonv-toggle, #log .jsonv-array.closed .jsonv-array .jsonv-toggle {
   display: none;
 }
-#log .jsonv .closed li:after {
-  content: ",…";
-}
-#log .jsonv-object.closed ul:after, #log .jsonv-array.closed ul:after {
+#log .jsonv-object:after {
   content: "}";
 }
-#log .jsonv-array.closed ol:after, #log .jsonv-object.closed ol:after {
+#log .jsonv-array:after {
   content: "]";
+}
+#log .jsonv-object.closed li:after, #log .jsonv-array.closed li:after {
+  content: ",…";
+}
+#log .jsonv-object.closed li:last-child:after, #log .jsonv-array.closed li:last-child:after {
+  content: none;
 }
 #log .location {
   float: right;
@@ -584,7 +596,7 @@ nav .selected button {
 #dependencies button:focus span, #dependencies input:focus + ul li:first-child button span {
   color: #def;
 }
-.jsonv {
+#config .jsonv {
   padding: 4px 10px;
 }
 .timeline {

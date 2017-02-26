@@ -93,7 +93,7 @@ simpl.add('app', function(o) {
           entry.tab.classList.add('selected');
           if ('code' in entry) {
             code.swapDoc(entry.doc);
-            config.update(entry.config || null);
+            config.put([], entry.config || null);
             dependencies(entry.dependencies);
             search.value = '';
             suggest();
@@ -689,22 +689,25 @@ simpl.add('app', function(o) {
           {section: {id: 'config', children: [
             {h2: 'Configuration'},
             {pre: function(e) {
-              config = o.jsonv(e, selected ? selected.entry.config : null, function(method, path, data) {
-                var current = selected,
-                    config = selected.entry.config;
-                path.forEach(function(key, i, path) {
-                  if (i < path.length-1) config = config[key];
-                  else if (method == 'put') config[key] = data;
-                  else if (method == 'insert') config.splice(key, 0, data);
-                  else if (typeof key == 'number') config.splice(key, 1);
-                  else delete config[key];
-                });
-                create(function() {
-                  request(url(current)+'/config', {method: 'PUT', json: config}, function(e) {
-                    if (e.target.status != 200)
-                      status('failure', 'Error updating configuration');
+              config = o.jsonv(e, selected ? selected.entry.config : null, {
+                editor: true,
+                listener: function(method, path, data) {
+                  var current = selected,
+                      config = selected.entry.config;
+                  path.forEach(function(key, i, path) {
+                    if (i < path.length-1) config = config[key];
+                    else if (method == 'put') config[key] = data;
+                    else if (method == 'insert') config.splice(key, 0, data);
+                    else if (typeof key == 'number') config.splice(key, 1);
+                    else delete config[key];
                   });
-                });
+                  create(function() {
+                    request(url(current)+'/config', {method: 'PUT', json: config}, function(e) {
+                      if (e.target.status != 200)
+                        status('failure', 'Error updating configuration');
+                    });
+                  });
+                }
               });
             }}
           ]}},
