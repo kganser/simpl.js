@@ -160,7 +160,7 @@
             var meta = options.metadata && value,
                 collapsed = meta && meta.collapsed;
             if (meta && typeof meta.data == 'object') {
-              var count = meta.remaining;
+              var count = meta.remaining || null;
               if (count) count = count === true ? 'more' : count+' more';
               value = meta.data;
             }
