@@ -171,17 +171,19 @@ function(modules) {
                 value: function(key, value) {
                   assert(i == 3 && key === 0 && value === 'elem'
                       || i == 4 && key === 2 && value === 2
-                      || i == 7 && key == 3 && compare(value, {object: {}}),
+                      || i == 7 && key == 3 && compare(value, {object: {}})
+                      || i == 8 && key === null && compare(value, ['elem', undefined, 3]),
                     'database cursor values '+(i++ > 4 ? i-5 : i-3));
                   if (i == 4) return value;
                   if (i == 5) return 3;
+                  if (i == 9) return {data: value};
                 }
               } : {
                 upperBound: 'string',
                 upperExclusive: true
               };
             }).then(function(result) {
-              assert(i == 8 && compare({array: ['elem', undefined, 3]}, result), 'database cursor result');
+              assert(i == 9 && compare({array: {data: ['elem', undefined, 3]}}, result), 'database cursor result');
               i = 1;
               this.get('array', {lowerBound: 1, upperBound: 2, action: function(key) {
                 assert(key == i, 'database cursor action key '+i++);
@@ -483,7 +485,7 @@ function(modules) {
       });
     },
     function() {
-      assert(passed == 96, 'tests complete ('+passed+'/96 in '+(Date.now()-start)+'ms)');
+      assert(passed == 97, 'tests complete ('+passed+'/97 in '+(Date.now()-start)+'ms)');
     }
   );
 }
