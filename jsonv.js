@@ -59,7 +59,7 @@
       displayed in the parent object/array at `path`, or null if empty. For `toggle`, `value` is true if expanded and
       false if collapsed. The event listener for all events except `toggle` can operate asynchronously by returning true
       and issuing `callback` later. As a special case, returning true on `toggle` expand events where the expanded
-      object has no entries currently loaded  */
+      object has no entries currently loaded. */
 
   /** Editor: {
         get: function(path),
@@ -138,7 +138,7 @@
           return {li: [
             {button: {className: 'jsonv-delete', children: '×', onclick: function() {
               var path = locate(model);
-              if (listener) listener('delete', path);
+              if (listener) listener('delete', path, undefined, function() {});
               self.delete(path.slice(-1));
             }}},
             keys && [{span: {className: 'jsonv-key', children: key}}, ': '],
@@ -291,8 +291,6 @@
           var value = values && values[path[0]];
           if (value) return value.toggle(path.slice(1), expand);
         };
-        // remove
-        self.update = function() {};
         
         return entry(data);
       };
