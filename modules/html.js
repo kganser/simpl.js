@@ -1,33 +1,5 @@
 simpl.add('html', function() {
-  var self, selfClosing = {
-    '!doctype': 1,
-    area: 1,
-    base: 1,
-    br: 1,
-    col: 1,
-    command: 1,
-    embed: 1,
-    hr: 1,
-    img: 1,
-    input: 1,
-    keygen: 1,
-    link: 1,
-    meta: 1,
-    param: 1,
-    source: 1,
-    track: 1,
-    wbr: 1
-  };
-  var attr = function(node, parent) {
-    Object.keys(node).forEach(function(k) {
-      if (k == 'children') return;
-      var n = node[k];
-      if (typeof parent[k] == 'undefined' || typeof n != 'object' || n == null)
-        return parent[k] = n;
-      attr(n, parent[k], true);
-    });
-    return node.children;
-  };
+  var self;
   /** html: {
         markup: function(node:any) -> string,
         dom: function(node:any, parent=null:DOMElement, clear=false:boolean) -> DOMNode|undefined,
@@ -87,19 +59,20 @@ simpl.add('html', function() {
         return '('+node+'('+(
           node.length && (args = node()) !== undefined ? Array.isArray(args) && node.length >= args.length ? args : [args] : []
         ).map(function(arg) { return JSON.stringify(arg); }).join(',')+'));';` */
-    markup: function(node) {
+    markup: function markup(node) {
       switch (typeof node) {
         case 'object':
           if (!node) break;
           if (Array.isArray(node))
-            return node.map(self.markup).join('');
+            return node.map(markup).join('');
           var tag = Object.keys(node)[0],
               value = node[tag],
               object = value && typeof value == 'object' && !Array.isArray(value);
           return '<'+tag+(object ? Object.keys(value) : []).map(function(attr) {
             var v = value[attr];
             return attr == 'children' || v === false ? '' : ' '+attr+(v == null || v === true ? '' : '="'+String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;')+'"');
-          }).join('')+'>'+self.markup(object ? value.children : value)+(selfClosing[tag] ? '' : '</'+tag+'>');
+          }).join('')+'>'+markup(object ? value.children : value)+({'!doctype':1,area:1,base:1,br:1,col:1,command:1,
+          embed:1,hr:1,img:1,input:1,keygen:1,link:1,meta:1,param:1,source:1,track:1,wbr:1}[tag] ? '' : '</'+tag+'>');
         case 'function':
           var args;
           return ('('+node+'('+(node.length && (args = node()) !== undefined ? Array.isArray(args) && node.length >= args.length ? args : [args] : [])
@@ -130,23 +103,32 @@ simpl.add('html', function() {
         If `parent` is a `DOMElement`, the structure is appended to it. If `clear` is true, `dom` first removes all
         children of `parent` (if set). `dom` returns the DOMNode corresponding to the top level of `node` created, or
         `parent` if `node` is an array. */
-    dom: function(node, parent, clear) {
+    dom: function dom(node, parent, clear) {
       if (clear && parent) while (parent.firstChild) parent.removeChild(parent.firstChild);
       switch (typeof node) {
         case 'object':
           if (!node) return;
           if (Array.isArray(node)) {
-            node.forEach(function(node) { self.dom(node, parent); });
+            node.forEach(function(node) { dom(node, parent); });
             return parent;
           }
           var tag = Object.keys(node)[0],
               elem = document.createElement(tag);
           if (parent) parent.appendChild(elem); 
           node = node[tag];
-          self.dom(typeof node == 'object' && node && !Array.isArray(node) ? attr(node, elem) : node, elem);
+          dom(typeof node == 'object' && node && !Array.isArray(node) ? function attr(node, parent) {
+            Object.keys(node).forEach(function(k) {
+              if (k == 'children') return;
+              var n = node[k];
+              if (typeof parent[k] == 'undefined' || typeof n != 'object' || n == null)
+                return parent[k] = n;
+              attr(n, parent[k], true);
+            });
+            return node.children;
+          }(node, elem) : node, elem);
           return elem;
         case 'function':
-          return self.dom(node(parent), parent);
+          return dom(node(parent), parent);
         case 'string':
         case 'number':
           node = document.createTextNode(node);
