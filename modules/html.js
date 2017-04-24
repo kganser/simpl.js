@@ -214,6 +214,19 @@ simpl.add('html', function() {
           model.insertAll(data_);
         }
       };
+    },
+    /** css: function(styles:object) -> string
+    
+        Generates a string of CSS from its object representation. The `styles` object consists of selectors as keys
+        mapping to objects with CSS property keys (in camelCase) and values. If a `styles` key begins with `'@media'`,
+        its value object is treated as an embedded `styles` object wrapped with the media query. */
+    css: function css(styles) {
+      return Object.keys(styles).map(function(selector) {
+        var attrs = styles[selector];
+        return selector+'{'+(selector.indexOf('@media ') ? Object.keys(attrs).map(function(property) {
+          return property.replace(/([a-z])([A-Z])/g, '$1-$2').replace(/^(webkit|moz|o|ms)-/, '-$1-').toLowerCase()+':'+attrs[property];
+        }).join(';') : css(attrs))+'}';
+      }).join('')
     }
   };
 });
