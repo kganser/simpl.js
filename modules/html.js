@@ -3,12 +3,13 @@ simpl.add('html', function() {
   /** html: {
         markup: function(node:any) -> string,
         dom: function(node:any, parent=null:DOMElement, clear=false:boolean) -> DOMNode|undefined,
-        model: function(data:object|array, insert:function(value:any, key:number|string, index:number, model:Model) -> any) -> Model
+        model: function(data:object|array, insert:function(value:any, key:number|string, index:number, model:Model) -> any) -> Model,
+        css: function(styles:object) -> string
       }
       
       Utilities for generating HTML using native javascript data structures: `markup` produces an HTML string, `dom`
-      builds a DOM structure using the client browser API, and `model` synchronizes the client's DOM view to an
-      underlying data structure. */
+      builds a DOM structure using the client browser API, `model` synchronizes the client's DOM view to an underlying
+      data structure, and `css` renders CSS from an object representation. */
   return self = {
     /** markup: function(node:any) -> string
         
