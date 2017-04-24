@@ -552,7 +552,10 @@ simpl.add('app', function(o) {
             value: selected && selected.entry.doc || '',
             lineNumbers: true,
             matchBrackets: true,
-            highlightSelectionMatches: true
+            highlightSelectionMatches: true,
+            foldGutter: true,
+            foldOptions: {widget: '\u27f7'},
+            gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter']
           });
           code.on('changes', function() {
             selected.entry.dirty = true;
