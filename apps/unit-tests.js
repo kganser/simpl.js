@@ -49,7 +49,8 @@ function(modules) {
     function(next) {
       var utf8 = modules.string.toUTF8Buffer,
           hex = modules.string.hexToBuffer,
-          toHex = modules.string.hexFromBuffer;
+          toHex = modules.string.hexFromBuffer,
+          base64 = modules.string.base64FromBuffer;
       assert(![
         ['', 'd41d8cd98f00b204e9800998ecf8427e'],
         ['abc', '900150983cd24fb0d6963f7d28e17f72'],
@@ -101,7 +102,9 @@ function(modules) {
       }].some(function(test) {
         toHex(modules.crypto.hmac(hex(test.key), hex(test.data))) !== test.mac;
       }), 'crypto hmac');
-      assert(modules.string.base64FromBuffer(modules.crypto.pbkdf2(utf8('password'), utf8('salt'))) === 'YywoEuRtRgQQK6dhjp1tfS+BKPYma0oDJk0qBGC33LM=',
+      assert(
+        base64(modules.crypto.pbkdf2(utf8('password'), utf8('salt'))) === 'YywoEuRtRgQQK6dhjp1tfS+BKPYma0oDJk0qBGC33LM=' &&
+        base64(modules.crypto.pbkdf2(utf8('password'), utf8('salt'), 100)) === 'B+aZcYDPfxKQTwQQDUBdNIiP32KvbVBqDswjsZb+mdg=',
         'crypto pbkdf2');
       
       modules.database.list(function(dbs) {

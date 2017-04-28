@@ -5,11 +5,11 @@ simpl.add('crypto', function() {
       sha1: HashFunction,
       sha256: HashFunction,
       hmac: function(key:ArrayBuffer, data=null:ArrayBuffer, algorithm=`crypto.sha256`:HashFunction) -> ArrayBuffer|function(data:ArrayBuffer) -> ArrayBuffer,
-      pbkdf2: function(password:ArrayBuffer, salt:ArrayBuffer) -> ArrayBuffer
+      pbkdf2: function(password:ArrayBuffer, salt:ArrayBuffer, iterations=1000:number) -> ArrayBuffer
     }
 
-    Cryptographic functions. `hmac` returns an ArrayBuffer MAC if `data` is provided up front, or a MAC generator
-    function otherwise. */
+    Cryptographic functions. Consider using `crypto.subtle` instead of this module for native crypto primitives. `hmac`
+    returns an ArrayBuffer MAC if `data` is provided up front, or a MAC generator function otherwise. */
     
 /** HashFunction: function(data=undefined:ArrayBuffer) -> ArrayBuffer|MessageDigest
 
@@ -309,13 +309,14 @@ simpl.add('crypto', function() {
         return b.clone().update(a.clone().update(data).digest()).digest();
       };
     },
-    pbkdf2: function(password, salt) {
+    pbkdf2: function(password, salt, iterations) {
+      if (!iterations) iterations = 1000;
       var key, prf = self.hmac(password);
       var s = new Uint8Array(salt.byteLength+4);
       s.set(new Uint8Array(salt));
       s[s.length-1] = 1;
       var k = key = new Uint8Array(prf(s.buffer));
-      for (var i = 1; i < 1000; i++) {
+      for (var i = 1; i < iterations; i++) {
         k = new Uint8Array(prf(k.buffer));
         for (var j = 0; j < k.length; j++)
           key[j] ^= k[j];
