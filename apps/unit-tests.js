@@ -209,11 +209,11 @@ function(modules) {
       });
     },
     function(next) {
-      var code = '/* comment */ var i = 0; // comment\n/** name: {fn: function(arg1:boolean|string, arg2=undefined:[number, ...]) -> {key:value}, str: string}\n\n first\n second\n\n third */',
+      var code = '/* comment */ var i = 0; // comment\n/** name: {fn: function(arg1:boolean|string, arg2=undefined:[number, ...]) -> {key:value}, str: string}\n\n first\n second\n\n third\n\n  `code\n   \n   block` */',
           doc = modules.docs.generate(code);
-      assert(compare(doc,[{spec:{name:'name',type:{object:[{name:'fn',type:{function:{args:[{name:'arg1',type:['boolean','string']},{name:'arg2',default:'undefined',type:{array:[{type:'number'},'...']}}],returns:{object:{name:'key',type:'value'}}}}},{name:'str',type:'string'}]}},error:null,text:[['first second'],['third']]}]),
+      assert(compare(doc,[{spec:{name:'name',type:{object:[{name:'fn',type:{function:{args:[{name:'arg1',type:['boolean','string']},{name:'arg2',default:'undefined',type:{array:[{type:'number'},'...']}}],returns:{object:{name:'key',type:'value'}}}}},{name:'str',type:'string'}]}},error:null,text:[['first second'],['third'],{pre:'code\n\nblock'}]}]),
         'docs generate');
-      assert(modules.docs.stringify(code) == 'name: {\n  fn: function(arg1: boolean|string, arg2=undefined: [number, ...]) → {key: value},\n  str: string\n}\n\nfirst second\n\nthird',
+      assert(modules.docs.stringify(code) == 'name: {\n  fn: function(arg1: boolean|string, arg2=undefined: [number, ...]) → {key: value},\n  str: string\n}\n\nfirst second\n\nthird\n\ncode\n\nblock',
         'docs stringify');
       assert(modules.docs.stringifySpec(doc[0].spec) == 'name: {\n  fn: function(arg1: boolean|string, arg2=undefined: [number, ...]) → {key: value},\n  str: string\n}',
         'docs stringifySpec');
