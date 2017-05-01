@@ -577,7 +577,7 @@ simpl.add('app', function(o) {
                 entry.code = code;
                 entry.dirty = false;
                 if (!entry.published) entry.published = [];
-                if (selected && selected.entry == entry)
+                if (selected && selected.entry == entry && !selected.app)
                   docs(selected.name, entry.code);
               });
             });
