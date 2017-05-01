@@ -8,8 +8,27 @@ simpl.add('crypto', function() {
       pbkdf2: function(password:ArrayBuffer, salt:ArrayBuffer, iterations=1000:number) -> ArrayBuffer
     }
 
-    Cryptographic functions. Consider using `crypto.subtle` instead of this module for native crypto primitives. `hmac`
-    returns an ArrayBuffer MAC if `data` is provided up front, or a MAC generator function otherwise. */
+    Cryptographic functions. `hmac` returns an ArrayBuffer MAC if `data` is provided up front, or a MAC generator
+    function otherwise.
+    
+    Consider using native `crypto.subtle` functions (which operate asynchronously using Promises) instead of this module
+    for secure crypto primitives:
+
+   `// hash (MD5 not supported):
+    crypto.subtle.digest('sha-256', data);
+    
+    // hmac:
+    crypto.subtle.importKey('raw', key, {name: 'hmac', hash: 'sha-256'}, false, ['sign']).then(function(key) {
+      return crypto.subtle.sign({name: 'hmac', hash: 'sha-256'}, key, data);
+    });
+    
+    // pbkdf2:
+    crypto.subtle.importKey('raw', password, 'pbkdf2', false, ['deriveKey']).then(function(key) {
+      return crypto.subtle.deriveKey({name: 'pbkdf2', salt: salt, iterations: iterations, hash: 'sha-256'},
+        key, {name: 'aes-cbc', length: 256}, true, ['encrypt']);
+    }).then(function(key) {
+      return crypto.subtle.exportKey('raw', key);
+    });` */
     
 /** HashFunction: function(data=undefined:ArrayBuffer) -> ArrayBuffer|MessageDigest
 
