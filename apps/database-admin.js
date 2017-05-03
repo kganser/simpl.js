@@ -27,31 +27,25 @@ function(modules) {
     return map;
   };
   var template = function(body, db) {
-    var css = {
-      body: {font: '13px sans-serif', webkitTextSizeAdjust: 'none'},
-      svg: {width: '1.2em', height: '1.2em', margin: '0 .5em', verticalAlign: 'bottom', fill: '#aaa'},
-      'form input': {outline: 'none', border: 'solid 1px #ececec', height: '23px', padding: '0 5px'},
-      'form button': {outline: 'none', border: 'none', background: '#3c3', color: 'white', cursor: 'pointer', padding: '0 8px', height: '25px'},
-      'button.delete': {background: 'transparent', color: '#aaa', padding: '0 5px', height: '17px'},
-      'button.delete:hover': {background: '#c5201c', color: 'white'},
-      '#icons': {display: 'none'},
-      '.databases': {listStyle: 'none', padding: 0, lineHeight: 1.5},
-      '.databases a, a.home': {textDecoration: 'none', color: '#1c00cf'},
-      'a.home:before': {content: '""', display: 'inline-block', border: '0 solid transparent', borderWidth: '.35em .6em .35em 0', borderRightColor: '#aaa'},
-      'a:hover svg, a:focus svg, a:active svg': {fill: '#5a5a5a'},
-      'a.home:hover:before, a.home:focus:before, a.home:active:before': {borderRightColor: '#5a5a5a'}
-    };
     return html.markup([
       {'!doctype': {html: null}},
       {head: [
         {title: (db ? db+' - ' : '')+'Database Admin'},
         {meta: {charset: 'utf-8'}},
-        {style: Object.keys(css).map(function(selector) {
-          var attrs = css[selector];
-          return selector+'{'+Object.keys(attrs).map(function(property) {
-            return property.replace(/([a-z])([A-Z])/g, '$1-$2').replace(/^(webkit|moz|o|ms)-/, '-$1-').toLowerCase()+':'+attrs[property];
-          }).join(';')+'}';
-        }).join('')},
+        {style: html.css({
+          body: {font: '13px sans-serif', webkitTextSizeAdjust: 'none'},
+          svg: {width: '1.2em', height: '1.2em', margin: '0 .5em', verticalAlign: 'bottom', fill: '#aaa'},
+          'form input': {outline: 'none', border: 'solid 1px #ececec', height: '23px', padding: '0 5px'},
+          'form button': {outline: 'none', border: 'none', background: '#3c3', color: 'white', cursor: 'pointer', padding: '0 8px', height: '25px'},
+          'button.delete': {background: 'transparent', color: '#aaa', padding: '0 5px', height: '17px'},
+          'button.delete:hover': {background: '#c5201c', color: 'white'},
+          '#icons': {display: 'none'},
+          '.databases': {listStyle: 'none', padding: 0, lineHeight: 1.5},
+          '.databases a, a.home': {textDecoration: 'none', color: '#1c00cf'},
+          'a.home:before': {content: '""', display: 'inline-block', border: '0 solid transparent', borderWidth: '.35em .6em .35em 0', borderRightColor: '#aaa'},
+          'a:hover svg, a:focus svg, a:active svg': {fill: '#5a5a5a'},
+          'a.home:hover:before, a.home:focus:before, a.home:active:before': {borderRightColor: '#5a5a5a'}
+        })},
         db && {link: {rel: 'stylesheet', href: '/static/jsonv.css'}}
       ]},
       {body: [
