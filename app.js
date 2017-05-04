@@ -554,7 +554,7 @@ simpl.add('app', function(o) {
             matchBrackets: true,
             highlightSelectionMatches: true,
             foldGutter: true,
-            foldOptions: {widget: '\u27f7'},
+            foldOptions: {widget: '\u27f7', minFoldSize: 1},
             gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter']
           });
           code.on('changes', function() {
