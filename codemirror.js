@@ -8653,13 +8653,13 @@ CodeMirror.defineMIME("application/typescript", { name: "javascript", typescript
 
   function highlightMatches(cm) {
     cm.operation(function() {
-      var state = cm.state.matchHighlighter;
+      var state = cm.state.matchHighlighter,
+          re = state.showToken === true ? /[\w$]/ : state.showToken;
       if (state.overlay) {
         cm.removeOverlay(state.overlay);
         state.overlay = null;
       }
       if (!cm.somethingSelected() && state.showToken) {
-        var re = state.showToken === true ? /[\w$]/ : state.showToken;
         var cur = cm.getCursor(), line = cm.getLine(cur.line), start = cur.ch, end = start;
         while (start && re.test(line.charAt(start - 1))) --start;
         while (end < line.length && re.test(line.charAt(end))) ++end;
@@ -8672,7 +8672,7 @@ CodeMirror.defineMIME("application/typescript", { name: "javascript", typescript
       if (state.wordsOnly && !isWord(cm, from, to)) return;
       var selection = cm.getRange(from, to).replace(/^\s+|\s+$/g, "");
       if (selection.length >= state.minChars)
-        cm.addOverlay(state.overlay = makeOverlay(selection, false, state.style));
+        cm.addOverlay(state.overlay = makeOverlay(selection, re, state.style));
     });
   }
 

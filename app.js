@@ -552,7 +552,7 @@ simpl.add('app', function(o) {
             value: selected && selected.entry.doc || '',
             lineNumbers: true,
             matchBrackets: true,
-            highlightSelectionMatches: true,
+            highlightSelectionMatches: {minChars: 1, showToken: true},
             foldGutter: true,
             foldOptions: {widget: '\u27f7', minFoldSize: 1},
             gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter']
