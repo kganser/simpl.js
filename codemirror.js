@@ -8654,7 +8654,7 @@ CodeMirror.defineMIME("application/typescript", { name: "javascript", typescript
   function highlightMatches(cm) {
     cm.operation(function() {
       var state = cm.state.matchHighlighter,
-          re = state.showToken === true ? /[\w$]/ : state.showToken;
+          re = /[\w$]/;
       if (state.overlay) {
         cm.removeOverlay(state.overlay);
         state.overlay = null;
