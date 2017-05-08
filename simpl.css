@@ -351,6 +351,9 @@ nav .selected button {
   transform-origin: right top 0;
   -webkit-transform-origin: right top 0;
 }
+.collapsed nav button {
+  margin-bottom: 1px;
+}
 .collapsed nav .selected {
   display: block;
   position: absolute;
@@ -383,27 +386,21 @@ nav .selected button {
   animation: yellow-fade 2s;
   -webkit-animation: yellow-fade 2s;
 }
-#code .CodeMirror {
-  line-height: normal;
-}
 #code .CodeMirror-matchingbracket,
 #code .CodeMirror-nonmatchingbracket {
   color: black;
-  background: red;
+  background: yellow;
   padding: 0 0 2px;
   box-shadow: 0 0 3px rgba(0, 0, 0, .6);
   border-radius: 3px;
 }
-#code .CodeMirror-matchingbracket {
-  background: yellow;
+#code .CodeMirror-nonmatchingbracket {
+  background: red;
 }
-#code .cm-matchhighlight {
-  background: rgba(217, 217, 217, .5);
-}
-#code .CodeMirror-focused .cm-matchhighlight {
+.CodeMirror-focused .cm-matchhighlight {
   background: rgba(215, 212, 240, .5);
 }
-#code .CodeMirror-foldmarker {
+.CodeMirror-foldmarker {
   text-shadow: none;
   display: inline-block;
   vertical-align: middle;
