@@ -552,6 +552,7 @@ simpl.add('app', function(o) {
             value: selected && selected.entry.doc || '',
             lineNumbers: true,
             matchBrackets: true,
+            styleActiveLine: true,
             highlightSelectionMatches: {minChars: 1},
             foldGutter: true,
             foldOptions: {widget: '\u27f7', minFoldSize: 1},
