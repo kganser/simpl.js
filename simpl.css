@@ -438,7 +438,7 @@ nav .selected button {
 #log .entry {
   border-bottom: solid 1px #ececec;
   padding: 1px 0;
-  white-space: pre-line;
+  white-space: normal;
 }
 #log .entry:after {
   content: "";
@@ -485,6 +485,9 @@ nav .selected button {
   float: right;
   color: #999;
   cursor: pointer;
+}
+#log .message > span {
+  white-space: pre-wrap;
 }
 #log .error, #log .warn, #docs .error {
   color: red;

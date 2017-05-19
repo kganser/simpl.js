@@ -54,11 +54,11 @@ simpl.add('app', function(o) {
         if (typeof part == 'string') {
           while (link = /\b(https?|ftp):\/\/[^\s/$.?#].\S*/i.exec(part)) {
             var url = link[0];
-            if (link.index) message.push(part.substr(0, link.index));
+            if (link.index) message.push({span: part.substr(0, link.index)});
             message.push({a: {href: url, target: '_blank', children: url}});
             part = part.substr(link.index+url.length);
           }
-          if (part) message.push(part);
+          if (part) message.push({span: part});
         } else {
           message.push({div: function(e) {
             o.jsonv(e, part, {collapsed: true});
