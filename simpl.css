@@ -438,6 +438,7 @@ nav .selected button {
 #log .entry {
   border-bottom: solid 1px #ececec;
   padding: 1px 0;
+  white-space: pre-line;
 }
 #log .entry:after {
   content: "";

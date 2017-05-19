@@ -52,7 +52,7 @@ simpl.add('app', function(o) {
       entry.message.forEach(function(part, i) {
         if (i) message.push(' ');
         if (typeof part == 'string') {
-          while (link = /\b(https?|ftp):\/\/\S+\b/.exec(part)) {
+          while (link = /\b(https?|ftp):\/\/[^\s/$.?#].\S*/i.exec(part)) {
             var url = link[0];
             if (link.index) message.push(part.substr(0, link.index));
             message.push({a: {href: url, target: '_blank', children: url}});
