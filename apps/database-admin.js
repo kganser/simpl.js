@@ -235,12 +235,12 @@ function(modules) {
                   if (typeof key == 'number') parent.splice(key, 1);
                   else delete parent[key];
                 } else if (method == 'insert' || method == 'put') {
-                  value = function inflate(v) {
+                  var padded = function inflate(v) {
                     return !v || typeof v != 'object' ? v : {data: Array.isArray(v) ? v.map(inflate)
                       : Object.keys(v).reduce(function(a, b) { a[b] = inflate(v[b]); return a; }, {})};
                   }(value);
-                  if (method == 'insert') parent.splice(key, 0, value);
-                  else parent[key] = value;
+                  if (method == 'insert') parent.splice(key, 0, padded);
+                  else parent[key] = padded;
                 }
                 var state = s(function prune(data) {
                   return Object.keys(data).reduce(function(o, key) {
