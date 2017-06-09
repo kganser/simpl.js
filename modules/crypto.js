@@ -15,14 +15,14 @@ simpl.add('crypto', function() {
     for secure crypto primitives:
 
    `// hash (MD5 not supported):
-    crypto.subtle.digest('sha-256', data);
+    crypto.subtle.digest('sha-256', data);`
     
-    // hmac:
+   `// hmac:
     crypto.subtle.importKey('raw', key, {name: 'hmac', hash: 'sha-256'}, false, ['sign']).then(function(key) {
       return crypto.subtle.sign({name: 'hmac', hash: 'sha-256'}, key, data);
-    });
+    });`
     
-    // pbkdf2:
+   `// pbkdf2:
     crypto.subtle.importKey('raw', password, 'pbkdf2', false, ['deriveKey']).then(function(key) {
       return crypto.subtle.deriveKey({name: 'pbkdf2', salt: salt, iterations: iterations, hash: 'sha-256'},
         key, {name: 'aes-cbc', length: 256}, true, ['encrypt']);

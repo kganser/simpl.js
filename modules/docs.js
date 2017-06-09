@@ -3,8 +3,8 @@ simpl.add('docs', function(modules) {
   var tokens = {
     id: /[a-z_$][a-z0-9_$]*/i,
     number: /(0|[1-9][0-9]*)(\.[0-9]*)?|\.[0-9]*/,
-    string: /'[^\\']*(\\.[^\\']*)*'|"[^\\"]*(\\.[^\\"]*)*"/,
-    code: /`[^\\`]*(\\.[^\\`]*)*`/,
+    string: /'[^\\'\r\n]*(\\.[^\\'\r\n]*)*'|"[^\\"\r\n]*(\\.[^\\"\r\n]*)*"/,
+    code: /`[^\\`\r\n]*(\\.[^\\`\r\n]*)*`/,
     '': /\s+/
   };
   var self, parse = modules.parser.generate({
@@ -107,42 +107,32 @@ simpl.add('docs', function(modules) {
   /** Type: [Type, ...]|string|{function:{args:Value, returns:Type|undefined}}|{object:Value}|{array:Value} */
   return self = {
     generate: function(code) {
-      return (code.match(/\/\*\*[^]+?\*\//g) || []).map(function(comment) {
-        comment = comment.slice(3, -2).trim();
-        var blocks = [],
-            spec = null,
-            error = null;
-        while (true) {
-          var code = comment.match(/\n\s*\n(\s*)`([^]*?)`\s*($|\n\s*\n)/);
-          (code ? comment.substr(0, code.index) : comment).split(/\n\s*\n/).forEach(function(block) {
-            block = block.trim().replace(/\s+/g, ' ');
-            if (!block) return;
-            if (!spec && !blocks.length) try {
-              spec = parse(block);
-            } catch (e) {
-              blocks.push(block);
-              spec = null;
-              error = e;
-            } else {
-              var chunks = [];
-              while (true) {
-                var code = block.match(tokens.code);
-                if (!code && block || code.index) chunks.push(code ? block.substr(0, code.index) : block);
-                if (!code) break;
-                if (code[0].length > 2) chunks.push({code: code[0].slice(1, -1)});
-                block = block.substr(code.index+code[0].length);
-              }
-              if (chunks.length) blocks.push(chunks);
-            }
-          });
-          if (!code) break;
-          blocks.push({pre: code[2].replace(new RegExp('\n'+code[1]+' ', 'g'), '\n')});
-          comment = comment.substr(code.index+code[0].length);
+      return (code.match(/\/\*\*\s*[\s\S]+?\s*\*\//g) || []).map(function(comment) {
+        var blocks = comment.substring(3, comment.length-2).trim().split(/\n\s*\n/),
+            spec = blocks.shift(), error = null;
+        try {
+          spec = parse(spec);
+        } catch (e) {
+          blocks.unshift(spec);
+          spec = null;
+          error = e;
         }
         return {
           spec: spec,
           error: error,
-          text: blocks
+          text: blocks.map(function(block) {
+            var chunks = [], code;
+            if (code = block.match(/^(\s*)`([^`]+)`\s*$/))
+              return {pre: code[2].replace(new RegExp('\n'+code[1]+' ', 'g'), '\n')};
+            block = block.trim().replace(/\s*\n\s*|\s\s+/g, ' ');
+            while (code = tokens.code.exec(block)) {
+              if (code.index) chunks.push(block.substr(0, code.index));
+              chunks.push({code: code[0].substring(1, code[0].length-1)});
+              block = block.substr(code.index+code[0].length);
+            }
+            if (block) chunks.push(block);
+            return chunks;
+          })
         };
       });
     },
