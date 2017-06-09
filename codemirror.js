@@ -11429,11 +11429,14 @@ var CodeMirror = function() {
       }
     }
 
-    var startToken = "{", endToken = "}", startCh = findOpening("{");
-    if (startCh == null) {
-      startToken = "[", endToken = "]";
-      startCh = findOpening("[");
-    }
+    // SIMPL.JS: check both curly and square brackets; pick whichever is last
+    var startCurly = findOpening('{'),
+        startSquare = findOpening('['),
+        startCh = startCurly == null ? startSquare :
+                  startSquare == null ? startCurly :
+                  Math.max(startCurly, startSquare),
+        startToken = startCh == startSquare ? '[' : '{',
+        endToken = startCh == startSquare ? ']' : '}';
 
     if (startCh == null) return;
     var count = 1, lastLine = cm.lastLine(), end, endCh;
@@ -11453,6 +11456,7 @@ var CodeMirror = function() {
       }
     }
     if (end == null || line == end && endCh == startCh) return;
+    //console.log(startToken, startCurly, startSquare, '\n|'+lineText+'\n'+Array(startCh+1).join(' ')+'^\n|'+text+'\n'+Array(endCh+2).join(' ')+'^');
     return {from: CodeMirror.Pos(line, startCh),
             to: CodeMirror.Pos(end, endCh)};
   });
