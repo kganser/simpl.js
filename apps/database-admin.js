@@ -189,8 +189,10 @@ function(modules) {
       switch (request.method) {
         case 'GET':
           return open(function(db) {
-            var i = 0, after = request.query.after;
-            db.get(path, false, function(path, array) {
+            var download = 'download' in request.query,
+                after = request.query.after,
+                i = 0;
+            db.get(path, false, download ? 'deep' : function(path, array) {
               if (path.length) return false;
               if (array) {
                 after = Math.max(parseInt(after, 10), -1);
@@ -207,7 +209,7 @@ function(modules) {
             }).then(function(object) {
               db.close();
               if (object === undefined) response.generic(404);
-              response.end(JSON.stringify({data: object, remaining: i > 100}), 'json');
+              response.end(JSON.stringify(download ? object : {data: object, remaining: i > 100}), 'json');
             });
           });
         case 'PUT':
@@ -223,7 +225,7 @@ function(modules) {
                 response.end(error ? '403 '+error : '200 Success', null, error ? 403 : 200);
               });
             });
-          }, request.headers['Content-Type'] == 'application/json' ? 'json' : 'utf8', 51200);
+          }, request.headers['Content-Type'] == 'application/json' ? 'json' : 'utf8', 1048576);
         case 'DELETE':
           if (request.headers.Authorization != csrf)
             return request.generic(403);
