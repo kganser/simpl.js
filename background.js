@@ -180,7 +180,6 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     services = {};
     server = port = null;
     clearInterval(ping);
-    if (typeof ws == 'object') ws.close();
   };
   
   (function(parts, count) {
@@ -202,6 +201,26 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
   o.xhr('/workspace.json', {responseType: 'json'}, function(e) {
     workspace = e.target.response;
     restore(function() {});
+  });
+  
+  chrome.runtime.onMessageExternal.addListener(function(message, sender, send) {
+    message = message || {};
+    var sid = verify(message.state),
+        token = message.token;
+    if (!sid || !token) return send({error: 'Invalid authentication request'});
+    return !api('user', token, function(status, data) {
+      if (status != 200) return send({error: 'Unable to access user account'});
+      db.put('sessions/'+sid, {
+        access_token: token,
+        username: data.username,
+        name: data.name,
+        email: data.email,
+        plan: data.plan,
+        expires: Date.now()+(message.expires_in || 86400)*1000
+      }).then(function() {
+        send({status: 'success'});
+      });
+    });
   });
   
   chrome.runtime.onSuspend.addListener(shutdown);
@@ -340,44 +359,14 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
               }, response.ok, method);
           }
         }
-        if (request.path == '/auth')
-          return authenticate(sid = request.cookie.sid, function(session) {
-            var code = request.query.authorization_code;
-            if (!session || !code || signature(sid) != request.query.state) return response.end(code ? session ? 'Bad state in request' : 'No session' : 'No authorization code', null, 400);
-            api('token?authorization_code='+code+'&client_secret='+session.secret, null, function(status, data) {
-              if (status != 200) return response.end('Could not get access token', null, 502);
-              api('user', code = data.access_token, function(status, data) {
-                if (status != 200) return response.end('Could not get user info', null, 502);
-                db.put('sessions/'+sid, {
-                  secret: session.secret,
-                  access_token: code,
-                  username: data.username,
-                  name: data.name,
-                  email: data.email,
-                  plan: data.plan,
-                  expires: Date.now()+86400000
-                }).then(function() {
-                  response.generic(303, {Location: session.redirect});
-                });
-              });
-            });
-          });
         if (request.path == '/login') {
-          var secret = request.query.token,
-              redirect = request.query.redirect || '/';
-          if (!secret) return response.generic(303, {Location: 'https://simpljs.com/launch'});
-          return authenticate(sid = request.cookie.sid, function(session) {
-            if (!session) sid = token(true);
-            else if (session.secret == secret) return response.generic(303, {Location: redirect});
-            gcSessions(db).put('sessions/'+sid, {
-              secret: secret,
-              redirect: redirect,
-              expires: Date.now()+86400000
-            }).then(function() {
-              response.generic(303, {
-                'Set-Cookie': 'sid='+sid,
-                Location: 'https://simpljs.com/authorize?client_id=simpljs&redirect_uri='+encodeURIComponent('http://'+request.headers.Host+'/auth')+'&state='+signature(sid)
-              });
+          sid = verify(request.cookie.sid) || token(true);
+          console.log('logging in with sid', sid);
+          return gcSessions(db).put('sessions/'+sid, {expires: Date.now()+86400000}).then(function() {
+            response.generic(303, {
+              'Set-Cookie': 'sid='+sid,
+              Location: 'https://simpljs.com/authorize?client_id=simpljs&redirect_uri='+
+                encodeURIComponent('http://'+request.headers.Host+(request.query.redirect || '/'))+'&state='+sid
             });
           });
         }
@@ -514,7 +503,6 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           server = s;
           port = command.port;
           ping = setInterval(function() {
-            if (typeof ws == 'object') ws.send('ping');
             Object.keys(services).forEach(function(id) {
               services[id].send('ping');
             });
@@ -534,17 +522,64 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
   var ws, port, path = '', launcher = false;
 
   chrome.app.runtime.onLaunched.addListener(function(source) {
-    var args = ((source || {}).url || '').match(/^https?:\/\/simpljs.com\/launch-([^\/]+)(.*)/),
-        headless = args && args[1] == 'headless';
-    path = args && !headless ? '/login?token='+args[1]+'&redirect='+args[2] : '';
-    if (launcher.focus) {
-      // TODO: use chrome.browser.openTab() to navigate in existing tab
-      if (!port) return launcher.focus();
-      var link = launcher.contentWindow.document.getElementById('link');
-      link.setAttribute('href', 'http://localhost:'+port+path);
-      link.click();
-      link.setAttribute('href', 'http://localhost:'+port);
-      return path = '';
+    var args = ((source || {}).url || '').match(/^https?:\/\/simpljs.com\/launch([^\/\?]*)([^\?]*)/),
+        headless = args && args[1] == '-headless';
+    if (!headless) {
+      path = args ? '/login?redirect='+encodeURIComponent(args[2]) : '';
+      if (launcher.focus) {
+        if (!port) return launcher.focus();
+        chrome.browser.openTab({url: 'http://localhost:'+port+path});
+        return path = '';
+      }
+    } else if (!ws) {
+      ws = true;
+      o.xhr('http://169.254.169.254/computeMetadata/v1/instance/attributes/?recursive=true', {
+        responseType: 'json',
+        headers: {'Metadata-Flavor': 'Google'}
+      }, function(e) {
+        if (e.target.status == 200) return callback(e);
+        o.xhr('http://169.254.169.254/latest/user-data', {responseType: 'json'}, callback);
+      });
+      function callback(e) {
+        e = e.target.response;
+        var token = e && e.token,
+            user = e && e.user,
+            connections, client, retries = 0;
+        if (!token || !user) return console.log('Simpl.js: Missing auth for headless launch');
+        (function connect() {
+          console.log('Simpl.js: attempting headless connection '+retries);
+          ws = new WebSocket('wss://api.simpljs.com/connect?access_token='+token);
+          ws.onopen = function() {
+            console.log('Simpl.js: headless connection opened');
+            connections = retries = 0;
+            client = {user: user, connection: ws};
+          };
+          ws.onmessage = function(e) {
+            try { var message = JSON.parse(e.data); } catch (e) { return; }
+            var command = message.command;
+            if (command == 'connect') {
+              if (!connections++)
+                clients[-1] = client;
+              return state(user, ws);
+            }
+            if (command == 'disconnect') {
+              if (!--connections)
+                delete clients[-1];
+              return;
+            }
+            if (command == 'stop' || command == 'restart')
+              stop(user, message.app, message.version);
+            if (command == 'run' || command == 'restart')
+              run(user, message.app, message.version, token);
+          };
+          ws.onclose = function() {
+            console.log('Simpl.js: headless connection closed');
+            delete clients[-1];
+            if (retries < 6) setTimeout(connect, (1 << retries++) * 1000);
+            else console.log('Simpl.js: headless connection failed');
+          };
+        }());
+      }
     }
     launcher = true;
     chrome.app.window.create('simpl.html', {
@@ -555,57 +590,6 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       (launcher = window).onClosed.addListener(function() {
         launcher = false;
       });
-      if (headless) launcher.contentWindow.onload = function(e) {
-        e.target.getElementById('action').click();
-        if (ws) return;
-        ws = true;
-        (function(callback) {
-          o.xhr('http://169.254.169.254/computeMetadata/v1/instance/attributes/?recursive=true', {
-            responseType: 'json',
-            headers: {'Metadata-Flavor': 'Google'}
-          }, function(e) {
-            if (e.target.status == 200) return callback(e);
-            o.xhr('http://169.254.169.254/latest/user-data', {responseType: 'json'}, callback);
-          });
-        }(function(e) {
-          e = e.target.response;
-          var token = e && e.token,
-              user = e && e.user,
-              connections, client, retries = 0;
-          if (!token || !user) return;
-          (function connect() {
-            ws = new WebSocket('wss://api.simpljs.com/connect?access_token='+token);
-            ws.onopen = function() {
-              connections = 0;
-              client = {user: user, connection: ws};
-            };
-            ws.onmessage = function(e) {
-              try { var message = JSON.parse(e.data); } catch (e) { return; }
-              var command = message.command;
-              if (command == 'connect') {
-                if (!connections++)
-                  clients[-1] = client;
-                return state(user, ws);
-              }
-              if (command == 'disconnect') {
-                if (!--connections)
-                  delete clients[-1];
-                return;
-              }
-              if (command == 'stop' || command == 'restart')
-                stop(user, message.app, message.version);
-              if (command == 'run' || command == 'restart')
-                run(user, message.app, message.version, token);
-            };
-            ws.onclose = function() {
-              delete clients[-1];
-              if (!server) return ws = null;
-              if (retries < 6) retries++;
-              setTimeout(connect, (1 << retries) * 1000);
-            };
-          }());
-        }));
-      };
     });
   });
 });

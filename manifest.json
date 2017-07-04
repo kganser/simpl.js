@@ -43,12 +43,11 @@
   },
   "url_handlers": {
     "launch": {
-      "matches": [
-        "https://simpljs.com/launch-*",
-        "http://simpljs.com/launch-*",
-        "http://test.simpljs.com/launch-*"
-      ],
+      "matches": ["https://simpljs.com/launch*"],
       "title": "Launch Simpl.js Console"
     }
+  },
+  "externally_connectable": {
+    "matches": ["https://simpljs.com/*"]
   }
 }

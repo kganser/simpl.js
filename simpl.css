@@ -192,6 +192,11 @@ nav .name {
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
+  color: inherit;
+  text-decoration: inherit;
+}
+nav .name:active {
+  opacity: 1;
 }
 nav .name span, #dependencies .name span {
   font-size: 90%;
@@ -219,7 +224,14 @@ nav .error .icon-error, nav .loading .icon-loading {
   display: inline-block;
 }
 nav .changed .name:before {
-  content: "*";
+  content: "";
+  display: inline-block;
+  vertical-align: middle;
+  height: 4px;
+  width: 4px;
+  background: black;
+  border-radius: 50%;
+  margin: 0 3px 4px 0;
 }
 .controls {
   float: right;
@@ -341,8 +353,7 @@ nav .selected button {
   width: 30px;
   overflow-y: hidden;
 }
-.collapsed nav li span {
-  float: left;
+.collapsed nav .name {
   padding: 8px 10px 0 0;
   width: 200px;
   text-align: right;
@@ -378,6 +389,28 @@ nav .selected button {
   display: none;
   color: white;
   padding: 3px 8px;
+}
+#auth {
+  display: none;
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, .3);
+}
+#auth.visible {
+  display: block;
+}
+#auth iframe {
+  display: block;
+  width: 400px;
+  height: 500px;
+  max-width: 100%;
+  border: none;
+  background: white;
+  box-shadow: 0 0 0 8px rgba(0, 0, 0, .3);
+  margin: 50px auto 0;
 }
 .CodeMirror-gutters {
   border-right: none;

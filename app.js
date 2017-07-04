@@ -23,7 +23,7 @@ simpl.add('app', function(o) {
       });
       modules[name] = {name: n[0], source: n[1], versions: versions};
     });
-    var appList, moduleList, selected, code, config, major, minor, remove, dependencies, search, suggest, timeline, history, log, docs, status, connect, send, servers,
+    var appList, moduleList, selected, code, config, major, minor, remove, dependencies, search, suggest, timeline, history, log, docs, status, login, connect, send, servers,
         icons = {}, dom = o.html.dom, boilerplate = 'function(modules) {\n  \n}';
     // Entypo pictograms by Daniel Bruce — www.entypo.com
     Array.prototype.slice.call(document.getElementById('icons').childNodes).forEach(function(icon) {
@@ -250,10 +250,6 @@ simpl.add('app', function(o) {
           v = minor ? 'v'+major : '';
       return {li: function(elem) {
         entry.tab = elem;
-        elem.onclick = function(e) {
-          if (!this.classList.contains('selected'))
-            navigate(name, major, app);
-        };
         return [
           {div: {className: 'controls', children: [
             {button: {className: 'view', onclick: function() { navigate(name, major, app, this.className.replace(/\s*view\s*/, '')); }, children: function(e) {
@@ -267,9 +263,16 @@ simpl.add('app', function(o) {
               }}};
             })
           ]}},
-          {span: {
+          {a: {
             className: 'name',
             title: v ? name+' '+v : name,
+            href: url({app: app, id: name, version: major})+(app ? '/code' : '/docs'),
+            onclick: function(e) {
+              if (e.which > 1 || e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) return;
+              e.preventDefault();
+              if (!elem.classList.contains('selected'))
+                navigate(name, major, app);
+            },
             children: [icons.loading, icons.error, record.name, {span: record.source ? [icons.link, record.source+' '+v] : v}]
           }}
         ];
@@ -292,7 +295,10 @@ simpl.add('app', function(o) {
           children: [
             {div: {className: 'controls', children: {a: user
               ? {id: 'logout', href: '/logout', title: 'Log Out', children: icons.logout}
-              : {id: 'login', href: '/login', title: 'Log In or Register', children: icons.login}}}},
+              : {id: 'login', href: '/login', title: 'Log In or Register', children: icons.login, onclick: function(e) {
+                  e.preventDefault();
+                  login();
+                }}}}},
             user
               ? {span: {className: 'name', style: {backgroundImage: 'url('+user.image+')'}, children: user.name}}
               : 'Simpl.js'
@@ -872,14 +878,22 @@ simpl.add('app', function(o) {
             clearTimeout(timer);
             timer = setTimeout(function() { e.style.display = 'none'; }, 2000);
           };
+        }}},
+        {div: {id: 'auth', children: function(e) {
+          login = function() {
+            e.classList.add('visible');
+            dom({iframe: {src: '/login'}}, e, true);
+          };
+        }, onclick: function(e) {
+          if (this == e.target)
+            this.classList.remove('visible');
         }}}
       ]}}
     ], body);
-    window.onpopstate = function(e) {
+    (window.onpopstate = function(e) {
       var parts = location.pathname.split('/');
       navigate(parts[2] && decodeURIComponent(parts[2]), +parts[3], parts[1] == 'apps', parts[4]);
-    };
-    window.onpopstate();
+    })();
     connect();
   };
 }, 0, {html: 0, xhr: 0, jsonv: 0, docs: 0});
