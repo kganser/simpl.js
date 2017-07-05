@@ -6,7 +6,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       encode = o.string.base64FromBuffer,
       decode = o.string.base64ToBuffer,
       utf8 = o.string.fromUTF8Buffer,
-      apps = {}, logs = {}, clients = {}, services = {}, csrf, ping;
+      apps = {}, logs = {}, clients = {}, csrf, ping;
   
   var signature = function(value) {
     try {
@@ -177,7 +177,6 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     if (!server) return;
     server.disconnect();
     clients = {};
-    services = {};
     server = port = null;
     clearInterval(ping);
   };
@@ -361,7 +360,6 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         }
         if (request.path == '/login') {
           sid = verify(request.cookie.sid) || token(true);
-          console.log('logging in with sid', sid);
           return gcSessions(db).put('sessions/'+sid, {expires: Date.now()+86400000}).then(function() {
             response.generic(303, {
               'Set-Cookie': 'sid='+sid,
@@ -406,20 +404,18 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             o.websocket.accept(request, response, function(client) {
               clients[socketId] = {user: user, connection: client};
               if (session && session.plan == 'pro') {
-                var ws = services[socketId] = new WebSocket('wss://api.simpljs.com/connect?access_token='+token);
+                var ws = new WebSocket('wss://api.simpljs.com/connect?access_token='+token);
                 ws.onmessage = function(e) {
-                  if (typeof e.data == 'string')
+                  if (typeof e.data == 'string' && e.data != 'ping')
                     client.send(e.data);
                 };
                 ws.onclose = function() {
                   client.close(1001);
                   delete clients[socketId];
-                  delete services[socketId];
                 };
                 client.socket.onDisconnect = function() {
                   ws.close();
                   delete clients[socketId];
-                  delete services[socketId];
                 };
               }
               return function(data) {
@@ -503,8 +499,8 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           server = s;
           port = command.port;
           ping = setInterval(function() {
-            Object.keys(services).forEach(function(id) {
-              services[id].send('ping');
+            Object.keys(clients).forEach(function(id) {
+              clients[id].connection.send('ping');
             });
           }, 30000);
         }
@@ -522,10 +518,10 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
   var ws, port, path = '', launcher = false;
 
   chrome.app.runtime.onLaunched.addListener(function(source) {
-    var args = ((source || {}).url || '').match(/^https?:\/\/simpljs.com\/launch([^\/\?]*)([^\?]*)/),
-        headless = args && args[1] == '-headless';
-    if (!headless) {
-      path = args ? '/login?redirect='+encodeURIComponent(args[2]) : '';
+    console.log('Simpl.js launched', source);
+    var args = (source.url || '').match(/^https:\/\/simpljs\.com\/launch(\/.*)?/);
+    if (source.source != 'file_handler') {
+      path = args ? '/login?redirect='+encodeURIComponent(args[1] || '') : '';
       if (launcher.focus) {
         if (!port) return launcher.focus();
         chrome.browser.openTab({url: 'http://localhost:'+port+path});
@@ -545,7 +541,10 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         var token = e && e.token,
             user = e && e.user,
             connections, client, retries = 0;
-        if (!token || !user) return console.log('Simpl.js: Missing auth for headless launch');
+        if (!token || !user) {
+          console.log('Simpl.js: Missing auth for headless launch');
+          return ws = false;
+        }
         (function connect() {
           console.log('Simpl.js: attempting headless connection '+retries);
           ws = new WebSocket('wss://api.simpljs.com/connect?access_token='+token);
