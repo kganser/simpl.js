@@ -49,5 +49,6 @@
   },
   "externally_connectable": {
     "matches": ["https://simpljs.com/*"]
-  }
+  },
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArk8M7DXQyUDaf1FgtNG/XUnbiLhSul9i24fMAjWyiTm2QAu/KF02k0vlhp+sVrw+VUs8yPTi3W9OHkWUuYsULwUrnN2zpmw+0Xx/EipuNFmuHSTjTfvBvLcHeii9zZgTlqrHiRD0kmX7X4krW7+BBfHN6DpZvJuALP+JxR9mJqfBUSMSPFr7zhqO3cBApsa2bqKv0EQunCw7mLKgrVUIQxra90rO3DBMs2SQ5QPbEnaj4MsEGOwTEreMWncEeqGaKLwRYdM/V4ixEsWHxH9sXP3GFEQzu10rlU9XdYxxhDViZzVHc+C4QFBhrQUnhiOmpK1Ljy/0uf6tEqMN10ur+wIDAQAB"
 }
