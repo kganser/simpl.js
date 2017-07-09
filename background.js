@@ -504,6 +504,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             });
           }, 30000);
         }
+        console.log('Simpl.js server - port '+command.port+' - '+(error ? error : 'running'));
         launcher.postMessage({error: error, action: 'start', port: port, path: path});
         path = '';
       });
@@ -520,10 +521,18 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
   chrome.app.runtime.onLaunched.addListener(function(source) {
     console.log('Simpl.js launched', source);
     var args = (source.url || '').match(/^https:\/\/simpljs\.com\/launch(\/.*)?/);
+    var onLauncher = function(callback, loaded) {
+      return function(x, fn) {
+        if (fn && loaded) fn();
+        else if (fn) callback = fn;
+        else if (callback) callback();
+        else loaded = true;
+      };
+    }();
     if (source.source != 'file_handler') {
       path = args ? '/login?redirect='+encodeURIComponent(args[1] || '') : '';
       if (launcher.focus) {
-        if (!port) return launcher.focus();
+        if (!server) return launcher.focus();
         chrome.browser.openTab({url: 'http://localhost:'+port+path});
         return path = '';
       }
@@ -540,12 +549,18 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         e = e.target.response;
         var token = e && e.token,
             user = e && e.user,
+            port = e && e.port,
             connections, client, retries = 0;
-        if (!token || !user) {
-          console.log('Simpl.js: Missing auth for headless launch');
+        if (!port && !(token && user)) {
+          console.log('Simpl.js: Missing port or auth for headless launch');
           return ws = false;
         }
-        (function connect() {
+        if (port && !server) onLauncher(null, function() {
+          var doc = launcher.contentWindow.document;
+          if (typeof port == 'number') doc.getElementById('port').value = port;
+          doc.launcher.onsubmit();
+        });
+        if (token && user) (function connect() {
           console.log('Simpl.js: attempting headless connection '+retries);
           ws = new WebSocket('wss://api.simpljs.com/connect?access_token='+token);
           ws.onopen = function() {
@@ -586,7 +601,9 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       resizable: false,
       innerBounds: {width: 300, height: 100}
     }, function(window) {
-      (launcher = window).onClosed.addListener(function() {
+      launcher = window;
+      launcher.contentWindow.onload = onLauncher;
+      launcher.onClosed.addListener(function() {
         launcher = false;
       });
     });

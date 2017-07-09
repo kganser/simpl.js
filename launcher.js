@@ -32,7 +32,7 @@ bg.onMessage.addListener(function(message) {
     port.focus();
 });
 document.launcher.onsubmit = function(e) {
-  e.preventDefault();
+  if (e) e.preventDefault();
   info.textContent = '';
   if (action.value == 'Launch') {
     var p = /^\d+$/.test(port.value) && parseInt(port.value, 10);
