@@ -550,16 +550,16 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         var token = e && e.token,
             user = e && e.user,
             port = e && e.port,
+            app = e && (e.app || '').split('@'),
             connections, client, retries = 0;
-        if (!port && !(token && user)) {
-          console.log('Simpl.js: Missing port or auth for headless launch');
-          return ws = false;
-        }
+        console.log('Simpl.js: Headless launch\n  token='+token+'\n  user='+user+'\n  port='+port+'\n  app='+app);
         if (port && !server) onLauncher(null, function() {
           var doc = launcher.contentWindow.document;
-          if (typeof port == 'number') doc.getElementById('port').value = port;
+          if (typeof port == 'number' || typeof port == 'string' && +port)
+            doc.getElementById('port').value = +port;
           doc.launcher.onsubmit();
         });
+        if (app) run('', app[0], +app[1] || 1);
         if (token && user) (function connect() {
           console.log('Simpl.js: attempting headless connection '+retries);
           ws = new WebSocket('wss://api.simpljs.com/connect?access_token='+token);
