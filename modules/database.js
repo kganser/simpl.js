@@ -54,8 +54,7 @@ simpl.add('database', function() {
     open: function(database, upgrade, version, onError) {
     /** database: {
           open: function(database:string, upgrade=`{}`:json|function(UpgradeTransaction), version=1:number, onError=undefined:function(error:DOMError, blocked:boolean)) -> Database,
-          delete: function(database:string, callback:function(error:undefined|DOMError, blocked:boolean)),
-          list: function(callback:function(array))
+          delete: function(database:string, callback:function(error:undefined|DOMError, blocked:boolean))
         }
         
         Database is backed by `indexedDB`. An upgrade transaction runs on `open` if the database version is less than
@@ -236,7 +235,7 @@ simpl.add('database', function() {
               if (db) return callback();
               if (queue) return queue.push(callback);
               queue = [callback];
-              var request = indexedDB.open(database, version || 1);
+              var request = indexedDB.open(database, version);
               request.onupgradeneeded = function(e) {
                 var self, db = e.target.result,
                     data = upgrade === undefined || typeof upgrade == 'function' ? {} : upgrade;
@@ -544,17 +543,15 @@ simpl.add('database', function() {
     },
     delete: function(database, callback) {
       var request = indexedDB.deleteDatabase(database);
-      request.onsuccess = request.onerror = function(e) {
+      request.onsuccess = request.onerror = callback && function(e) {
         callback(e.target.error, false);
       };
-      request.onblocked = function() {
+      request.onblocked = callback && function() {
         callback(null, true);
       };
     },
-    list: function(callback) {
-      indexedDB.webkitGetDatabaseNames().onsuccess = function(e) {
-        callback(Array.prototype.slice.call(e.target.result));
-      };
+    list: function(callback) { // deprecated
+      callback([]);
     }
   };
 });

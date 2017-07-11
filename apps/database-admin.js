@@ -110,12 +110,7 @@ function(modules) {
       ]}
     ]);
   };
-  var dbs = function(callback, name, error) {
-    database.list(function(names) {
-      if (!name) return callback(names);
-      callback(~names.indexOf(name) ? database.open(name, undefined, undefined, error) : null);
-    });
-  };
+  
   var database = modules.database || modules['database@simpljs'],
       html = modules.html || modules['html@simpljs'],
       http = modules.http || modules['http@simpljs'],
@@ -124,24 +119,34 @@ function(modules) {
       csrf = string.base64FromBuffer(crypto.getRandomValues(new Uint8Array(24)), true);
   
   http.serve({port: config.port}, function(request, response) {
+    var db;
     if (request.path == '/') {
       if (request.method == 'POST')
         return request.slurp(function(body) {
-          var db, done = function() {
+          var dbs, done = function() {
             if (db) db.close();
+            if (dbs) dbs.close();
             response.generic(303, {Location: '/'});
           };
           if (body.token != csrf)
             return response.generic(403);
           if (body.action == 'delete' && body.name)
-            return database.delete(body.name, done);
+            return database.delete(body.name, function(error) {
+              if (error) return done();
+              (dbs = database.open('_dbs')).delete(encodeURIComponent(body.name)).then(done);
+            });
           if (body.action == 'add' && body.name)
-            return (db = database.open(body.name)).put('', {}).then(done);
+            return (db = database.open(body.name)).get('', true, 'shallow').then(function create(exists) {
+              if (!exists) return this.put('', {}).then(function() { create(true); });
+              (dbs = database.open('_dbs')).put(encodeURIComponent(body.name), 1).then(done);
+            });
           done();
         }, 'url');
-      return dbs(function(dbs) {
+      return (db = database.open('_dbs')).get('', true).then(function(dbs) {
+        if (dbs) db.close();
+        else this.put('', {}).then(db.close);
         response.end(template([
-          {ul: {class: 'databases', children: dbs.map(function(name) {
+          {ul: {class: 'databases', children: Object.keys(dbs || {}).map(function(name) {
             return {li: [
               {form: {method: 'post', onsubmit: 'return confirm("Permanently delete database '+name+'?");', children: [
                 {input: {type: 'hidden', name: 'token', value: csrf}},
@@ -169,7 +174,7 @@ function(modules) {
         });
       });
     }
-    var name = request.path.match(/^\/([^/]*)/)[1],
+    var name = decodeURIComponent(request.path.match(/^\/([^/]*)/)[1]),
         path = request.path.substr(name.length+2),
         json = request.headers.Accept == 'application/json' || request.query.format == 'json';
     if (!json && (path || name == 'favicon.ico'))
@@ -177,40 +182,39 @@ function(modules) {
         if (e.target.status != 200) return response.generic(404);
         response.end(e.target.response, (path.match(/\.([^.]*)$/) || [])[1]);
       });
-    var open = function(callback) {
-      dbs(function(db) {
-        if (!db) return response.generic(404);
-        callback(db);
-      }, name = decodeURIComponent(name), function(e) {
-        response.end(e.message, 500);
+    var open = function() {
+      var upgrade;
+      return db = database.open(name, function() { upgrade = true; }, undefined, function(e) {
+        db.close();
+        if (!upgrade) response.end(e.message, null, 500);
+        database.delete(name);
+        response.generic(404);
       });
     };
     if (json) {
       switch (request.method) {
         case 'GET':
-          return open(function(db) {
-            var download = 'download' in request.query,
-                after = request.query.after,
-                i = 0;
-            db.get(path, false, download ? 'deep' : function(path, array) {
-              if (path.length) return false;
-              if (array) {
-                after = Math.max(parseInt(after, 10), -1);
-                if (isNaN(after) || after < 0) after = null;
-              }
-              var action = function() {
-                if (i++ == 100) return 'stop';
-              };
-              return after == null ? action : { // null bound possible?
-                lowerBound: after,
-                lowerExclusive: true,
-                action: action
-              };
-            }).then(function(object) {
-              db.close();
-              if (object === undefined) response.generic(404);
-              response.end(JSON.stringify(download ? object : {data: object, remaining: i > 100}), 'json');
-            });
+          var download = 'download' in request.query,
+              after = request.query.after,
+              i = 0;
+          return open().get(path, false, download ? 'deep' : function(path, array) {
+            if (path.length) return false;
+            if (array) {
+              after = Math.max(parseInt(after, 10), -1);
+              if (isNaN(after) || after < 0) after = null;
+            }
+            var action = function() {
+              if (i++ == 100) return 'stop';
+            };
+            return after == null ? action : { // null bound possible?
+              lowerBound: after,
+              lowerExclusive: true,
+              action: action
+            };
+          }).then(function(object) {
+            db.close();
+            if (object === undefined) response.generic(404);
+            response.end(JSON.stringify(download ? object : {data: object, remaining: i > 100}), 'json');
           });
         case 'PUT':
         case 'POST':
@@ -219,21 +223,17 @@ function(modules) {
             return response.generic(403);
           return request.slurp(function(body) {
             if (body === undefined) return response.generic(415);
-            open(function(db) {
-              db[{PUT: 'put', POST: 'append', INSERT: 'insert'}[request.method]](path, body).then(function(error) {
-                db.close();
-                response.end(error ? '403 '+error : '200 Success', null, error ? 403 : 200);
-              });
+            open()[{PUT: 'put', POST: 'append', INSERT: 'insert'}[request.method]](path, body).then(function(error) {
+              db.close();
+              response.end(error ? '403 '+error : '200 Success', null, error ? 403 : 200);
             });
           }, request.headers['Content-Type'] == 'application/json' ? 'json' : 'utf8', 1048576);
         case 'DELETE':
           if (request.headers.Authorization != csrf)
             return request.generic(403);
-          return open(function(db) {
-            db.delete(path).then(function(error) {
-              db.close();
-              response.end(error ? '403 '+error : '200 Success', null, error ? 403 : 200);
-            });
+          return open().delete(path).then(function(error) {
+            db.close();
+            response.end(error ? '403 '+error : '200 Success', null, error ? 403 : 200);
           });
       }
       return response.generic(501);
@@ -245,116 +245,114 @@ function(modules) {
     } catch (e) {
       return response.generic(301, {Location: request.path});
     }
-    open(function(db) {
-      db.get('', false, function(path) {
-        var e = expanded, a = actual, i = 0;
-        return !path.some(function(segment) {
-          if (!(e = e[segment += ''])) return true;
-          a = a[segment] = a[segment] || {};
-        }) && {
-          action: function() {
-            if (i++ == 100) return 'stop';
-          },
-          value: function(key, value) {
-            return key == null ? {data: value, remaining: i > 100} : value;
-          }
-        };
-      }).then(function(data) {
-        db.close();
-        actual = stringify(actual);
-        if (state != actual)
-          return response.generic(303, {Location: request.path+(actual && '?'+actual)});
-        response.end(template([
-          {a: {href: '/', class: 'home', children: [{svg: [{use: {'xlink:href': '#icon-database'}}]}, name]}},
-          {pre: {id: 'value'}},
-          {script: {src: '/static/jsonv.js'}},
-          {script: function(d, s, p, token) {
-            if (!s) return [data, stringify, parse, csrf];
-            var pad = function(o) {
-              return o && typeof o == 'object' ? o.data ? {
-                data: Array.isArray(o.data) ? o.data.map(pad)
-                  : Object.keys(o.data).reduce(function(a, b) { a[b] = pad(o.data[b]); return a; }, {}),
-                remaining: o.remaining
-              } : {data: o, remaining: true, collapsed: true} : o;
-            };
-            var entry = function(path) {
-              for (var entry = d, i = 0; entry.data && i < path.length; i++)
-                entry = entry.data[path[i]];
-              return entry;
-            };
-            var editor = jsonv(document.getElementById('value'), d = pad(d), {
-              editor: true,
-              metadata: true,
-              listener: function(method, path, value, callback) {
-                var parent = entry(path.slice(0, -1)).data,
-                    key = path[path.length-1];
-                if (method == 'toggle') {
-                  if (key == null) return;
-                  var item = parent[key];
-                  method = !item.loaded;
-                  item.collapsed = !value;
-                  item.loaded = true;
-                } else if (method == 'delete') {
-                  if (typeof key == 'number') parent.splice(key, 1);
-                  else delete parent[key];
-                } else if (method == 'insert' || method == 'put') {
-                  var padded = function inflate(v) {
-                    return !v || typeof v != 'object' ? v : {data: Array.isArray(v) ? v.map(inflate)
-                      : Object.keys(v).reduce(function(a, b) { a[b] = inflate(v[b]); return a; }, {})};
-                  }(value);
-                  if (method == 'insert') parent.splice(key, 0, padded);
-                  else parent[key] = padded;
-                }
-                var state = s(function prune(data) {
-                  return Object.keys(data).reduce(function(o, key) {
-                    var v = data[key];
-                    if (v && typeof v == 'object' && !v.collapsed) o[key] = prune(v.data);
-                    return o;
-                  }, {});
-                }(d.data)).replace(/.+/, '?$&');
-                // TODO: replaceState for delete, insert on arrays
-                if (state != location.search) history.pushState(null, '', location.pathname+state);
-                if (typeof method == 'boolean') return method;
-                var request = new XMLHttpRequest();
-                if (method == 'get') request.responseType = 'json';
-                request.onload = request.onerror = function() {
-                  var error = request.status != 200;
-                  if (!error && method == 'get') {
-                    // TODO: check that item has not been deleted (in jsonv also?)
-                    var value = pad(request.response),
-                        data = value && value.data || {},
-                        item = key == null ? parent : parent[key].data;
-                    if (Array.isArray(data)) [].push.apply(item, data);
-                    else Object.keys(data).forEach(function(key) { item[key] = data[key]; });
-                  }
-                  if (callback) callback(error, value);
-                };
-                request.open(method, location.pathname+'/'+path.map(encodeURIComponent).join('/')+
-                  (method == 'get' && value != null ? '?after='+encodeURIComponent(value) : ''));
-                request.setRequestHeader('Accept', 'application/json');
-                request.setRequestHeader('Content-Type', 'application/json');
-                request.setRequestHeader('Authorization', token);
-                request.send(method == 'get' ? undefined : JSON.stringify(value));
+    open().get('', false, function(path) {
+      var e = expanded, a = actual, i = 0;
+      return !path.some(function(segment) {
+        if (!(e = e[segment += ''])) return true;
+        a = a[segment] = a[segment] || {};
+      }) && {
+        action: function() {
+          if (i++ == 100) return 'stop';
+        },
+        value: function(key, value) {
+          return key == null ? {data: value, remaining: i > 100} : value;
+        }
+      };
+    }).then(function(data) {
+      db.close();
+      actual = stringify(actual);
+      if (state != actual)
+        return response.generic(303, {Location: request.path+(actual && '?'+actual)});
+      response.end(template([
+        {a: {href: '/', class: 'home', children: [{svg: [{use: {'xlink:href': '#icon-database'}}]}, name]}},
+        {pre: {id: 'value'}},
+        {script: {src: '/static/jsonv.js'}},
+        {script: function(d, s, p, token) {
+          if (!s) return [data, stringify, parse, csrf];
+          var pad = function(o) {
+            return o && typeof o == 'object' ? o.data ? {
+              data: Array.isArray(o.data) ? o.data.map(pad)
+                : Object.keys(o.data).reduce(function(a, b) { a[b] = pad(o.data[b]); return a; }, {}),
+              remaining: o.remaining
+            } : {data: o, remaining: true, collapsed: true} : o;
+          };
+          var entry = function(path) {
+            for (var entry = d, i = 0; entry.data && i < path.length; i++)
+              entry = entry.data[path[i]];
+            return entry;
+          };
+          var editor = jsonv(document.getElementById('value'), d = pad(d), {
+            editor: true,
+            metadata: true,
+            listener: function(method, path, value, callback) {
+              var parent = entry(path.slice(0, -1)).data,
+                  key = path[path.length-1];
+              if (method == 'toggle') {
+                if (key == null) return;
+                var item = parent[key];
+                method = !item.loaded;
+                item.collapsed = !value;
+                item.loaded = true;
+              } else if (method == 'delete') {
+                if (typeof key == 'number') parent.splice(key, 1);
+                else delete parent[key];
+              } else if (method == 'insert' || method == 'put') {
+                var padded = function inflate(v) {
+                  return !v || typeof v != 'object' ? v : {data: Array.isArray(v) ? v.map(inflate)
+                    : Object.keys(v).reduce(function(a, b) { a[b] = inflate(v[b]); return a; }, {})};
+                }(value);
+                if (method == 'insert') parent.splice(key, 0, padded);
+                else parent[key] = padded;
               }
-            });
-            window.onpopstate = function() {
-              // assumes state changes using data currently in memory
-              editor.toggle([], true);
-              (function compare(path, a, b) {
-                Object.keys(a).forEach(function(key) {
-                  var state = a[key], next = b[key];
-                  if (!state || typeof state != 'object') return;
-                  if (state.collapsed != !next) {
-                    editor.toggle(path.concat([key]));
-                    state.collapsed = !next;
-                  }
-                  if (next) compare(path.concat([key]), state.data, next);
-                });
-              }([], d.data, p(location.search.substr(1))));
-            };
-          }}
-        ], name), 'html');
-      });
+              var state = s(function prune(data) {
+                return Object.keys(data).reduce(function(o, key) {
+                  var v = data[key];
+                  if (v && typeof v == 'object' && !v.collapsed) o[key] = prune(v.data);
+                  return o;
+                }, {});
+              }(d.data)).replace(/.+/, '?$&');
+              // TODO: replaceState for delete, insert on arrays
+              if (state != location.search) history.pushState(null, '', location.pathname+state);
+              if (typeof method == 'boolean') return method;
+              var request = new XMLHttpRequest();
+              if (method == 'get') request.responseType = 'json';
+              request.onload = request.onerror = function() {
+                var error = request.status != 200;
+                if (!error && method == 'get') {
+                  // TODO: check that item has not been deleted (in jsonv also?)
+                  var value = pad(request.response),
+                      data = value && value.data || {},
+                      item = key == null ? parent : parent[key].data;
+                  if (Array.isArray(data)) [].push.apply(item, data);
+                  else Object.keys(data).forEach(function(key) { item[key] = data[key]; });
+                }
+                if (callback) callback(error, value);
+              };
+              request.open(method, location.pathname+'/'+path.map(encodeURIComponent).join('/')+
+                (method == 'get' && value != null ? '?after='+encodeURIComponent(value) : ''));
+              request.setRequestHeader('Accept', 'application/json');
+              request.setRequestHeader('Content-Type', 'application/json');
+              request.setRequestHeader('Authorization', token);
+              request.send(method == 'get' ? undefined : JSON.stringify(value));
+            }
+          });
+          window.onpopstate = function() {
+            // assumes state changes using data currently in memory
+            editor.toggle([], true);
+            (function compare(path, a, b) {
+              Object.keys(a).forEach(function(key) {
+                var state = a[key], next = b[key];
+                if (!state || typeof state != 'object') return;
+                if (state.collapsed != !next) {
+                  editor.toggle(path.concat([key]));
+                  state.collapsed = !next;
+                }
+                if (next) compare(path.concat([key]), state.data, next);
+              });
+            }([], d.data, p(location.search.substr(1))));
+          };
+        }}
+      ], name), 'html');
     });
   }, function(error) {
     if (error) console.error('Error listening on 0.0.0.0:'+config.port+'\n'+error);
