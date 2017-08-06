@@ -153,23 +153,73 @@ header {
   margin-bottom: 20px;
   padding: 20px 10px 10px;
 }
-header ul {
+.logo {
+  display: inline-block;
+  vertical-align: top;
+  height: 32px;
+  padding-left: 37px;
+  background: url(/img/icon.png) left/32px no-repeat;
+  image-rendering: pixelated;
+  font: 500 24px/32px "Segoe UI", ArialMT, sans-serif;
+  color: black;
+}
+#nav-toggle, #account-toggle {
+  display: none;
+}
+header nav {
   margin-left: 22px;
   display: inline-block;
   vertical-align: top;
 }
-header li {
+header nav a {
   display: inline-block;
-}
-header li a {
-  display: block;
   padding: 10px 15px;
   font-size: 15px;
   color: #999;
   text-decoration: none;
 }
-header li a:hover {
+header nav a:hover {
   color: black;
+}
+.account {
+  float: right;
+  position: relative;
+}
+.account .button {
+  margin: 5px 0 0 5px;
+}
+.account ul {
+  display: none;
+  position: absolute;
+  top: 35px;
+  right: 0;
+  width: 200px;
+  background: #333;
+  z-index: 1;
+}
+.account ul a {
+  display: block;
+  color: #ddd;
+  padding: 10px 15px;
+}
+#account-toggle + label {
+  display: block;
+  cursor: pointer;
+}
+#account-toggle + label img {
+  vertical-align: middle;
+}
+#account-toggle + label:after {
+  content: "";
+  display: inline-block;
+  vertical-align: middle;
+  border: solid transparent;
+  border-width: 6px 4px 0;
+  border-top-color: #999;
+  margin: 0 5px;
+}
+#account-toggle:checked + label + ul {
+  display: block;
 }
 footer {
   padding: 20px 10px;
@@ -188,51 +238,6 @@ footer:after {
   content: "";
   display: block;
   clear: both;
-}
-.logo {
-  display: inline-block;
-  vertical-align: top;
-  height: 32px;
-  padding-left: 37px;
-  background: url(/img/icon.png) left/32px no-repeat;
-  image-rendering: pixelated;
-  font: 500 24px/32px "Segoe UI", ArialMT, sans-serif;
-  color: black;
-}
-.account {
-  float: right;
-  text-align: right;
-  margin: 5px 0 2px 0;
-}
-.account .button {
-  margin-left: 5px;
-}
-#user {
-  position: relative;
-  color: black;
-  padding: 5px 2px 5px 37px;
-  background-color: transparent;
-  background-position: -1px center;
-  background-repeat: no-repeat;
-}
-#user svg {
-  visibility: hidden;
-  position: relative;
-  margin: 0 14px 0 -29px;
-  fill: white;
-}
-#user:hover svg {
-  visibility: visible;
-}
-#user:hover:before {
-  content: "";
-  display: block;
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 31px;
-  height: 100%;
-  background: #33c;
 }
 #github, .github a:hover {
   background: black;
@@ -338,4 +343,48 @@ a.user.large {
 }
 .imgupload .preview {
   margin-bottom: 5px;
+}
+@media all and (max-width: 800px) {
+  #nav-toggle + label {
+    display: inline-block;
+    float: left;
+    margin: 0 5px 0 -7px;
+    padding: 7px;
+    width: 24px;
+    cursor: pointer;
+  }
+  #nav-toggle + label:before,
+  #nav-toggle + label:after {
+    content: "";
+    display: block;
+    height: 5px;
+    border: solid 0 #999;
+    border-width: 3px 0;
+  }
+  #nav-toggle + label:after {
+    border-width: 0 0 3px;
+  }
+  #nav-toggle:checked + label:before {
+    transform: translate(-3px, 0) rotate(-45deg);
+    transform-origin: top right;
+    border-bottom: none;
+  }
+  #nav-toggle:checked + label:after {
+    transform: translate(-3px, 3px) rotate(45deg);
+    transform-origin: bottom right;
+  }
+  #nav-toggle:checked + label + nav {
+    display: block;
+  }
+  header nav {
+    display: none;
+    clear: both;
+    margin: 10px -10px;
+    background: #f7f7f7;
+  }
+  header nav a {
+    display: block;
+    padding-left: 84px;
+    color: #666;
+  }
 }
