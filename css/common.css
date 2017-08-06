@@ -202,14 +202,14 @@ header nav a:hover {
   color: #ddd;
   padding: 10px 15px;
 }
-#account-toggle + label {
+.account label {
   display: block;
   cursor: pointer;
 }
-#account-toggle + label img {
+.account label img {
   vertical-align: middle;
 }
-#account-toggle + label:after {
+.account label:after {
   content: "";
   display: inline-block;
   vertical-align: middle;
@@ -217,6 +217,12 @@ header nav a:hover {
   border-width: 6px 4px 0;
   border-top-color: #999;
   margin: 0 5px;
+}
+.account label:hover {
+  background: #f7f7f7;
+}
+.account label:hover:after {
+  border-top-color: #666;
 }
 #account-toggle:checked + label + ul {
   display: block;
