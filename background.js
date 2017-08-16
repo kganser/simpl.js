@@ -98,25 +98,26 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
   var wrap = function(name, code, version, dependencies) {
     return 'simpl.add('+[JSON.stringify(name), code, version, JSON.stringify(dependencies)]+');';
   };
+  var send = function(client, event, data) {
+    client.send(JSON.stringify({event: event, data: data}), function(info) {
+      if (info.error) delete clients[client.socket.socketId];
+    });
+  };
   var broadcast = function(event, data, user) {
     Object.keys(clients).forEach(function(socketId) {
       var client = clients[socketId];
-      if (client.user != user) return;
-      client.connection.send(JSON.stringify({event: event, data: data}), function(info) {
-        if (info.error) delete clients[socketId];
-      });
+      if (client.user == user) send(client.connection, event, data);
     });
   };
-  var state = function(user, client, local) {
-    if (local) client.send(JSON.stringify({event: 'token', data: csrf}));
-    client.send(JSON.stringify({event: 'state', data: Object.keys(apps).reduce(function(apps, id) {
+  var state = function(user, client) {
+    send(client, 'state', Object.keys(apps).reduce(function(apps, id) {
       var i = id.indexOf('@');
       if (id.substr(0, i) == user) apps.push(id.substr(i+1));
       return apps;
-    }, [])}));
+    }, []));
     Object.keys(logs).forEach(function(id) {
       if (id.split('@', 1)[0] == user) logs[id].forEach(function(e) {
-        client.send(JSON.stringify(e.fatal ? {event: 'error', data: e.fatal} : {event: 'log', data: e}));
+        send(client, e.fatal ? 'error' : 'log', e.fatal ? e.fatal : e);
       });
     });
   };
@@ -202,13 +203,17 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     restore(function() {});
   });
   
-  chrome.runtime.onMessageExternal.addListener(function(message, sender, send) {
+  chrome.runtime.onMessageExternal.addListener(function(message, sender, reply) {
     message = message || {};
     var sid = verify(message.state),
-        token = message.token;
-    if (!sid || !token) return send({error: 'Invalid authentication request'});
+        token = message.token,
+        uri = message.redirect_uri,
+        client;
+    if (/^wss?:\/\/\d+$/.test(uri) && (client = clients[uri.split('//')[1]]))
+      reply = function(data) { send(client.connection, 'login', data); };
+    if (!sid || !token) return reply({error: 'Invalid authentication request'});
     return !api('user', token, function(status, data) {
-      if (status != 200) return send({error: 'Unable to access user account'});
+      if (status != 200) return reply({error: 'Unable to access user account'});
       db.put('sessions/'+sid, {
         access_token: token,
         username: data.username,
@@ -217,7 +222,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         plan: data.plan,
         expires: Date.now()+(message.expires_in || 86400)*1000
       }).then(function() {
-        send({status: 'success'});
+        reply({status: 'success'});
       });
     });
   });
@@ -235,16 +240,14 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       o.http.serve({port: command.port}, function(request, response) {
         
         var match, sid;
-        var logout = function() {
-          response.generic(303, {'Set-Cookie': 'sid=; Expires='+new Date().toUTCString(), Location: '/'});
-        };
         var forward = function(path, fallback, callback, method, data, text) {
-          sid = path == 'workspace' ? request.cookie.sid : request.query.sid;
-          authenticate(sid, function(session, local) {
+          authenticate(sid = request.query.sid || request.cookie.sid, function(session, local) {
             if (local || !session && !method) return fallback(callback);
             if (!session) return response.generic(401);
             api(path, session.access_token, function(status, data) {
-              if (status != 200) return logout(); // TODO: handle certain error statuses
+              if (status != 200) return path == 'workspace'
+                ? response.generic(302, {'Set-Cookie': 'sid=; Expires='+new Date().toUTCString(), Location: '/'})
+                : response.end(JSON.stringify(data), 'json', status);
               callback(data, {username: session.username, name: session.name, email: session.email});
             }, method, data, text);
           });
@@ -361,15 +364,19 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         if (request.path == '/login') {
           sid = verify(request.cookie.sid) || token(true);
           return gcSessions(db).put('sessions/'+sid, {expires: Date.now()+86400000}).then(function() {
+            var socket = request.query.socket;
             response.generic(303, {
               'Set-Cookie': 'sid='+sid,
-              Location: 'https://simpljs.com/authorize?client_id=simpljs&redirect_uri='+
-                encodeURIComponent('http://'+request.headers.Host+(request.query.redirect || '/'))+'&state='+sid
+              Location: 'https://simpljs.com/authorize?client_id=simpljs&redirect_uri='+encodeURIComponent(
+                socket ? 'ws://'+socket : 'http://'+request.headers.Host+(request.query.redirect || '/'))+'&state='+sid
             });
           });
         }
         if (request.path == '/logout')
-          return request.cookie.sid ? logout() : response.generic(301, {Location: '/'});
+          return response.generic(302, {
+            'Set-Cookie': request.cookie.sid && 'sid=; Expires='+new Date().toUTCString(),
+            Location: '/'
+          });
         if (request.path == '/token')
           return response.end(csrf);
         if (request.path == '/restore' && request.method == 'POST')
@@ -395,7 +402,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             });
           }, 'json');
         if (request.path == '/connect')
-          return authenticate(request.query.sid, function(session, local) {
+          return authenticate(sid = request.query.sid, function(session, local) {
             if (!session && !local && request.headers.Origin != 'http://'+request.headers.Host)
               return response.generic(401);
             var socketId = response.socket.socketId,
@@ -403,6 +410,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                 token = session && session.access_token;
             o.websocket.accept(request, response, function(client) {
               clients[socketId] = {user: user, connection: client};
+              send(client, 'connect', {token: sid, id: socketId});
               if (session && session.plan == 'pro') {
                 var ws = new WebSocket('wss://api.simpljs.com/connect?access_token='+token);
                 ws.onmessage = function(e) {
@@ -424,7 +432,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                     command = message.command;
                 if (instance) return ws && ws.send(data);
                 if (command == 'connect')
-                  return state(user, client, !session);
+                  return state(user, client);
                 if (command == 'stop' || command == 'restart')
                   stop(user, message.app, message.version);
                 if (command == 'run' || command == 'restart')

@@ -23,7 +23,7 @@ simpl.add('app', function(o) {
       });
       modules[name] = {name: n[0], source: n[1], versions: versions};
     });
-    var appList, moduleList, selected, code, config, major, minor, remove, dependencies, search, suggest, timeline, history, log, docs, status, login, connect, send, servers,
+    var appList, moduleList, selected, code, config, major, minor, remove, dependencies, search, suggest, timeline, history, log, docs, status, login, connect, send, servers, id,
         icons = {}, dom = o.html.dom, boilerplate = 'function(modules) {\n  \n}';
     // Entypo pictograms by Daniel Bruce — www.entypo.com
     Array.prototype.slice.call(document.getElementById('icons').childNodes).forEach(function(icon) {
@@ -45,7 +45,14 @@ simpl.add('app', function(o) {
         options = {};
       }
       options.responseType = 'json';
-      o.xhr(path+(~path.indexOf('?') ? '&sid=' : '?sid=')+token, options, callback);
+      o.xhr(path+(~path.indexOf('?') ? '&sid=' : '?sid=')+token, options, function(e) {
+        // TODO: normalize response (JSON body)
+        if (e.target.status != 401) return callback(e);
+        login.open(function(response) {
+          if (!response || response.error) callback(e);
+          else request(path, options, callback);
+        });
+      });
     };
     var logLine = function(entry) {
       var message = [], link;
@@ -297,7 +304,7 @@ simpl.add('app', function(o) {
               ? {id: 'logout', href: '/logout', title: 'Log Out', children: icons.logout}
               : {id: 'login', href: '/login', title: 'Log In or Register', children: icons.login, onclick: function(e) {
                   e.preventDefault();
-                  login();
+                  login.open();
                 }}}}},
             user
               ? {span: {className: 'name', style: {backgroundImage: 'url('+user.image+')'}, children: user.name}}
@@ -363,9 +370,15 @@ simpl.add('app', function(o) {
                 if (event in {error: 1, log: 1, run: 1, stop: 1} && (instance != server || !entry)) return;
                 switch (event) {
                   case 'connect':
+                    token = data.token;
+                    id = data.id;
+                    if (!servers) break;
                     for (var i = servers.firstChild; i && i.value.localeCompare(instance) < 0; i = i.nextSibling);
                     if (i && i.value == instance) i.disabled = false;
                     else servers.insertBefore(dom({option: {value: instance, children: message.name}}), i);
+                    break;
+                  case 'login':
+                    login.close(data);
                     break;
                   case 'disconnect':
                     for (var i = servers.firstChild; i; i = i.nextSibling) {
@@ -380,9 +393,6 @@ simpl.add('app', function(o) {
                         break;
                       }
                     }
-                    break;
-                  case 'token':
-                    token = data;
                     break;
                   case 'state':
                     if (Array.isArray(data)) data.forEach(function(id) {
@@ -877,13 +887,23 @@ simpl.add('app', function(o) {
           };
         }}},
         {div: {id: 'auth', children: function(e) {
-          login = function() {
-            e.classList.add('visible');
-            dom({iframe: {src: '/login'}}, e, true);
+          var handler;
+          login = {
+            open: function(callback) {
+              e.classList.add('visible');
+              handler = id && callback;
+              dom({iframe: {src: '/login'+(handler ? '?socket='+id : '')}}, e, true);
+            },
+            close: function(response) {
+              e.classList.remove('visible');
+              if (handler) handler(response);
+              handler = null;
+            }
           };
-        }, onclick: function(e) {
-          if (this == e.target)
-            this.classList.remove('visible');
+          e.onclick = function(e) {
+            if (this == e.target)
+              login.close();
+          };
         }}}
       ]}}
     ], body);
