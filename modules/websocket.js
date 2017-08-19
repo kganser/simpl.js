@@ -50,7 +50,7 @@ simpl.add('websocket', function(modules) {
       
   /** Connection: {
         send: function(message:string|ArrayBuffer, callback=undefined:function(info:SendInfo)) -> Connection,
-        close: function(code=1000:number),
+        close: function(code=1000:number, reason='Normal Closure':string),
         onMessage: function(message:string|ArrayBuffer),
         onError: function(code:number),
         socket: ClientSocket
@@ -119,8 +119,10 @@ simpl.add('websocket', function(modules) {
               if (info.error) error(1006);
             });
           },
-          close: function(code) {
-            if (!closed) socket.send(frame(8, utf8(self.statusMessage(code)).buffer, code || 1000), socket.disconnect);
+          close: function(code, message) {
+            if (!code) code = 1000;
+            if (message == null) message = self.statusMessage(code);
+            if (!closed) socket.send(frame(8, utf8(message).buffer, code), socket.disconnect);
             closed = true;
           },
           socket: socket
