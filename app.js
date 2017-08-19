@@ -326,7 +326,7 @@ simpl.add('app', function(o) {
         ]}},
         {div: {id: 'connection', children: [
           {span: function(e) {
-            var socket, server, unload, countdown, retries = 0;
+            var socket, server, unload, expired, countdown, retries = 0;
             var status = function(message, className) {
               e.parentNode.className = message ? className || 'info' : null;
               e.textContent = message;
@@ -339,6 +339,7 @@ simpl.add('app', function(o) {
               socket.send(JSON.stringify(data));
             };
             connect = function(host) {
+              clearInterval(countdown);
               status('Connecting...', 'connecting');
               server = host || undefined;
               appList.classList.add('disabled');
@@ -351,14 +352,21 @@ simpl.add('app', function(o) {
                   entry.log = [];
                 });
               });
+              if (user && expired) return login.open(function(response) {
+                if (response && !response.error) return connect(host);
+                status(response ? response.error : 'Disconnected', 'error');
+              });
               if (socket) return send('connect');
               if (!window.WebSocket) return status('WebSockets are not supported in this browser.', 'fatal');
-              clearInterval(countdown);
               socket = new WebSocket('ws://'+location.host+'/connect?sid='+token);
               socket.onopen = function() {
-                retries = 0;
                 status();
                 send('connect');
+                expired = false;
+                var s = socket;
+                setTimeout(function() {
+                  if (s == socket) retries = 0;
+                }, 2000);
               };
               socket.onmessage = function(e) {
                 try { var message = JSON.parse(e.data); } catch (e) { return; }
@@ -372,13 +380,20 @@ simpl.add('app', function(o) {
                   case 'connect':
                     token = data.token;
                     id = data.id;
-                    if (!servers) break;
+                    if (!servers || !instance) break;
                     for (var i = servers.firstChild; i && i.value.localeCompare(instance) < 0; i = i.nextSibling);
                     if (i && i.value == instance) i.disabled = false;
                     else servers.insertBefore(dom({option: {value: instance, children: message.name}}), i);
                     break;
                   case 'login':
+                    if (!data.error) status();
                     login.close(data);
+                    break;
+                  case 'expire':
+                    dom({option: {value: '', children: 'Localhost'}}, servers, true);
+                    if (data.refresh) expired = true;
+                    server = undefined;
+                    connect();
                     break;
                   case 'disconnect':
                     for (var i = servers.firstChild; i; i = i.nextSibling) {
@@ -445,7 +460,7 @@ simpl.add('app', function(o) {
               socket.onclose = function() {
                 appList.classList.add('disabled');
                 dom({option: {value: '', children: 'Localhost'}}, servers, true);
-                server = socket = null;
+                server = socket = undefined;
                 if (unload) return;
                 if (retries == 6) return status('Disconnected', 'error');
                 var seconds = 1 << retries++;

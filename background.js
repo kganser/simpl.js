@@ -223,6 +223,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         expires: Date.now()+(message.expires_in || 86400)*1000
       }).then(function() {
         reply({status: 'success'});
+        if (client) client.connect(data.plan, token);
       });
     });
   });
@@ -406,37 +407,42 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             if (!session && !local && request.headers.Origin != 'http://'+request.headers.Host)
               return response.generic(401);
             var socketId = response.socket.socketId,
-                user = session ? session.username : '',
-                token = session && session.access_token;
+                user = session ? session.username : '';
             o.websocket.accept(request, response, function(client) {
-              clients[socketId] = {user: user, connection: client};
+              var self = clients[socketId] = {
+                user: user,
+                connection: client,
+                connect: function(plan, token) {
+                  if (self.remote || plan != 'pro') return;
+                  self.token = token;
+                  self.remote = new WebSocket('wss://api.simpljs.com/connect?access_token='+token);
+                  self.remote.onmessage = function(e) {
+                    if (typeof e.data == 'string' && e.data != 'ping')
+                      client.send(e.data);
+                  };
+                  self.remote.onclose = function(e) {
+                    send(client, 'expire', {refresh: e.code != 4001});
+                    self.remote = null;
+                  };
+                }
+              };
               send(client, 'connect', {token: sid, id: socketId});
-              if (session && session.plan == 'pro') {
-                var ws = new WebSocket('wss://api.simpljs.com/connect?access_token='+token);
-                ws.onmessage = function(e) {
-                  if (typeof e.data == 'string' && e.data != 'ping')
-                    client.send(e.data);
-                };
-                ws.onclose = function() {
-                  client.close(1001);
-                  delete clients[socketId];
-                };
-                client.socket.onDisconnect = function() {
-                  ws.close();
-                  delete clients[socketId];
-                };
-              }
+              if (session) self.connect(session.plan, session.access_token);
+              client.socket.onDisconnect = function() {
+                if (self.remote) self.remote.close();
+                delete clients[socketId];
+              };
               return function(data) {
                 try { var message = JSON.parse(data); } catch (e) { return; }
                 var instance = message.instance,
                     command = message.command;
-                if (instance) return ws && ws.send(data);
+                if (instance) return self.remote && self.remote.send(data);
                 if (command == 'connect')
                   return state(user, client);
                 if (command == 'stop' || command == 'restart')
                   stop(user, message.app, message.version);
                 if (command == 'run' || command == 'restart')
-                  run(user, message.app, message.version, token);
+                  run(user, message.app, message.version, self.token);
               };
             });
           });
