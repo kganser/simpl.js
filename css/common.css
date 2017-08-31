@@ -62,32 +62,35 @@ button, input, textarea {
   border: none;
   padding: 3px;
   font: inherit;
+  outline: none;
 }
-.form select {
-  background: white;
-  border-radius: 0;
+input, textarea {
+  border: solid 1px #ddd;
+}
+input[type=file] {
   border: none;
-  padding: 2px 0;
-  font: inherit;
 }
 textarea {
   vertical-align: bottom;
 }
-button, input[type=submit], a.button {
+select {
+  background: white;
+  border-radius: 0;
+  border: solid 1px #ddd;
+  padding: 2px 0;
+  font: inherit;
+  outline: none;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: #aaa;
+}
+button, a.button {
   font: 13px/15px arial, sans-serif;
   padding: 5px 8px;
   color: #666;
   background: #f7f7f7;
   cursor: pointer;
   -webkit-appearance: none;
-}
-.form button, input[type=submit] {
-  background: #666;
-  color: white;
-}
-button[type=submit], input[type=submit] {
-  padding: 5px 10px;
-  margin: 10px 10px 0 0;
 }
 button[disabled], input[disabled] {
   cursor: auto;
@@ -193,7 +196,7 @@ header nav a:hover {
   position: absolute;
   top: 35px;
   right: 0;
-  width: 200px;
+  width: 150px;
   background: #333;
   z-index: 1;
 }
@@ -201,6 +204,9 @@ header nav a:hover {
   display: block;
   color: #ddd;
   padding: 10px 15px;
+}
+.account ul a:hover {
+  color: white;
 }
 .account label {
   display: block;
@@ -262,12 +268,10 @@ footer:after {
   color: white;
 }
 .form {
-  display: inline-block;
-  vertical-align: top;
-  text-align: left;
   background: #f7f7f7;
-  margin: 0 0 20px 0;
-  padding: 20px 50px 20px 120px;
+  margin: 0 0 20px;
+  max-width: 320px;
+  padding: 20px 0 20px 140px;
 }
 .form label {
   display: block;
@@ -281,18 +285,25 @@ footer:after {
 .form label span {
   float: left;
   text-align: right;
-  margin-left: -120px;
+  margin-left: -140px;
   padding: 3px 0;
-  width: 110px;
+  width: 130px;
 }
 .form label .value {
   padding: 3px 0;
 }
+.form button {
+  background: #666;
+  color: white;
+  padding: 5px 10px;
+  margin: 10px 10px 0 0;
+}
 .form p {
-  margin: 0 -30px 0 -100px;
+  font-size: inherit;
+  margin: 0 20px 0 -120px;
 }
 .form .error {
-  margin: -20px -50px 20px -120px;
+  margin: -20px 0 20px -140px;
   display: none;
 }
 #exp-month {
@@ -392,5 +403,23 @@ a.user.large {
     display: block;
     padding-left: 84px;
     color: #666;
+  }
+}
+@media all and (max-width: 360px) {
+  .form {
+    padding: 20px 0 20px 20px;
+  }
+  .form label span {
+    float: none;
+    width: auto;
+    display: block;
+    text-align: left;
+    margin-left: 0;
+  }
+  .form p {
+    margin: 0 20px 0 0;
+  }
+  .form .error {
+    margin: -20px 0 20px -20px;
   }
 }

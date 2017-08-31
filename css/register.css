@@ -1,11 +1,14 @@
-#page-register main {
-  overflow: hidden;
-}
-#page-register form {
+#page-register .form {
+  float: left;
+  width: 300px;
   margin-right: 40px;
 }
+#page-register .form.free .payment,
+#page-register .form.free .disclosure span {
+  display: none;
+}
 #page-register aside {
-  display: inline-block;
+  float: left;
   width: 100%;
   max-width: 400px;
 }
@@ -13,7 +16,7 @@
   background-size: 120%;
   background-position: 10px 10px;
   background-repeat: no-repeat;
-  box-shadow: inset 0 0 10px rgba(0,0,0,.3);
+  border: solid 1px #ddd;
   height: 130px;
 }
 #page-register aside #profile {
@@ -31,19 +34,21 @@
   margin: 5px 0 30px;
 }
 .compare {
-  float: right;
   padding: 3px 0;
+  margin-left: 20px;
 }
 #price {
   font-size: 16px;
-  margin: 10px 0;
-  text-align: center;
+  margin: 20px 0 10px;
 }
 .disclosure {
-  font-size: 11px;
-  line-height: 14px;
+  font-size: 12px;
+  line-height: 1.3;
   color: #666;
-  width: 314px;
-  padding: 0 15px;
-  margin: 15px -50px 10px -120px;
+  padding: 10px 15px 10px 0;
+}
+@media all and (max-width: 800px) {
+  #page-register .form {
+    margin-right: 0;
+  }
 }

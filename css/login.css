@@ -1,4 +1,4 @@
-#page-login main {
+#page-login p {
   text-align: center;
 }
 #page-login p .button {
@@ -8,14 +8,7 @@
 #page-login em {
   font: italic 16px georgia, serif;
 }
-#page-login form {
-  margin: 0 20px 20px;
-}
-@media only screen and (max-width: 600px) {
-  #page-login main {
-    overflow: hidden;
-  }
-  #page-login form {
-    margin: 0 -10px 20px;
-  }
+#page-login .form {
+  max-width: 240px;
+  margin: 0 auto 20px;
 }

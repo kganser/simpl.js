@@ -33,7 +33,7 @@
   fill: #f0f0f0;
 }
 #pricing td {
-  width: 30%;
+  width: 20%;
   text-align: center;
 }
 #pricing .price td {
@@ -41,6 +41,7 @@
   padding: 5px 0;
 }
 #pricing td:first-child {
+  width: 40%;
   text-align: left;
 }
 #pricing td svg {

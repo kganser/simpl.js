@@ -1,5 +1,4 @@
 #page-account .form {
-  width: 250px;
   margin-bottom: 0;
 }
 .form#accounts {
@@ -22,13 +21,7 @@
 #avatar {
   padding-top: 0;
 }
-#avatar a {
-  font-size: 12px;
-}
-#avatar a:hover {
-  text-decoration: none;
-}
 #avatar img {
-  margin-right: 5px;
+  margin-right: 8px;
   vertical-align: middle;
 }

@@ -31,7 +31,7 @@
   box-sizing: border-box;
   max-width: 300px;
   font-size: 15px;
-  line-height: 30px;
+  line-height: 28px;
   margin: 5px 0;
   padding: 0 0 0 30px;
 }
@@ -43,24 +43,26 @@
   line-height: 28px;
   padding: 6px;
 }
-.pagination input {
+.pagination button {
   margin: 0 -5px 0 10px;
   padding: 0 11px;
   line-height: 28px;
+  background: #666;
+  color: white;
 }
-.pagination input:disabled {
-  background: white;
+.pagination button:disabled {
+  background: transparent;
   color: black;
 }
 #page-search h3 {
   margin: .7em 0 .5em;
 }
-#page-search label {
+#page-search aside label {
   display: inline-block;
   padding: 1px 8px 1px 0;
   cursor: pointer;
 }
-#page-search select {
+#page-search aside select {
   margin: 5px 0;
 }
 #page-search aside button {
