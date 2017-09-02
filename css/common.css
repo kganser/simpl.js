@@ -120,7 +120,7 @@ button:hover, a.button:hover {
   color: white;
   background: #666;
 }
-a.button.red:hover, button.red:hover, .error, button[type=submit].red {
+a.button.red:hover, button.red:hover, .error {
   color: white;
   background: #c33;
 }
