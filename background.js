@@ -24,7 +24,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     return signature(parts[0]) == parts[1] && signed;
   };
   var api = function(path, token, callback, method, data, text) {
-    o.xhr(localApiPort ? 'https://api.simpljs.com/'+path : 'http://localhost:'+localApiPort+'/'+path, {
+    o.xhr(localApiPort ? 'http://localhost:'+localApiPort+'/'+path : 'https://api.simpljs.com/'+path, {
       method: method,
       responseType: 'json',
       headers: {Authorization: token ? 'Bearer '+token : null},
