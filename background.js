@@ -6,7 +6,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       encode = o.string.base64FromBuffer,
       decode = o.string.base64ToBuffer,
       utf8 = o.string.fromUTF8Buffer,
-      apps = {}, logs = {}, clients = {}, csrf, ping;
+      apps = {}, logs = {}, clients = {}, csrf, ping, localApiPort;
   
   var signature = function(value) {
     try {
@@ -24,7 +24,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     return signature(parts[0]) == parts[1] && signed;
   };
   var api = function(path, token, callback, method, data, text) {
-    o.xhr('https://api.simpljs.com/'+path, {
+    o.xhr(localApiPort ? 'https://api.simpljs.com/'+path : 'http://localhost:'+localApiPort+'/'+path, {
       method: method,
       responseType: 'json',
       headers: {Authorization: token ? 'Bearer '+token : null},
@@ -403,8 +403,8 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             });
           }, 'json');
         if (request.path == '/connect')
-          return authenticate(sid = request.query.sid, function(session, local) {
-            if (!session && !local && request.headers.Origin != 'http://'+request.headers.Host)
+          return authenticate(sid = request.query.sid, function(session) {
+            if (request.headers.Origin != 'http://'+request.headers.Host)
               return response.generic(401);
             var socketId = response.socket.socketId,
                 user = session ? session.username : '';
@@ -564,9 +564,9 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         var token = e && e.token,
             user = e && e.user,
             port = e && e.port,
-            app = e && (e.app || '').split('@'),
+            app = e && (e.app || '').split('@'), // name@version
             connections, client, retries = 0;
-        console.log('Simpl.js: Headless launch\n  token='+token+'\n  user='+user+'\n  port='+port+'\n  app='+app);
+        console.log('Simpl.js: Headless launch '+JSON.stringify(e));
         if (port && !server) onLauncher(null, function() {
           var doc = launcher.contentWindow.document;
           if (typeof port == 'number' || typeof port == 'string' && +port)
@@ -574,39 +574,42 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           doc.launcher.onsubmit();
         });
         if (app) run('', app[0], +app[1] || 1);
-        if (token && user) (function connect() {
-          console.log('Simpl.js: attempting headless connection '+retries);
-          ws = new WebSocket('wss://api.simpljs.com/connect?access_token='+token);
-          ws.onopen = function() {
-            console.log('Simpl.js: headless connection opened');
-            connections = retries = 0;
-            client = {user: user, connection: ws};
-          };
-          ws.onmessage = function(e) {
-            try { var message = JSON.parse(e.data); } catch (e) { return; }
-            var command = message.command;
-            if (command == 'connect') {
-              if (!connections++)
-                clients[-1] = client;
-              return state(user, ws);
-            }
-            if (command == 'disconnect') {
-              if (!--connections)
-                delete clients[-1];
-              return;
-            }
-            if (command == 'stop' || command == 'restart')
-              stop(user, message.app, message.version);
-            if (command == 'run' || command == 'restart')
-              run(user, message.app, message.version, token);
-          };
-          ws.onclose = function() {
-            console.log('Simpl.js: headless connection closed');
-            delete clients[-1];
-            if (retries < 6) setTimeout(connect, (1 << retries++) * 1000);
-            else console.log('Simpl.js: headless connection failed');
-          };
-        }());
+        if (token && user) {
+          localApiPort = +e.localApiPort;
+          (function connect() {
+            console.log('Simpl.js: attempting headless connection '+retries);
+            ws = new WebSocket((localApiPort ? 'ws://localhost:'+localApiPort : 'wss://api.simpljs.com')+'/connect?access_token='+token);
+            ws.onopen = function() {
+              console.log('Simpl.js: headless connection opened');
+              connections = retries = 0;
+              client = {user: user, connection: ws};
+            };
+            ws.onmessage = function(e) {
+              try { var message = JSON.parse(e.data); } catch (e) { return; }
+              var command = message.command;
+              if (command == 'connect') {
+                if (!connections++)
+                  clients[-1] = client;
+                return state(user, ws);
+              }
+              if (command == 'disconnect') {
+                if (!--connections)
+                  delete clients[-1];
+                return;
+              }
+              if (command == 'stop' || command == 'restart')
+                stop(user, message.app, message.version);
+              if (command == 'run' || command == 'restart')
+                run(user, message.app, message.version, token);
+            };
+            ws.onclose = function() {
+              console.log('Simpl.js: headless connection closed');
+              delete clients[-1];
+              if (retries < 6) setTimeout(connect, (1 << retries++) * 1000);
+              else console.log('Simpl.js: headless connection failed');
+            };
+          }());
+        }
       }
     }
     launcher = true;
