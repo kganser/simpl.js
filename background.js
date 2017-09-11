@@ -413,8 +413,8 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                 user: user,
                 connection: client,
                 connect: function(plan, token) {
-                  if (self.remote || plan != 'pro') return;
                   self.token = token;
+                  if (self.remote || plan != 'pro') return;
                   self.remote = new WebSocket('wss://api.simpljs.com/connect?access_token='+token);
                   self.remote.onmessage = function(e) {
                     if (typeof e.data == 'string' && e.data != 'ping')
