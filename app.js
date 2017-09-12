@@ -378,12 +378,14 @@ simpl.add('app', function(o) {
                 if (event in {error: 1, log: 1, run: 1, stop: 1} && (instance != server || !entry)) return;
                 switch (event) {
                   case 'connect':
-                    token = data.token;
-                    id = data.id;
-                    if (!servers || !instance) break;
-                    for (var i = servers.firstChild; i && i.value.localeCompare(instance) < 0; i = i.nextSibling);
-                    if (i && i.value == instance) i.disabled = false;
-                    else servers.insertBefore(dom({option: {value: instance, children: message.name}}), i);
+                    if (!instance) {
+                      token = data.token;
+                      id = data.id;
+                    } else if (servers) {
+                      for (var i = servers.firstChild; i && i.value.localeCompare(instance) < 0; i = i.nextSibling);
+                      if (i && i.value == instance) i.disabled = false;
+                      else servers.insertBefore(dom({option: {value: instance, children: message.name}}), i);
+                    }
                     break;
                   case 'login':
                     if (!data.error) status();
