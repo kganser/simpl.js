@@ -831,7 +831,7 @@ simpl.add('app', function(o) {
                   if (gap.length) sections.push({lines: gap});
                   if (section.change) {
                     sections.push(section);
-                    if (i > context) sections.push(section.lines.splice(context-i));
+                    if (i > context) sections.push({lines: section.lines.splice(context-i)});
                   }
                   var ellipses = [a, b].map(function(n) { return String(n).replace(/./g, '·'); });
                   history(sections.map(function(section) {
