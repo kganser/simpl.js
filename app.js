@@ -353,7 +353,7 @@ simpl.add('app', function(o) {
                 });
               });
               if (user && expired) return login.open(function(response) {
-                if (response && !response.error) return connect(host);
+                if (response && !response.error) return connect(server);
                 status(response ? response.error : 'Disconnected', 'error');
               });
               if (socket) return send('connect');
@@ -388,13 +388,14 @@ simpl.add('app', function(o) {
                     }
                     break;
                   case 'login':
-                    if (!data.error) status();
+                    if (!data.error) expired = false;
                     login.close(data);
                     break;
                   case 'expire':
                     dom({option: {value: '', children: 'Localhost'}}, servers, true);
-                    if (data.refresh) expired = true;
+                    expired = data.refresh;
                     server = undefined;
+                    send('connect'); // switch to localhost
                     connect();
                     break;
                   case 'disconnect':
