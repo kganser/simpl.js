@@ -1,7 +1,6 @@
 simpl.add('websocket', function(modules) {
   
-  var sha1 = modules.crypto.sha1,
-      utf8 = modules.string.toUTF8Buffer,
+  var utf8 = modules.string.toUTF8Buffer,
       utf8decode = modules.string.fromUTF8Buffer,
       encode = modules.string.base64FromBuffer,
       self;
@@ -97,134 +96,136 @@ simpl.add('websocket', function(modules) {
           if (e in o) extensions.push(e);
         });
       }
-      response.end('', {
-        Upgrade: 'websocket',
-        Connection: 'upgrade',
-        'Sec-WebSocket-Accept': encode(sha1(utf8(key+'258EAFA5-E914-47DA-95CA-C5AB0DC85B11'))),
-        'Sec-WebSocket-Version': 13,
-        'Sec-WebSocket-Protocol': protocol,
-        'Sec-WebSocket-Extension': (extensions || []).join(', ')
-      }, 101, function(info) {
-        if (info.error) return error(1006);
-        var receive = callback(connection = {
-          send: function(message, callback) {
-            if (!closed) socket.send(typeof message == 'string' ? frame(1, utf8(message).buffer) : frame(2, message), function(info) {
-              if (info.error) error(1006);
-              if (callback) callback(info);
-            });
-            return connection;
-          },
-          ping: function() {
-            if (!closed) socket.send(frame(9, utf8('ping').buffer), function(info) {
-              if (info.error) error(1006);
-            });
-          },
-          close: function(code, message) {
-            if (!code) code = 1000;
-            if (message == null) message = self.statusMessage(code);
-            if (!closed) socket.send(frame(8, utf8(message).buffer, code), socket.disconnect);
-            closed = true;
-          },
-          socket: socket
-        }, protocol, extensions || []);
-        if (typeof connection.onMessage != 'function')
-          connection.onMessage = receive;
-        socket.onReceive = function(data) {
-          //console.log('received: '+data.byteLength+' '+modules.string.hexFromBuffer(data));
-          if (closed) return;
-          var start, i = 0;
-          data = new Uint8Array(data);
-          while (i < data.length) {
-            start = l < 127 ? l < 126 ? 6 : 8 : 14;
-            if (pos < start) {
-              switch (pos) {
-                case 0:
-                  fin = data[i] & 128;
-                  opcode = data[i] & 15 || opcode;
-                  break;
-                case 1:
-                  if (data[i] & 128 ^ 128) return error(1002); // message not masked
-                  l = data[i] & 127;
-                  length = l < 126 ? l : 0;
-                  mask = 0;
-                  break;
-                case 2:
-                  if (l > 126) return error(1009);
-                  if (l < 126) mask |= data[i] << 24;
-                  else length += data[i] << 8;
-                  break;
-                case 3:
-                  if (l > 126) return error(1009);
-                  if (l < 126) mask |= data[i] << 16;
-                  else length += data[i];
-                  break;
-                case 4:
-                  if (l > 126) length += data[i] * 1099511627776; // << 40
-                  else mask |= data[i] << (l < 126 ? 8 : 24);
-                  break;
-                case 5:
-                  if (l > 126) length += data[i] * 4294967296; // << 32
-                  else mask |= l < 126 ? data[i] : data[i] << 16;
-                  break;
-                case 6:
-                  if (l > 126) length += data[i] * 16777216; // << 24
-                  else mask |= data[i] << 8;
-                  break;
-                case 7:
-                  if (l > 126) length += data[i] << 16;
-                  else mask |= data[i];
-                  break;
-                case 8:
-                  length += data[i] << 8;
-                  break;
-                case 9:
-                  length += data[i];
-                  break;
-                case 10:
-                  mask |= data[i] << 24;
-                  break;
-                case 11:
-                  mask |= data[i] << 16;
-                  break;
-                case 12:
-                  mask |= data[i] << 8;
-                  break;
-                case 13:
-                  mask |= data[i];
-              }
-              i++;
-              pos++;
-            } else {
-              if (length > (options.maxLength || 65535))
-                return error(1009);
-              if (!buffer) {
-                buffer = new Uint8Array(length);
-              } else if (pos == start) {
-                var b = new Uint8Array(buffer.length+length);
-                b.set(buffer);
-                buffer = b;
-              }
-              var offset = pos-start,
-                  bufferOffset = buffer.length-length+offset,
-                  size = Math.min(length-offset, data.length-i);
-              for (var j = 0; j < size; j++)
-                buffer[bufferOffset+j] = data[i+j] ^ mask >> (3-(offset+j) % 4 << 3) & 255;
-              pos += size;
-              i += size;
-              if (offset+size == length) {
-                //console.log('fin: '+fin+' opcode: '+opcode+' length: '+length+' mask: '+mask.toString(16)+' unmasked: '+modules.string.hexFromBuffer(buffer));
-                l = pos = 0;
-                if (fin) {
-                  buffer = buffer.buffer;
-                  if (opcode == 8) error(1006); // close
-                  else if (opcode == 9) socket.send(frame(10, buffer)); // pong
-                  else if (connection.onMessage) connection.onMessage(opcode == 1 ? utf8decode(buffer) : buffer);
-                  buffer = null;
+      crypto.subtle.digest('sha-1', utf8(key+'258EAFA5-E914-47DA-95CA-C5AB0DC85B11')).then(function(hash) {
+        response.end('', {
+          Upgrade: 'websocket',
+          Connection: 'upgrade',
+          'Sec-WebSocket-Accept': encode(hash),
+          'Sec-WebSocket-Version': 13,
+          'Sec-WebSocket-Protocol': protocol,
+          'Sec-WebSocket-Extension': (extensions || []).join(', ')
+        }, 101, function(info) {
+          if (info.error) return error(1006);
+          var receive = callback(connection = {
+            send: function(message, callback) {
+              if (!closed) socket.send(typeof message == 'string' ? frame(1, utf8(message).buffer) : frame(2, message), function(info) {
+                if (info.error) error(1006);
+                if (callback) callback(info);
+              });
+              return connection;
+            },
+            ping: function() {
+              if (!closed) socket.send(frame(9, utf8('ping').buffer), function(info) {
+                if (info.error) error(1006);
+              });
+            },
+            close: function(code, message) {
+              if (!code) code = 1000;
+              if (message == null) message = self.statusMessage(code);
+              if (!closed) socket.send(frame(8, utf8(message).buffer, code), socket.disconnect);
+              closed = true;
+            },
+            socket: socket
+          }, protocol, extensions || []);
+          if (typeof connection.onMessage != 'function')
+            connection.onMessage = receive;
+          socket.onReceive = function(data) {
+            //console.log('received: '+data.byteLength+' '+modules.string.hexFromBuffer(data));
+            if (closed) return;
+            var start, i = 0;
+            data = new Uint8Array(data);
+            while (i < data.length) {
+              start = l < 127 ? l < 126 ? 6 : 8 : 14;
+              if (pos < start) {
+                switch (pos) {
+                  case 0:
+                    fin = data[i] & 128;
+                    opcode = data[i] & 15 || opcode;
+                    break;
+                  case 1:
+                    if (data[i] & 128 ^ 128) return error(1002); // message not masked
+                    l = data[i] & 127;
+                    length = l < 126 ? l : 0;
+                    mask = 0;
+                    break;
+                  case 2:
+                    if (l > 126) return error(1009);
+                    if (l < 126) mask |= data[i] << 24;
+                    else length += data[i] << 8;
+                    break;
+                  case 3:
+                    if (l > 126) return error(1009);
+                    if (l < 126) mask |= data[i] << 16;
+                    else length += data[i];
+                    break;
+                  case 4:
+                    if (l > 126) length += data[i] * 1099511627776; // << 40
+                    else mask |= data[i] << (l < 126 ? 8 : 24);
+                    break;
+                  case 5:
+                    if (l > 126) length += data[i] * 4294967296; // << 32
+                    else mask |= l < 126 ? data[i] : data[i] << 16;
+                    break;
+                  case 6:
+                    if (l > 126) length += data[i] * 16777216; // << 24
+                    else mask |= data[i] << 8;
+                    break;
+                  case 7:
+                    if (l > 126) length += data[i] << 16;
+                    else mask |= data[i];
+                    break;
+                  case 8:
+                    length += data[i] << 8;
+                    break;
+                  case 9:
+                    length += data[i];
+                    break;
+                  case 10:
+                    mask |= data[i] << 24;
+                    break;
+                  case 11:
+                    mask |= data[i] << 16;
+                    break;
+                  case 12:
+                    mask |= data[i] << 8;
+                    break;
+                  case 13:
+                    mask |= data[i];
+                }
+                i++;
+                pos++;
+              } else {
+                if (length > (options.maxLength || 65535))
+                  return error(1009);
+                if (!buffer) {
+                  buffer = new Uint8Array(length);
+                } else if (pos == start) {
+                  var b = new Uint8Array(buffer.length+length);
+                  b.set(buffer);
+                  buffer = b;
+                }
+                var offset = pos-start,
+                    bufferOffset = buffer.length-length+offset,
+                    size = Math.min(length-offset, data.length-i);
+                for (var j = 0; j < size; j++)
+                  buffer[bufferOffset+j] = data[i+j] ^ mask >> (3-(offset+j) % 4 << 3) & 255;
+                pos += size;
+                i += size;
+                if (offset+size == length) {
+                  //console.log('fin: '+fin+' opcode: '+opcode+' length: '+length+' mask: '+mask.toString(16)+' unmasked: '+modules.string.hexFromBuffer(buffer));
+                  l = pos = 0;
+                  if (fin) {
+                    buffer = buffer.buffer;
+                    if (opcode == 8) error(1006); // close
+                    else if (opcode == 9) socket.send(frame(10, buffer)); // pong
+                    else if (connection.onMessage) connection.onMessage(opcode == 1 ? utf8decode(buffer) : buffer);
+                    buffer = null;
+                  }
                 }
               }
             }
-          }
-        };
+          };
+        });
       });
     },
     statusMessage: function(code) {
@@ -246,4 +247,4 @@ simpl.add('websocket', function(modules) {
       }[code];
     }
   };
-}, 0, {crypto: 0, string: 0});
+}, 0, {string: 0});

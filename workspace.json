@@ -15,6 +15,6 @@
   {"name": "socket", "proxy": true},
   {"name": "string"},
   {"name": "system", "proxy": true},
-  {"name": "websocket", "dependencies": {"crypto": 0, "string": 0}},
+  {"name": "websocket", "dependencies": {"string": 0}},
   {"name": "xhr"}
 ]
