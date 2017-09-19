@@ -606,6 +606,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
               console.log('Simpl.js: headless connection closed');
               delete clients[-1];
               if (retries < 6) setTimeout(connect, (1 << retries++) * 1000);
+              else if (localApiPort) setTimeout(connect, 64000);
               else console.log('Simpl.js: headless connection failed');
             };
           }());
