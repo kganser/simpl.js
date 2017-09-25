@@ -214,6 +214,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     if (!sid || !token) return reply({error: 'Invalid authentication request'});
     return !api('user', token, function(status, data) {
       if (status != 200) return reply({error: 'Unable to access user account'});
+      // TODO: remove sessions from db; send api accessToken to client
       db.put('sessions/'+sid, {
         access_token: token,
         username: data.username,
@@ -365,11 +366,13 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         if (request.path == '/login') {
           sid = verify(request.cookie.sid) || token(true);
           return gcSessions(db).put('sessions/'+sid, {expires: Date.now()+86400000}).then(function() {
-            var socket = request.query.socket;
+            var socket = request.query.socket,
+                client = clients[socket];
+            if (client) send(client.connection, 'connect', {token: sid, id: socket}); // refresh sid on client
             response.generic(303, {
               'Set-Cookie': 'sid='+sid,
               Location: 'https://simpljs.com/authorize?client_id=simpljs&redirect_uri='+encodeURIComponent(
-                socket ? 'ws://'+socket : 'http://'+request.headers.Host+(request.query.redirect || '/'))+'&state='+sid
+                client ? 'ws://'+socket : 'http://'+request.headers.Host+(request.query.redirect || '/'))+'&state='+sid
             });
           });
         }
