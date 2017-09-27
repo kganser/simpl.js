@@ -737,7 +737,7 @@ simpl.add('app', function(o) {
                     else delete config[key];
                   });
                   create(function() {
-                    request(url(current)+'/config', {method: 'PUT', json: config}, function(e) {
+                    request(url(current)+'/config', {method: 'PUT', json: selected.entry.config}, function(e) {
                       if (e.target.status != 200)
                         status('failure', 'Error updating configuration');
                     });
