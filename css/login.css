@@ -12,3 +12,13 @@
   max-width: 240px;
   margin: 0 auto 20px;
 }
+#page-login .oauth img {
+  border: solid 3px #eee;
+  margin: 0 10px;
+  padding: 3px;
+  width: 64px;
+  height: 64px;
+}
+#page-login .oauth button {
+  margin: 10px;
+}
