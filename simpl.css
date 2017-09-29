@@ -644,6 +644,8 @@ nav .selected button {
 }
 #config .jsonv {
   padding: 4px 10px;
+  min-height: 174px;
+  overflow-x: auto;
 }
 .timeline {
   position: relative;

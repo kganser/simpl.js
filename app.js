@@ -99,7 +99,6 @@ simpl.add('app', function(o) {
           body.classList.add(app ? 'show-app' : 'show-module');
           entry.tab.classList.add('selected');
           if ('code' in entry) {
-            code.swapDoc(entry.doc);
             config.put([], entry.config || null);
             dependencies(entry.dependencies);
             search.value = '';
@@ -148,7 +147,8 @@ simpl.add('app', function(o) {
         entry.view.className = 'view '+next;
         entry.view.title = 'Show '+next[0].toUpperCase()+next.substr(1);
         if (selected.panel == 'code') {
-          code.refresh();
+          if ('code' in entry && code.doc != entry.doc)
+            code.swapDoc(entry.doc);
           if (ln != null) {
             code.scrollIntoView({line: ln-1, ch: 0});
             var line = code.addLineClass(ln-1, 'background', 'current');
