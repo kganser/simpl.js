@@ -39,6 +39,15 @@ simpl.add('app', function(o) {
     var url = function(e, unversioned) {
       return (e.app ? '/apps/' : '/modules/')+encodeURIComponent(e.id)+(unversioned ? '' : '/'+e.version);
     };
+    var dirty = function() {
+      return Object.keys(apps).map(function(name) { return apps[name]; })
+        .concat(Object.keys(modules).map(function(name) { return modules[name]; }))
+        .some(function(item) {
+          return Object.keys(item.versions).some(function(version) {
+            return item.versions[version].dirty;
+          });
+        });
+    };
     var request = function(path, options, callback) {
       if (typeof options == 'function') {
         callback = options;
@@ -388,6 +397,11 @@ simpl.add('app', function(o) {
                     }
                     break;
                   case 'login':
+                    if (!data.error && (!user || data.username != user.name)) {
+                      if (!dirty() || confirm('You have unsaved changes. Continue logging in as '+data.username+'?'))
+                        return location.reload();
+                      data.error = 'Login cancelled';
+                    }
                     if (!data.error) expired = false;
                     login.close(data);
                     break;
@@ -474,7 +488,11 @@ simpl.add('app', function(o) {
                 }, 1000);
               };
             };
-            window.onbeforeunload = function() { unload = true; };
+            window.onbeforeunload = function(e) {
+              login.close();
+              if (dirty()) return e.returnValue = 'You have unsaved changes. Cancel navigation to stay on this page.';
+              unload = true;
+            };
           }},
           {button: {children: 'Connect Now', onclick: function() { connect(); }}}
         ]}},

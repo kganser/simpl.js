@@ -223,7 +223,8 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         plan: data.plan,
         expires: Date.now()+(message.expires_in || 86400)*1000
       }).then(function() {
-        reply({status: 'success'});
+        // if workspace is dirty and user cancels refresh, newUser != oldUser causes problems; see TODO above
+        reply({username: data.username});
         if (client) client.connect(data.plan, token);
       });
     });
