@@ -54,7 +54,7 @@ simpl.add('app', function(o) {
         options = {};
       }
       options.responseType = 'json';
-      o.xhr(path+(~path.indexOf('?') ? '&sid=' : '?sid=')+token, options, function(e) {
+      o.xhr(path+(~path.indexOf('?') ? '&token=' : '?token=')+token, options, function(e) {
         // TODO: normalize response (JSON body)
         if (e.target.status != 401) return callback(e);
         login.open(function(response) {
@@ -367,7 +367,7 @@ simpl.add('app', function(o) {
               });
               if (socket) return send('connect');
               if (!window.WebSocket) return status('WebSockets are not supported in this browser.', 'fatal');
-              socket = new WebSocket('ws://'+location.host+'/connect?sid='+token);
+              socket = new WebSocket('ws://'+location.host+'/connect?token='+token);
               socket.onopen = function() {
                 status();
                 send('connect');
@@ -388,7 +388,6 @@ simpl.add('app', function(o) {
                 switch (event) {
                   case 'connect':
                     if (!instance) {
-                      token = data.token;
                       id = data.id;
                     } else if (servers) {
                       for (var i = servers.firstChild; i && i.value.localeCompare(instance) < 0; i = i.nextSibling);
@@ -397,12 +396,18 @@ simpl.add('app', function(o) {
                     }
                     break;
                   case 'login':
-                    if (!data.error && (!user || data.username != user.name)) {
-                      if (!dirty() || confirm('You have unsaved changes. Continue logging in as '+data.username+'?'))
-                        return location.reload();
-                      data.error = 'Login cancelled';
+                    if (!data.error) {
+                      document.cookie = 'token='+data.token+'; Path=/';
+                      if (!user || data.username != user.name) {
+                        if (!dirty() || confirm('You have unsaved changes. Continue logging in as '+data.username+'?'))
+                          return location.reload();
+                        data.error = 'Login cancelled';
+                      }
                     }
-                    if (!data.error) expired = false;
+                    if (!data.error) {
+                      token = data.token;
+                      expired = false;
+                    }
                     login.close(data);
                     break;
                   case 'expire':
@@ -585,7 +590,7 @@ simpl.add('app', function(o) {
             {a: {id: 'google', target: '_blank', href: 'https://www.google.com/+Simpljs', children: icons.google}}
           ]},
           !user && {form: {method: 'post', action: '/restore', children: [
-            {input: {type: 'hidden', name: 'sid', value: token}},
+            {input: {type: 'hidden', name: 'token', value: token}},
             {button: {className: 'revert', type: 'submit', name: 'scope', value: 'modules', children: [icons.revert, 'Restore Modules'], onclick: function(e) {
               if (!confirm('This will delete and restore all preinstalled modules in your workspace. Are you sure?'))
                 e.preventDefault();
@@ -927,8 +932,8 @@ simpl.add('app', function(o) {
           login = {
             open: function(callback) {
               e.classList.add('visible');
-              handler = id && callback;
-              dom({iframe: {src: '/login'+(handler ? '?socket='+id : '')}}, e, true);
+              handler = callback;
+              dom({iframe: {src: '/login'+(id ? '?socket='+id : '')}}, e, true);
             },
             close: function(response) {
               e.classList.remove('visible');
