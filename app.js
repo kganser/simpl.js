@@ -398,7 +398,7 @@ simpl.add('app', function(o) {
                   case 'login':
                     if (!data.error) {
                       document.cookie = 'token='+data.token+'; Path=/';
-                      if (!user || data.username != user.name) {
+                      if (!user || data.username != user.username) {
                         if (!dirty() || confirm('You have unsaved changes. Continue logging in as '+data.username+'?'))
                           return location.reload();
                         data.error = 'Login cancelled';
