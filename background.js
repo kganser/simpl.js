@@ -9,6 +9,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       csrf, ping, localApiPort;
 
   var api = function(path, token, callback, method, data, text) {
+    if (path == 'user' && sessions[token]) return callback(sessions[token]);
     o.xhr(localApiPort ? 'http://localhost:'+localApiPort+'/'+path : 'https://api.simpljs.com/'+path, {
       method: method,
       responseType: 'json',
@@ -16,17 +17,29 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       json: text ? undefined : data,
       data: text ? data : undefined
     }, function(e) {
-      var t = e.target;
-      callback(t.status, t.response);
+      e = e.target;
+      var response = e.response || {};
+      if (e.status >= 400 && !response.error)
+        response.error = o.http.statusMessage(e.status);
+      if (path == 'user' && !response.error) {
+        var now = Date.now();
+        Object.keys(sessions).forEach(function(token) {
+          if (sessions[token].expires < now) delete sessions[token];
+        });
+        response.expires = now+86400000; // TODO: use expires_in from runtime.onMessageExternal?
+        response.image = '//www.gravatar.com/avatar/'+o.string.hexFromBuffer(
+          o.crypto.md5(o.string.toUTF8Buffer(response.email.toLowerCase())))+'?d=retro';
+        sessions[token] = response;
+      }
+      callback(response, e.status);
     });
   };
   var authenticate = function(token, callback) {
     if (token == csrf) return callback(null, true);
     if (!token) return callback();
-    if (sessions[token]) return callback(sessions[token]);
-    api('user', token, function(status, data) {
-      if (status != 200) return callback();
-      callback(data);
+    api('user', token, function(body) {
+      if (body.error) return callback();
+      callback(body);
     });
   };
   var restore = function(callback, scope, sparse) {
@@ -104,11 +117,9 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     (function(callback) {
       var path = 'apps/'+encodeURIComponent(name);
       if (!token) return db.get(path+'/versions/'+(version-1)).then(callback);
-      api(path+'/'+version, token, function(status, data) {
-        callback(status == 200 && data);
-      });
+      api(path+'/'+version, token, callback);
     }(function(app) {
-      if (!app) return broadcast('error', {app: name, version: version, message: 'App not found'}, user);
+      if (!app || app.error) return broadcast('error', {app: name, version: version, message: app.error || 'App not found'}, user);
       logs[id] = [];
       apps[id] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';simpl.user='+JSON.stringify(user)+';simpl.use('+JSON.stringify(app.dependencies)+','+app.code+','+JSON.stringify(name.split('@')[1])+');', function(module, callback) {
         var path = 'modules/'+encodeURIComponent(module.name),
@@ -117,12 +128,14 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         if (current) v = 1-v;
         (function(callback) {
           if (!token) return db.get(path+'/versions/'+(v-1)).then(callback);
-          api(path+'/'+v, token, function(status, data) {
-            callback(status == 200 && data);
-          });
+          api(path+'/'+v, token, callback);
         }(function(record) {
-          if (record && !current) record = record.published.pop();
-          if (record) return callback(wrap(module.name, record.code, module.version, record.dependencies));
+          var error = !record ? 'Module '+module.name+' not found'
+            : record.error && 'Module '+module.name+': '+record.error;
+          if (!error) {
+            if (!current) record = record.published.pop();
+            if (record) return callback(wrap(module.name, record.code, module.version, record.dependencies));
+          }
           if (!apps[id]) return;
           apps[id].terminate();
           delete apps[id];
@@ -190,18 +203,11 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       else reply(data);
     };
     if (!token) return callback({error: 'Unable to authenticate'});
-    return !api('user', token, function(status, data) {
+    return !api('user', token, function(response) {
       if (socket) client = clients[socket];
-      if (status != 200) return callback({error: 'Unable to access user account'});
-      var now = Date.now();
-      Object.keys(sessions).forEach(function(token) {
-        if (sessions[token].expires < now) delete sessions[token];
-      });
-      data.expires = now+(message.expires_in || 86400)*1000;
-      sessions[token] = data;
-      callback({username: data.username, token: token});
-      if (client) client.connect(data.plan, token);
-      // else: need to set cookie on client TODO
+      if (response.error) return callback({error: response.error});
+      callback({username: response.username, token: token});
+      if (client) client.connect(response.plan, token);
     });
   });
   
@@ -223,11 +229,11 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           authenticate(token, function(session, local) {
             if (local || !session && !method) return fallback(callback);
             if (!session) return response.generic(401);
-            api(path, token, function(status, data) {
-              if (status != 200) return path == 'workspace'
+            api(path, token, function(body, status) {
+              if (body.error) return path == 'workspace'
                 ? response.generic(302, {'Set-Cookie': 'token=; Expires='+new Date().toUTCString(), Location: '/'})
-                : response.end(JSON.stringify(data), 'json', status);
-              callback(data, {username: session.username, name: session.name, email: session.email});
+                : response.end(JSON.stringify(body), 'json', status);
+              callback(body, session);
             }, method, data, text);
           });
         };
@@ -460,7 +466,6 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             });
           }, function(data, session) {
             if (!data) return response.generic(500);
-            if (session) session.image = 'http://www.gravatar.com/avatar/'+o.string.hexFromBuffer(o.crypto.md5(o.string.toUTF8Buffer(session.email.toLowerCase())))+'?d=retro';
             Object.keys(data.apps).forEach(function(name) { data.apps[name] = data.apps[name].versions; });
             Object.keys(data.modules).forEach(function(name) { data.modules[name] = data.modules[name].versions; });
             response.end(o.html.markup([

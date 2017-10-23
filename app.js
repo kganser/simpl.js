@@ -55,10 +55,15 @@ simpl.add('app', function(o) {
       }
       options.responseType = 'json';
       o.xhr(path+(~path.indexOf('?') ? '&token=' : '?token=')+token, options, function(e) {
-        // TODO: normalize response (JSON body)
-        if (e.target.status != 401) return callback(e);
+        e = e.target;
+        var response = e.response || {};
+        if (typeof response != 'object') try {
+          response = JSON.parse(e.response);
+        } catch (e) {}
+        if (e.status >= 400 && !response.error) response.error = 'Unknown error';
+        if (e.status != 401) return callback(response);
         login.open(function(response) {
-          if (!response || response.error) callback(e);
+          if (!response || response.error) callback(response);
           else request(path, options, callback);
         });
       });
@@ -123,20 +128,8 @@ simpl.add('app', function(o) {
             else docs(record.name, entry.code);
           } else if (!refresh && !entry.tab.classList.contains('loading')) {
             entry.tab.classList.add(selected.panel = 'loading'); // TODO: avoid possible /loading url
-            request(url(selected), function(e) {
-              try {
-                if (e.target.status != 200) throw 'error';
-                var response = e.target.response;
-                if (typeof response != 'object')
-                  response = JSON.parse(response);
-                entry.doc = CodeMirror.Doc(response.code, {name: 'javascript'});
-                entry.code = response.code;
-                entry.config = response.config;
-                entry.dependencies = response.dependencies;
-                entry.published = response.published;
-                entry.tab.classList.remove('loading');
-                if (entry.state != 'error') entry.tab.classList.remove('error');
-              } catch (e) {
+            request(url(selected), function(response) {
+              if (response.error) {
                 entry.tab.classList.remove('loading');
                 entry.tab.classList.add('error');
                 if (selected && selected.entry == entry) {
@@ -144,8 +137,15 @@ simpl.add('app', function(o) {
                   body.classList.remove('show-loading');
                   selected = null;
                 }
-                return status('failure', 'Error retrieving '+(app ? 'app' : 'module'));
+                return status('failure', response.error);
               }
+              entry.doc = CodeMirror.Doc(response.code, {name: 'javascript'});
+              entry.code = response.code;
+              entry.config = response.config;
+              entry.dependencies = response.dependencies;
+              entry.published = response.published;
+              entry.tab.classList.remove('loading');
+              if (entry.state != 'error') entry.tab.classList.remove('error');
               if (selected && selected.entry == entry)
                 navigate(name, version, app, panel, ln, true);
             });
@@ -191,9 +191,9 @@ simpl.add('app', function(o) {
       if (!name) return;
       status('info', 'Copying linked '+type+'...');
       // TODO: use pegged minor version
-      request(url(selected)+'?name='+encodeURIComponent(name), {method: 'POST'}, function(e) {
-        if (e.target.status != 200)
-          return status('failure', 'Error copying linked '+type);
+      request(url(selected)+'?name='+encodeURIComponent(name), {method: 'POST'}, function(response) {
+        if (response.error)
+          return status('failure', response.error);
         status('success', 'Copied successfully');
         group[name] = {name: name, versions: {1: {
           minor: 0,
@@ -214,9 +214,9 @@ simpl.add('app', function(o) {
     var create = function(callback) {
       var entry = selected.entry;
       if (entry.published) return callback();
-      request(url(selected), {method: 'PUT', data: entry.code}, function(e) {
-        if (e.target.status != 200)
-          return status('failure', 'Error saving document');
+      request(url(selected), {method: 'PUT', data: entry.code}, function(response) {
+        if (response.error)
+          return status('failure', response.error);
         entry.published = [];
         callback();
       });
@@ -235,9 +235,9 @@ simpl.add('app', function(o) {
           JSON.stringify(entry.dependencies) == JSON.stringify(published.dependencies))
         return alert('No changes to publish');
       status('info', 'Publishing...');
-      request(url(current, true)+(upgrade ? '?source=' : '/')+current.version, {method: 'POST'}, function(e) {
-        if (e.target.status != 200)
-          return status('failure', 'Error publishing new version');
+      request(url(current, true)+(upgrade ? '?source=' : '/')+current.version, {method: 'POST'}, function(response) {
+        if (response.error)
+          return status('failure', response.error);
         status('success', 'Published');
         if (upgrade) {
           var versions = (current.app ? apps : modules)[current.id].versions,
@@ -624,9 +624,9 @@ simpl.add('app', function(o) {
               var entry = selected.entry,
                   code = entry.doc.getValue();
               status('info', 'Saving...');
-              request(url(selected), {method: 'PUT', data: code}, function(e) {
-                if (e.target.status != 200)
-                  return status('failure', 'Error saving document');
+              request(url(selected), {method: 'PUT', data: code}, function(response) {
+                if (response.error)
+                  return status('failure', response.error);
                 status('success', 'Saved');
                 entry.tab.classList.remove('changed');
                 entry.code = code;
@@ -649,10 +649,10 @@ simpl.add('app', function(o) {
               if (!confirm('Are you sure you want to delete this '+type+'?')) return;
               button.disabled = true;
               status('info', 'Deleting '+type+'...');
-              request(url(current, true), {method: 'DELETE'}, function(e) {
+              request(url(current, true), {method: 'DELETE'}, function(response) {
                 button.disabled = false;
-                if (e.target.status != 200)
-                  return status('failure', 'Error deleting '+type);
+                if (response.error)
+                  return status('failure', response.error);
                 status('success', 'Deleted');
                 delete (current.app ? apps : modules)[current.id];
                 current.entry.tab.parentNode.removeChild(current.entry.tab);
@@ -702,9 +702,9 @@ simpl.add('app', function(o) {
                       suggest();
                       fork(function() {
                         create(function() {
-                          request(url(current)+'/dependencies', {method: 'POST', json: match}, function(e) {
-                            if (e.target.status != 200)
-                              return status('failure', 'Error updating dependencies');
+                          request(url(current)+'/dependencies', {method: 'POST', json: match}, function(response) {
+                            if (response.error)
+                              return status('failure', response.error);
                             entry.dependencies[match.name] = match.version;
                             if (selected && selected.entry == entry)
                               dependencies(entry.dependencies);
@@ -729,10 +729,10 @@ simpl.add('app', function(o) {
                       var button = this,
                           entry = selected.entry;
                       button.disabled = true;
-                      request(url(selected)+'/dependencies/'+encodeURIComponent(id), {method: 'DELETE'}, function(e) {
+                      request(url(selected)+'/dependencies/'+encodeURIComponent(id), {method: 'DELETE'}, function(response) {
                         button.disabled = false;
-                        if (e.target.status != 200)
-                          return status('failure', 'Error updating dependencies');
+                        if (response.error)
+                          return status('failure', response.error);
                         delete entry.dependencies[id];
                         if (selected && selected.entry == entry)
                           button.parentNode.parentNode.removeChild(button.parentNode);
@@ -760,9 +760,9 @@ simpl.add('app', function(o) {
                     else delete config[key];
                   });
                   create(function() {
-                    request(url(current)+'/config', {method: 'PUT', json: selected.entry.config}, function(e) {
-                      if (e.target.status != 200)
-                        status('failure', 'Error updating configuration');
+                    request(url(current)+'/config', {method: 'PUT', json: selected.entry.config}, function(response) {
+                      if (response.error)
+                        status('failure', response.error);
                     });
                   });
                 }
