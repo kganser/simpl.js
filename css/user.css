@@ -76,7 +76,8 @@
   margin: 0 0 5px 5px;
 }
 #servers .controls span {
-  margin: 0 5px 5px;
+  display: inline-block;
+  margin: 5px;
   color: #666;
   font-size: 100%;
 }
