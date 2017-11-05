@@ -26,7 +26,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         Object.keys(sessions).forEach(function(token) {
           if (sessions[token].expires < now) delete sessions[token];
         });
-        response.expires = now+86400000; // TODO: use expires_in from runtime.onMessageExternal?
+        response.expires = now + 86400000; // TODO: use expires_in from runtime.onMessageExternal?
         response.image = '//www.gravatar.com/avatar/'+o.string.hexFromBuffer(
           o.crypto.md5(o.string.toUTF8Buffer(response.email.toLowerCase())))+'?d=retro';
         sessions[token] = response;
@@ -253,8 +253,10 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           
           if (parts.length > 2) parts[2]--;
           parts.splice(2, 0, 'versions');
+          if (parts.length == 5 && parts[4] >= 0) parts.splice(4, 0, 'published');
           var path = parts.join('/');
           
+          // publish app/module
           if (parts.length < 5 && method == 'POST') {
             var upgrade = parts.length == 3,
                 source = request.query.source;
@@ -297,34 +299,44 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
               if (app) delete logs[stop(session && session.username || '', name, parts[3]+1)];
               response.ok();
             }, method);
-          } else if (parts.length == 4) {
-            if (method == 'GET')
-              return forward(uri, function(callback) {
-                db.get(path).then(callback);
-              }, function(data) {
-                if (!data) return response.generic(404);
-                response.end(JSON.stringify(data), 'json');
+          }
+          // get app/module
+          if ((parts.length == 4 || parts.length == 6 && parts[5] >= 0) && method == 'GET')
+            return forward(uri, function(callback) {
+              db.get(path).then(function(data) {
+                // TODO: change to {code, dependencies, config?, published: {minor, code, dependencies, config?}}
+                if (data && data.published) data.published.slice(0, -1).forEach(function(version) {
+                  version.code = version.dependencies = version.config = undefined;
+                });
+                callback(data);
               });
-            if (method == 'PUT')
-              return request.slurp(function(code) {
-                forward(uri, function(callback) {
-                  db.put(path+'/code', code).then(function(error) { // TODO: check If-Match header
-                    if (!error) return callback();
-                    if (parts[3]) return response.error();
-                    var record = {code: code, dependencies: {}, published: []};
-                    if (app) record.config = {};
-                    this.put(parts[0]+'/'+parts[1], {versions: [record]}).then(callback);
-                  });
-                }, response.ok, method, code, true);
-              }, 'utf8', 262144);
-          } else if (parts.length == 3 && method == 'DELETE') {
+            }, function(data) {
+              if (!data) return response.generic(404);
+              response.end(JSON.stringify(data), 'json');
+            });
+          // save code
+          if (parts.length == 4 && method == 'PUT')
+            return request.slurp(function(code) {
+              forward(uri, function(callback) {
+                db.put(path+'/code', code).then(function(error) { // TODO: check If-Match header
+                  if (!error) return callback();
+                  if (parts[3]) return response.error();
+                  var record = {code: code, dependencies: {}, published: []};
+                  if (app) record.config = {};
+                  this.put(parts[0]+'/'+parts[1], {versions: [record]}).then(callback);
+                });
+              }, response.ok, method, code, true);
+            }, 'utf8', 1048576);
+          // delete app/module
+          if (parts.length == 3 && method == 'DELETE')
             return forward(uri, function(callback) {
               db.delete(uri).then(callback);
             }, function(data, session) {
               if (app) delete logs[stop(session && session.username || '', name, 1)];
               response.ok();
             }, method);
-          } else if (parts[4] == 'config' && method == 'PUT') {
+          // update config
+          if (parts[4] == 'config' && method == 'PUT')
             return request.slurp(function(body) {
               if (body === undefined) return response.error();
               forward(uri, function(callback) {
@@ -332,7 +344,8 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                 db.put(path, body).then(callback);
               }, response.ok, method, body);
             }, 'json');
-          } else if (parts[4] == 'dependencies') {
+          // update dependencies
+          if (parts[4] == 'dependencies') {
             if (method == 'POST' && parts.length == 5)
               return request.slurp(function(body) {
                 if (!body || !body.name || typeof body.version != 'number') return response.error();

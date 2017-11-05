@@ -143,7 +143,9 @@ simpl.add('app', function(o) {
               entry.code = response.code;
               entry.config = response.config;
               entry.dependencies = response.dependencies;
-              entry.published = response.published;
+              entry.published = response.published.map(function(version, i, versions) { // TODO: remove
+                return i < versions.length-1 ? {} : version;
+              });
               entry.tab.classList.remove('loading');
               if (entry.state != 'error') entry.tab.classList.remove('error');
               if (selected && selected.entry == entry)
@@ -809,31 +811,29 @@ simpl.add('app', function(o) {
                   return lines.concat(insert);
                 };
               }(new diff_match_patch);
-              elem.onclick = function(e) {
-                var target = e.target.tagName == 'SPAN' ? e.target.parentNode : e.target;
-                if (target == first) {
-                  first = last;
-                  last = null;
-                } else if (target == last) {
-                  last = null;
-                } else if (first) {
-                  last = target;
-                } else {
-                  first = target;
-                }
-                var versions = [], range = first && last;
-                for (var i = selected.source ? 1 : 0, node = this.firstChild; node; node = node.nextSibling, i++) {
-                  if (node == first || node == last) {
-                    versions.push(i ? selected.entry.published[selected.entry.published.length-i].code : selected.entry.code);
-                    node.className = range ? versions.length > 1 ? 'last selected' : 'first selected' : 'selected';
-                  } else {
-                    node.className = range && versions.length == 1 ? 'inner' : '';
+              var render = function(current, minors) {
+                var entry = current.entry,
+                    loading;
+                var versions = minors.map(function(minor) {
+                  var version = minor == entry.published.length ? entry : entry.published[minor];
+                  if (!version.code && !version.loading) {
+                    loading = version.loading = true;
+                    request(url(current)+'/'+minor, function(response) {
+                      version.loading = false;
+                      if (!response.error) entry.published[minor] = response;
+                      if (!selected && selected.entry != entry) return;
+                      if (response.error) history(response.error);
+                      else render(current, minors);
+                    });
                   }
-                }
-                if (range) {
+                  return version;
+                });
+                if (loading) {
+                  history('Loading...');
+                } else if (versions.length == 2) {
                   var sections = [], gap = [], section = {lines: []},
                       context = 3, i = 0, a = 1, b = 1;
-                  diff(versions[1], versions[0]).forEach(function(line) {
+                  diff(versions[0].code, versions[1].code).forEach(function(line) {
                     if (line.change) {
                       i = 0;
                       section.change = true;
@@ -858,7 +858,7 @@ simpl.add('app', function(o) {
                     if (i > context) sections.push({lines: section.lines.splice(context-i)});
                   }
                   var ellipses = [a, b].map(function(n) { return String(n).replace(/./g, '·'); });
-                  history(sections.map(function(section) {
+                  history({table: sections.map(function(section) {
                     if (!section.change) section.lines.push(null);
                     return {tbody: {className: section.change ? 'changed' : 'unchanged', children: section.lines.map(function(line) {
                       return line ? {tr: {className: ['delete', 'unchanged', 'insert'][line.change+1], children: [
@@ -873,12 +873,35 @@ simpl.add('app', function(o) {
                         {td: sections.length == 1 ? 'No Changes' : 'Expand'}
                       ]}};
                     })}};
-                  }));
-                } else {
-                  history(versions[0] != null && {tbody: versions[0].split('\n').map(function(line, i) {
-                    return {tr: [{td: {className: 'line', children: i+1}}, {td: line}]};
                   })});
+                } else {
+                  history(versions[0] && {table: [{tbody: versions[0].code.split('\n').map(function(line, i) {
+                    return {tr: [{td: {className: 'line', children: i+1}}, {td: line}]};
+                  })}]});
                 }
+              };
+              elem.onclick = function(e) {
+                var target = e.target.tagName == 'SPAN' ? e.target.parentNode : e.target;
+                if (target == first) {
+                  first = last;
+                  last = null;
+                } else if (target == last) {
+                  last = null;
+                } else if (first) {
+                  last = target;
+                } else {
+                  first = target;
+                }
+                var versions = [], range = first && last;
+                for (var i = selected.source ? 1 : 0, node = this.firstChild; node; node = node.nextSibling, i++) {
+                  if (node == first || node == last) {
+                    versions.push(selected.entry.published.length - i);
+                    node.className = range ? versions.length > 1 ? 'last selected' : 'first selected' : 'selected';
+                  } else {
+                    node.className = range && versions.length == 1 ? 'inner' : '';
+                  }
+                }
+                render(selected, versions.reverse());
               };
               timeline = function(record, major) {
                 if (typeof record == 'string')
@@ -893,7 +916,7 @@ simpl.add('app', function(o) {
                 }).slice(record.source ? 1 : 0), elem, true);
               };
             }}},
-            {table: function(e) {
+            {div: function(e) {
               history = function(data) { dom(data, e, true); };
               e.onclick = function(e) {
                 var target = e.target;

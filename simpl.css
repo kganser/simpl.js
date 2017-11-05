@@ -547,6 +547,7 @@ nav .selected button {
   border-left: none;
   width: auto;
   min-height: 0;
+  padding-left: 83px;
 }
 #settings #actions {
   padding-top: 50px;
@@ -652,7 +653,7 @@ nav .selected button {
   white-space: nowrap;
   float: left;
   width: 83px;
-  margin-right: -83px;
+  margin: -4px 0 0 -83px;
   z-index: 1;
 }
 .timeline li {
@@ -709,8 +710,12 @@ nav .selected button {
 .timeline li.inner:before {
   background: #36c;
 }
+#history h2 {
+  margin: 0 0 4px -83px;
+}
 #history table {
   width: 100%;
+  margin-top: -4px;
   font-family: Consolas, monospace;
   line-height: 15px;
   white-space: pre-wrap;
@@ -719,7 +724,6 @@ nav .selected button {
 }
 #history tbody {
   border-bottom: 2px solid white;
-  border-left: 83px solid white;
 }
 #history td {
   vertical-align: top;
