@@ -19,8 +19,8 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     }, function(e) {
       e = e.target;
       var response = e.response || {};
-      if (e.status >= 400 && !response.error)
-        response.error = o.http.statusMessage(e.status);
+      if (!e.status || e.status >= 400 && !response.error)
+        response.error = e.status ? o.http.statusMessage(e.status) : 'Connection failed';
       if (path == 'user' && !response.error) {
         var now = Date.now();
         Object.keys(sessions).forEach(function(token) {
