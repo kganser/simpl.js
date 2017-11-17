@@ -401,8 +401,10 @@ simpl.add('app', function(o) {
                     if (!data.error) {
                       document.cookie = 'token='+data.token+'; Path=/';
                       if (!user || data.username != user.username) {
-                        if (!dirty() || confirm('You have unsaved changes. Continue logging in as '+data.username+'?'))
+                        if (!dirty() || confirm('You have unsaved changes. Continue logging in as '+data.username+'?')) {
+                          unload = true;
                           return location.reload();
+                        }
                         data.error = 'Login cancelled';
                       }
                     }
@@ -497,7 +499,8 @@ simpl.add('app', function(o) {
             };
             window.onbeforeunload = function(e) {
               login.close();
-              if (dirty()) return e.returnValue = 'You have unsaved changes. Cancel navigation to stay on this page.';
+              if (dirty() && !unload)
+                return e.returnValue = 'You have unsaved changes. Cancel navigation to stay on this page.';
               unload = true;
             };
           }},
