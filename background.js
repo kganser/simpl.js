@@ -200,7 +200,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         client = socket && clients[socket];
     var callback = function(data) {
       if (client) send(client.connection, 'login', data);
-      else reply(data);
+      reply(data.error ? data : {status: 'success'});
     };
     if (!token) return callback({error: 'Unable to authenticate'});
     return !api('user', token, function(response) {
