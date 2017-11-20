@@ -13,6 +13,8 @@ simpl.add('string', function() {
       removes `=` and replaces `+` and `/` with `-` and `_`, respectively. */
   return {
     toUTF8Buffer: function(string) {
+      if (typeof string != 'string')
+        throw new Error('toUTF8Buffer expects string input');
       var c, len = string.length;
       for (var i = 0, j = 0; i < len; i++) {
         c = string.charCodeAt(i);
@@ -80,6 +82,8 @@ simpl.add('string', function() {
       return string.join('');
     },
     base64ToBuffer: function(base64, url) {
+      if (typeof base64 != 'string')
+        throw new Error('base64ToBuffer expects string input');
       if (url) base64 = base64.replace(/-/g, '+').replace(/_/g, '/');
       base64 = base64.replace(/=+$/, '');
       var mod = base64.length % 4;
@@ -125,6 +129,8 @@ simpl.add('string', function() {
       return url ? base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '') : base64;
     },
     hexToBuffer: function(hex) {
+      if (typeof hex != 'string')
+        throw new Error('hexToBuffer expects string input');
       var len = hex.length;
       if (/[^0-9a-f]/i.test(hex) || len % 2) throw new RangeError('Invalid hex string');
       var bytes = new Uint8Array(len / 2);
