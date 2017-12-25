@@ -116,9 +116,10 @@ function(modules) {
       http = modules.http || modules['http@simpljs'],
       string = modules.string || modules['string@simpljs'],
       xhr = modules.xhr || modules['xhr@simpljs'],
-      csrf = string.base64FromBuffer(crypto.getRandomValues(new Uint8Array(24)), true);
+      csrf = string.base64FromBuffer(crypto.getRandomValues(new Uint8Array(24)), true),
+      port = config.port || 8002;
   
-  http.serve({port: config.port}, function(request, response) {
+  http.serve({port: port}, function(request, response) {
     var db;
     if (request.path == '/') {
       if (request.method == 'POST')
@@ -194,8 +195,45 @@ function(modules) {
     if (json) {
       switch (request.method) {
         case 'GET':
-          var download = 'download' in request.query,
-              after = request.query.after,
+          if ('download' in request.query) {
+            response.send('', 'json');
+            return function get(tx, path, callback, start) {
+              var next, brackets;
+              tx.get(path, function(keys, array) {
+                if (keys.length) return false;
+                brackets = array ? '[]' : '{}';
+                if (start == null) response.send(brackets[0]);
+                return {
+                  lowerBound: start,
+                  lowerExclusive: true,
+                  action: function(key) {
+                    if (next != null) return 'stop';
+                  },
+                  value: function(key, value) {
+                    if (key == null || value === undefined) return;
+                    if (value && typeof value == 'object') next = key;
+                    var chunk = (start ? ',' : '')+
+                      (array ? '' : JSON.stringify(key)+':')+
+                      (next == null ? JSON.stringify(value) : '')
+                    if (chunk) response.send(chunk);
+                    start = true;
+                  }
+                };
+              }).then(function() {
+                if (next == null) {
+                  response.send(brackets[1]);
+                  if (callback) return callback.call(this);
+                  response.end();
+                  db.close();
+                } else {
+                  get(this, (path ? path+'/' : '')+encodeURIComponent(next), function() {
+                    get(this, path, callback, next);
+                  });
+                }
+              });
+            }(open().transaction(), path);
+          }
+          var after = request.query.after,
               i = 0;
           return open().get(path, false, download ? 'deep' : function(path, array) {
             if (path.length) return false;
@@ -214,7 +252,7 @@ function(modules) {
           }).then(function(object) {
             db.close();
             if (object === undefined) response.generic(404);
-            response.end(JSON.stringify(download ? object : {data: object, remaining: i > 100}), 'json');
+            response.end(JSON.stringify({data: object, remaining: i > 100}), 'json');
           });
         case 'PUT':
         case 'POST':
@@ -355,7 +393,7 @@ function(modules) {
       ], name), 'html');
     });
   }, function(error) {
-    if (error) console.error('Error listening on 0.0.0.0:'+config.port+'\n'+error);
-    else console.log('Listening at http://localhost:'+config.port);
+    if (error) console.error('Error listening on port '+port+'\n'+error);
+    else console.log('Listening at http://localhost:'+port);
   });
 }
