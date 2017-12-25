@@ -1,4 +1,7 @@
 function(modules) {
+
+  if (!config.sessionKey)
+    console.log('Set config.sessionKey to preserve logins on server restart');
   
   var database = modules.database || modules['database@simpljs'],
       html = modules.html || modules['html@simpljs'],
@@ -8,7 +11,9 @@ function(modules) {
       encode = string.base64FromBuffer,
       decode = string.base64ToBuffer,
       utf8 = string.toUTF8Buffer,
-      key = crypto.subtle.importKey('raw', utf8(config.sessionKey), {name: 'hmac', hash: 'sha-256'}, false, ['sign']);
+      sessionKey = config.sessionKey ? utf8(config.sessionKey) : crypto.getRandomValues(new Uint8Array(24)),
+      key = crypto.subtle.importKey('raw', sessionKey, {name: 'hmac', hash: 'sha-256'}, false, ['sign']),
+      port = config.port || 8003;
 
   var mac = function(data) {
     return key.then(function(key) {
@@ -37,7 +42,7 @@ function(modules) {
       return encode(hash, true);
     });
   };
-  http.serve({port: config.port}, function(request, response) {
+  http.serve({port: port}, function(request, response) {
     var render = function(body, status) {
       response.end(html.markup([
         {'!doctype': {html: null}},
@@ -108,7 +113,7 @@ function(modules) {
     }
     response.generic(404);
   }, function(error) {
-    if (error) console.error('Error listening on 0.0.0.0:'+config.port+'\n'+error);
-    else console.log('Listening at http://localhost:'+config.port);
+    if (error) console.error('Error listening on port '+port+'\n'+error);
+    else console.log('Listening at http://localhost:'+port);
   });
 }
