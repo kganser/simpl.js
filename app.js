@@ -615,15 +615,13 @@ simpl.add('app', function(o) {
             highlightSelectionMatches: {minChars: 1},
             foldGutter: true,
             foldOptions: {widget: '\u27f7', minFoldSize: 1},
-            gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter']
+            gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
+            extraKeys: {'Shift-Tab': 'indentLess'}
           });
           code.on('changes', function() {
             selected.entry.dirty = true;
             selected.entry.tab.classList.add('changed');
           });
-          code.setOption('extraKeys', {Tab: function() {
-            code.replaceSelection('  ');
-          }});
           CodeMirror.commands.save = function() {
             fork(function() {
               var entry = selected.entry,
@@ -695,6 +693,7 @@ simpl.add('app', function(o) {
                 }
               }}},
               {ul: {className: 'suggest', children: function(e) {
+                // TODO: up/down arrow selection
                 suggest = function(matches) {
                   dom(matches && matches.map(function(match) {
                     var module = modules[match.name],
@@ -953,21 +952,31 @@ simpl.add('app', function(o) {
             timer = setTimeout(function() { e.style.display = 'none'; }, 2000);
           };
         }}},
-        {div: {id: 'auth', children: function(e) {
+        {div: {id: 'auth', children: function(elem) {
           var handler;
           login = {
             open: function(callback) {
-              e.classList.add('visible');
+              elem.classList.add('visible');
               handler = callback;
-              dom({iframe: {src: '/login'+(id ? '?socket='+id : '')}}, e, true);
+              (function render() {
+                dom({div: [{iframe: {src: '/login'+(id ? '?socket='+id : '')}}]}, elem, true);
+                o.xhr('/online', function(e) {
+                  if (e.target.status == 200 || !elem.classList.contains('visible')) return;
+                  dom({div: [
+                    {strong: 'Network Error'}, {br: null},
+                    {p: 'Please check your internet connection'},
+                    {button: {onclick: render, children: 'Reconnect'}}
+                  ]}, elem, true);
+                });
+              }());
             },
             close: function(response) {
-              e.classList.remove('visible');
+              elem.classList.remove('visible');
               if (handler) handler(response);
               handler = null;
             }
           };
-          e.onclick = function(e) {
+          elem.onclick = function(e) {
             if (this == e.target)
               login.close();
           };

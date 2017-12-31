@@ -413,6 +413,10 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
               response.generic(200);
             });
           }, 'json');
+        if (request.path == '/online')
+          return o.xhr('https://api.simpljs.com', {method: 'head'}, function(e) {
+            response.generic(e.target.status ? 200 : 502);
+          });
         if (request.path == '/connect')
           return authenticate(request.query.token, function(session) {
             if (request.headers.Origin != 'http://'+request.headers.Host)
