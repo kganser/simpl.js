@@ -124,8 +124,10 @@ simpl.add('app', function(o) {
             major.textContent = 'Publish v'+(Object.keys(record.versions).length+1)+'.0';
             minor.textContent = 'Publish v'+version+'.'+entry.minor;
             timeline(record, version);
-            if (app) dom(entry.log.map(logLine), log, true);
-            else docs(record.name, entry.code);
+            if (app)
+              dom(entry.log.map(logLine), log, true);
+            else if (!docs(record.name, entry.code))
+              return navigate(name, version, app, 'code', ln); // redirect to /code if no docs exist
           } else if (!refresh && !entry.tab.classList.contains('loading')) {
             entry.tab.classList.add(selected.panel = 'loading'); // TODO: avoid possible /loading url
             request(url(selected), function(response) {
@@ -939,7 +941,9 @@ simpl.add('app', function(o) {
         }}},
         {div: {id: 'docs', children: function(e) {
           docs = function(name, code) {
-            dom([{h1: name}, o.docs.generateDom(code)], e, true);
+            var docs = o.docs.generateDom(code);
+            dom([{h1: name}, docs], e, true);
+            return docs && docs.length;
           };
         }}},
         {div: {id: 'status', children: function(e, timer) {
