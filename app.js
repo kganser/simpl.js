@@ -160,8 +160,15 @@ simpl.add('app', function(o) {
         entry.view.className = 'view '+next;
         entry.view.title = 'Show '+next[0].toUpperCase()+next.substr(1);
         if (selected.panel == 'code') {
-          if ('code' in entry && code.doc != entry.doc)
+          if ('code' in entry && code.doc != entry.doc) {
             code.swapDoc(entry.doc);
+            if (!entry.rendered) {
+              entry.rendered = true;
+              entry.code.split('\n').forEach(function(line, i) {
+                if (/[\[{] \/\/-$/.test(line)) code.foldCode(CodeMirror.Pos(i, 0), null, 'fold');
+              });
+            }
+          }
           if (ln != null) {
             code.scrollIntoView({line: ln-1, ch: 0});
             var line = code.addLineClass(ln-1, 'background', 'current');
