@@ -618,7 +618,7 @@ simpl.add('app', function(o) {
             foldGutter: true,
             foldOptions: {widget: '\u27f7', minFoldSize: 1},
             gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
-            extraKeys: {'Shift-Tab': 'indentLess'}
+            extraKeys: {Tab: 'indentMore', 'Shift-Tab': 'indentLess'}
           });
           code.on('changes', function() {
             selected.entry.dirty = true;
