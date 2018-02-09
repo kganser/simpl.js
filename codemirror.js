@@ -11411,7 +11411,6 @@ var CodeMirror = function() {
 
   CodeMirror.registerHelper("fold", "brace", function(cm, start) {
     var line = start.line, lineText = cm.getLine(line);
-    var tokenType;
 
     function findOpening(openCh) {
       for (var at = start.ch, pass = 0;;) {
@@ -11423,8 +11422,8 @@ var CodeMirror = function() {
           continue;
         }
         if (pass == 1 && found < start.ch) break;
-        tokenType = cm.getTokenTypeAt(CodeMirror.Pos(line, found + 1));
-        if (!/^(comment|string)/.test(tokenType)) return found + 1;
+        var type = cm.getTokenTypeAt(CodeMirror.Pos(line, found + 1));
+        if (!/^(comment|string)/.test(type)) return [found + 1, type];
         at = found - 1;
       }
     }
@@ -11432,16 +11431,17 @@ var CodeMirror = function() {
     // SIMPL.JS: check both curly and square brackets; pick whichever is last
     var startCurly = findOpening('{'),
         startSquare = findOpening('['),
-        startCh = startCurly == null ? startSquare :
-                  startSquare == null ? startCurly :
-                  Math.max(startCurly, startSquare),
-        startToken = startCh == startSquare ? '[' : '{',
-        endToken = startCh == startSquare ? ']' : '}';
-
-    if (startCh == null) return;
-    var count = 1, lastLine = cm.lastLine(), end, endCh;
+        startCh = startCurly ? startSquare && startSquare[0] > startCurly[0] ? startSquare : startCurly : startSquare;
+    
+    if (!startCh) return;
+    
+    var startToken = startCh == startSquare ? '[' : '{',
+        endToken = startCh == startSquare ? ']' : '}',
+        startPos = startCh[0],
+        tokenType = startCh[1],
+        count = 1, lastLine = cm.lastLine(), end, endPos;
     outer: for (var i = line; i <= lastLine; ++i) {
-      var text = cm.getLine(i), pos = i == line ? startCh : 0;
+      var text = cm.getLine(i), pos = i == line ? startPos : 0;
       for (;;) {
         var nextOpen = text.indexOf(startToken, pos), nextClose = text.indexOf(endToken, pos);
         if (nextOpen < 0) nextOpen = text.length;
@@ -11450,15 +11450,16 @@ var CodeMirror = function() {
         if (pos == text.length) break;
         if (cm.getTokenTypeAt(CodeMirror.Pos(i, pos + 1)) == tokenType) {
           if (pos == nextOpen) ++count;
-          else if (!--count) { end = i; endCh = pos; break outer; }
+          else if (!--count) { end = i; endPos = pos; break outer; }
         }
         ++pos;
       }
     }
-    if (end == null || line == end && endCh == startCh) return;
-    //console.log(startToken, startCurly, startSquare, '\n|'+lineText+'\n'+Array(startCh+1).join(' ')+'^\n|'+text+'\n'+Array(endCh+2).join(' ')+'^');
-    return {from: CodeMirror.Pos(line, startCh),
-            to: CodeMirror.Pos(end, endCh)};
+    if (end == null || line == end && endPos == startPos) return;
+    
+    //console.log(startToken, startCurly, startSquare, '\n|'+lineText+'\n'+Array(startPos+1).join(' ')+'^\n|'+text+'\n'+Array(endPos+2).join(' ')+'^');
+    return {from: CodeMirror.Pos(line, startPos),
+            to: CodeMirror.Pos(end, endPos)};
   });
 }());
 
