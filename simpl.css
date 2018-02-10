@@ -31,7 +31,11 @@ p button svg, p a svg {
   margin: 0;
 }
 pre, code, kbd, samp, tt, .CodeMirror {
-  font-family: Consolas, monospace;
+  font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, Courier, monospace;
+  font-size: 12px;
+}
+pre, .CodeMirror {
+  line-height: 16px;
 }
 html, body, #code, .CodeMirror {
   height: 100%;
@@ -437,7 +441,7 @@ nav .selected button {
 #code .CodeMirror-nonmatchingbracket {
   color: black;
   background: yellow;
-  padding: 0 0 2px;
+  padding: 1px 0;
   box-shadow: 0 0 3px rgba(0, 0, 0, .6);
   border-radius: 3px;
 }
@@ -451,12 +455,15 @@ nav .selected button {
   text-shadow: none;
   display: inline-block;
   vertical-align: middle;
-  padding: 0 2px 2px;
+  padding: 3.5px 1px;
+  margin-bottom: 2px;
   border-radius: 3px;
   background: #666;
   color: white;
   font-family: inherit;
-  line-height: 10px;
+}
+.CodeMirror-gutter-elt {
+  font-size: 13px;
 }
 .show-settings #main, .show-log #main, .show-docs #main {
   background: transparent;
