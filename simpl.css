@@ -30,11 +30,11 @@ p button svg, p a svg {
   height: 15px;
   margin: 0;
 }
-pre, code, kbd, samp, tt, .CodeMirror {
+pre, code, kbd, samp, tt, .CodeMirror, #history table {
   font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, Courier, monospace;
   font-size: 12px;
 }
-pre, .CodeMirror {
+pre, .CodeMirror, #history table {
   line-height: 16px;
 }
 html, body, #code, .CodeMirror {
@@ -736,8 +736,6 @@ nav .selected button {
 #history table {
   width: 100%;
   margin-top: -4px;
-  font-family: Consolas, monospace;
-  line-height: 15px;
   white-space: pre-wrap;
   border-collapse: collapse;
   border-spacing: 0;
