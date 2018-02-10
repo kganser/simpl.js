@@ -763,6 +763,7 @@ simpl.add('app', function(o) {
               config = o.jsonv(e, selected ? selected.entry.config : null, {
                 editor: true,
                 listener: function(method, path, data) {
+                  if (method == 'toggle') return;
                   var current = selected,
                       config = selected.entry.config;
                   path.forEach(function(key, i, path) {
