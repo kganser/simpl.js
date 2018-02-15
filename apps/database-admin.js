@@ -235,7 +235,7 @@ function(modules) {
           }
           var after = request.query.after,
               i = 0;
-          return open().get(path, false, download ? 'deep' : function(path, array) {
+          return open().get(path, false, function(path, array) {
             if (path.length) return false;
             if (array) {
               after = Math.max(parseInt(after, 10), -1);
