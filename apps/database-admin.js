@@ -3,7 +3,7 @@ function(modules) {
   // uri    := path? branch?
   // branch := '[' path branch? ( ',' path branch? )+ ']'
   // path   := segment ( '/' segment )*
-  var stringify = function stringify(map, prefix) {
+  var stringify = function stringify(map, prefix) { //-
     var keys = Object.keys(map);
     return !keys.length ? ''
       : keys.length == 1 ? (prefix || '')+encodeURIComponent(keys[0])+stringify(map[keys[0]], '/')
@@ -11,7 +11,7 @@ function(modules) {
           return encodeURIComponent(key)+stringify(map[key], '/');
         }).join(',')+']';
   };
-  var parse = function(path) {
+  var parse = function(path) { //-
     var i, map = {}, stack = [], node = map;
     while (path) {
       if (i = path.search(/[[\],]/)) {
@@ -26,7 +26,7 @@ function(modules) {
     }
     return map;
   };
-  var template = function(body, db) {
+  var template = function(body, db) { //-
     return html.markup([
       {'!doctype': {html: null}},
       {head: [
@@ -205,7 +205,7 @@ function(modules) {
                 if (start == null) response.send(brackets[0]);
                 return {
                   lowerBound: start,
-                  lowerExclusive: true,
+                  lowerExclusive: start != null,
                   action: function(key) {
                     if (next != null) return 'stop';
                   },
@@ -214,7 +214,7 @@ function(modules) {
                     if (value && typeof value == 'object') next = key;
                     var chunk = (start ? ',' : '')+
                       (array ? '' : JSON.stringify(key)+':')+
-                      (next == null ? JSON.stringify(value) : '')
+                      (next == null ? JSON.stringify(value) : '');
                     if (chunk) response.send(chunk);
                     start = true;
                   }
