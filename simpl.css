@@ -433,6 +433,9 @@ nav .selected button {
 .CodeMirror-gutters {
   border-right: none;
 }
+.CodeMirror-dialog input {
+  font: inherit;
+}
 .CodeMirror .current {
   animation: yellow-fade 2s;
   -webkit-animation: yellow-fade 2s;
