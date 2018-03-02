@@ -95,14 +95,14 @@ simpl.add('app', function(o) {
         {div: {className: 'message', children: message}}
       ]}};
     };
-    var navigate = function(name, version, app, panel, ln, refresh) { // TODO: remove `refresh`
+    var navigate = function(name, version, app, panel, ln) {
       var record = (app ? apps : modules)[name];
       if (record) {
         var entry = record.versions[version],
             first = app ? entry.state ? 'log' : 'code' : 'docs',
             next = {settings: first, code: 'settings'}[panel = panel || first] || 'code';
-        if (selected) body.classList.remove('show-'+selected.panel);
-        if (selected && selected.entry == entry && !refresh) {
+        if (selected) body.classList.remove(selected.entry.loading ? 'show-loading' : 'show-'+selected.panel);
+        if (selected && selected.entry == entry && selected.rendered) {
           selected.panel = panel;
         } else {
           if (selected) {
@@ -113,6 +113,7 @@ simpl.add('app', function(o) {
           body.classList.add(app ? 'show-app' : 'show-module');
           entry.tab.classList.add('selected');
           if ('code' in entry) {
+            selected.rendered = true;
             config.put([], entry.config || null);
             dependencies(entry.dependencies);
             search.value = '';
@@ -128,11 +129,13 @@ simpl.add('app', function(o) {
               dom(entry.log.map(logLine), log, true);
             else if (!docs(record.name, entry.code))
               return navigate(name, version, app, 'code', ln); // redirect to /code if no docs exist
-          } else if (!refresh && !entry.tab.classList.contains('loading')) {
-            entry.tab.classList.add(selected.panel = 'loading'); // TODO: avoid possible /loading url
+          } else if (!entry.loading) {
+            entry.loading = true;
+            entry.tab.classList.add('loading');
             request(url(selected), function(response) {
+              entry.loading = false;
+              entry.tab.classList.remove('loading');
               if (response.error) {
-                entry.tab.classList.remove('loading');
                 entry.tab.classList.add('error');
                 if (selected && selected.entry == entry) {
                   entry.tab.classList.remove('selected');
@@ -148,14 +151,15 @@ simpl.add('app', function(o) {
               entry.published = response.published.map(function(version, i, versions) { // TODO: remove
                 return i < versions.length-1 ? {} : version;
               });
-              entry.tab.classList.remove('loading');
               if (entry.state != 'error') entry.tab.classList.remove('error');
-              if (selected && selected.entry == entry)
-                navigate(name, version, app, panel, ln, true);
+              if (selected && selected.entry == entry) {
+                body.classList.remove('show-loading');
+                navigate(name, version, app, panel, ln);
+              }
             });
           }
         }
-        body.classList.add('show-'+selected.panel);
+        body.classList.add(entry.loading ? 'show-loading' : 'show-'+selected.panel);
         body.lastChild.scrollTop = selected.panel == 'log' ? body.lastChild.scrollHeight : 0;
         entry.view.className = 'view '+next;
         entry.view.title = 'Show '+next[0].toUpperCase()+next.substr(1);
@@ -181,7 +185,7 @@ simpl.add('app', function(o) {
         selected.entry.tab.classList.remove('selected');
         selected = body.className = null;
       }
-      if (!name == !record && !refresh) {
+      if (!name == !record) {
         var path = record ? url(selected)+'/'+panel : '/';
         if (location.pathname != path) window.history.pushState(null, null, path);
         document.title = record ? record.name : 'Simpl.js';
