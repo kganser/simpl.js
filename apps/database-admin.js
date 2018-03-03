@@ -212,7 +212,7 @@ function(modules) {
                   value: function(key, value) {
                     if (key == null || value === undefined) return;
                     if (value && typeof value == 'object') next = key;
-                    var chunk = (start ? ',' : '')+
+                    var chunk = (start == null ? '' : ',')+
                       (array ? '' : JSON.stringify(key)+':')+
                       (next == null ? JSON.stringify(value) : '');
                     if (chunk) response.send(chunk);
