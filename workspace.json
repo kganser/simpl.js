@@ -1,7 +1,7 @@
 [
   {"name": "Hello World", "file": "hello-world"},
   {"name": "Web Server", "file": "web-server", "config": {"port": 8001}, "dependencies": {"http": 0}},
-  {"name": "Database Admin", "file": "database-admin", "config": {"port": 8002}, "dependencies": {"database": 0, "html": 0, "http": 0, "string": 0, "xhr": 0}},
+  {"name": "Database Admin", "file": "database-admin", "config": {"port": 8002}, "dependencies": {"database": 0, "html": 0, "http": 0, "string": 0}},
   {"name": "Simple Login", "file": "simple-login", "config": {"port": 8003, "sessionKey": "yabadabadoo"}, "dependencies": {"database": 0, "html": 0, "http": 0, "string": 0}},
   {"name": "Unit Tests", "file": "unit-tests", "dependencies": {"async": 0, "crypto": 0, "database": 0, "docs": 0, "html": 0, "http": 0, "parser": 0, "socket": 0, "string": 0, "system": 0, "websocket": 0, "xhr": 0}},
   {"name": "async"},

@@ -115,7 +115,6 @@ function(modules) {
       html = modules.html || modules['html@simpljs'],
       http = modules.http || modules['http@simpljs'],
       string = modules.string || modules['string@simpljs'],
-      xhr = modules.xhr || modules['xhr@simpljs'],
       csrf = string.base64FromBuffer(crypto.getRandomValues(new Uint8Array(24)), true),
       port = config.port || 8002;
   
@@ -179,9 +178,11 @@ function(modules) {
         path = request.path.substr(name.length+2),
         json = request.headers.Accept == 'application/json' || request.query.format == 'json';
     if (!json && (path || name == 'favicon.ico'))
-      return xhr(location.origin+'/'+path, {responseType: 'arraybuffer'}, function(e) {
-        if (e.target.status != 200) return response.generic(404);
-        response.end(e.target.response, (path.match(/\.([^.]*)$/) || [])[1]);
+      return fetch(location.origin+'/'+path).then(function(r) {
+        if (!r.ok) return response.generic(404);
+        r.arrayBuffer().then(function(body) {
+          response.end(body, (path.match(/\.([^.]*)$/) || [])[1]);
+        });
       });
     var open = function() {
       var upgrade;
