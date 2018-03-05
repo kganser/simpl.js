@@ -275,25 +275,33 @@ function(modules) {
         assert(!error, 'http listen on port 9123');
         if (error) return next();
         var host = 'http://127.0.0.1:9123';
-        modules.xhr(host, function(e) {
-          assert(i++ == 2 && e.target.status == 200 && e.target.responseText === 'hello',
+        fetch(host).then(function(r) {
+          return Promise.all([r, r.text()]);
+        }).then(function(r) {
+          assert(i++ == 2 && r[0].status == 200 && r[1] === 'hello',
             'http get response');
-          modules.xhr(host+'/path?a=1&b=ab%20cd&a=2&c=3', {headers: {'Accept': 'text/plain; q=0.9'}}, function(e) {
-            assert(i++ == 5 && e.target.status == 200 && e.target.responseText === 'hellogoodbye' && e.target.getResponseHeader('Transfer-Encoding') === 'chunked',
+          fetch(host+'/path?a=1&b=ab%20cd&a=2&c=3', {headers: {'Accept': 'text/plain; q=0.9'}}).then(function(r) {
+            return Promise.all([r, r.text()]);
+          }).then(function(r) {
+            assert(i++ == 5 && r[0].status == 200 && r[1] === 'hellogoodbye',
               'http chunked response receive');
-            modules.xhr(host, {method: 'POST', data: 'yabadaba'}, function(e) {
-              assert(i++ == 8 && e.target.status == 200 && e.target.responseText === '200 OK',
+            fetch(host, {method: 'POST', body: 'yabadaba'}).then(function(r) {
+              return Promise.all([r, r.text()]);
+            }).then(function(r) {
+              assert(i++ == 8 && r[0].status == 200 && r[1] === '200 OK',
                 'http response after slurp');
-              modules.xhr(host, {method: 'POST', data: large}, function(e) {
-                assert(i++ == 10 && e.target.status == 413,
+              fetch(host, {method: 'POST', body: large}).then(function(r) {
+                assert(i++ == 10 && r.status == 413,
                   'http request body too large error');
-                modules.xhr(host+'/first', {headers: {'X-Large-Header': large}}, function(e) {
-                  assert(i++ < 13 && e.target.status == 431,
+                fetch(host+'/first', {headers: {'X-Large-Header': large}}).then(function(r) {
+                  assert(i++ < 13 && r.status == 431,
                     'http request header too large error');
                   if (i == 13) next(server);
                 });
-                modules.xhr(host+'/second', {method: 'POST', data: '{"malformed": json}'}, function(e) {
-                  assert(i++ < 13 && e.target.status == 400 && e.target.responseText === '400 Bad Request',
+                fetch(host+'/second', {method: 'POST', body: '{"malformed": json}'}).then(function(r) {
+                  return Promise.all([r, r.text()]);
+                }).then(function(r) {
+                  assert(i++ < 13 && r[0].status == 400 && r[1] === '400 Bad Request',
                     'http response to malformed body');
                   if (i == 13) next(server);
                 });
