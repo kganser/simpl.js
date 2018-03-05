@@ -187,7 +187,7 @@ function(modules) {
       var upgrade;
       return db = database.open(name, function() { upgrade = true; }, undefined, function(e) {
         db.close();
-        if (!upgrade) response.end(e.message, null, 500);
+        if (!upgrade) return response.end(e.message, null, 500);
         database.delete(name);
         response.generic(404);
       });
@@ -196,11 +196,12 @@ function(modules) {
       switch (request.method) {
         case 'GET':
           if ('download' in request.query) {
-            response.send('', 'json');
+            var root = path;
             return function get(tx, path, callback, start) {
               var next, brackets;
               tx.get(path, function(keys, array) {
                 if (keys.length) return false;
+                if (path == root && start == null) response.send('', 'json');
                 brackets = array ? '[]' : '{}';
                 if (start == null) response.send(brackets[0]);
                 return {

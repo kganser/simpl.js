@@ -10,7 +10,7 @@
         }
         var tag = Object.keys(node)[0],
             elem = document.createElement(tag);
-        if (parent) parent.appendChild(elem); 
+        if (parent) parent.appendChild(elem);
         node = node[tag];
         dom(typeof node == 'object' && node && !Array.isArray(node) ? function attr(node, parent) {
           Object.keys(node).forEach(function(k) {
