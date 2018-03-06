@@ -21,101 +21,76 @@ function(modules) {
   
   var passed = 0, start = Date.now();
   
-  modules.async.step(
-    function(next, pass) {
-      next(assert(pass === undefined, 'async step no argument'));
-    },
-    function(next, pass) {
-      modules.async.join(
-        function(cb) { assert(pass === true, 'async step with argument'); cb(pass = 1); },
-        function(cb) { cb(pass = pass === 1 && 2); },
-        function(a, b) { assert(pass === 2, 'async join with sync functions'); }
-      );
-      modules.async.join(
-        function(cb) { setTimeout(function() { cb(pass = pass === 3 && 5); }, 10); },
-        function(cb) { setTimeout(function() { cb(pass = pass === 2 && 3, 4); }, 0); },
-        function(a, b) {
-          assert(pass === 5 && a === 5 && typeof b == 'object' && b.length == 2 && b[0] === 3 && b[1] === 4,
-            'async join with async functions, multiple callback args');
-          var once = modules.async.once(function(callback) {
-            setTimeout(function() { callback(++pass); }, 10);
-          });
-          once(function(value) { if (pass === 6 && value === 6) pass++; });
-          once(function(value) { if (pass === 7 && value === 6) pass++; });
-          setTimeout(function() { once(function(value) { next(assert(pass === 8 && value === 6, 'async once')); }); }, 15);
-        }
-      );
-    },
-    function(next) {
-      var utf8 = modules.string.toUTF8Buffer,
-          hex = modules.string.hexToBuffer,
-          toHex = modules.string.hexFromBuffer,
-          base64 = modules.string.base64FromBuffer;
-      assert(![
-        ['', 'd41d8cd98f00b204e9800998ecf8427e'],
-        ['abc', '900150983cd24fb0d6963f7d28e17f72'],
-        ['The quick brown fox jumps over the lazy dog', '9e107d9d372bb6826bd81d3542a419d6'],
-        ['c\'\u00e8', '8ef7c2941d78fe89f31e614437c9db59']
-      ].some(function(test) {
-        return toHex(modules.crypto.md5(utf8(test[0]))) !== test[1];
-      }), 'crypto md5');
-      assert(![
-        ['', 'da39a3ee5e6b4b0d3255bfef95601890afd80709'],
-        ['abc', 'a9993e364706816aba3e25717850c26c9cd0d89d'],
-        ['The quick brown fox jumps over the lazy dog', '2fd4e1c67a2d28fced849ee1bb76e7391b93eb12'],
-        ['c\'\u00e8', '98c9a3f804daa73b68a5660d032499a447350c0d']
-      ].some(function(test) {
-        return toHex(modules.crypto.sha1(utf8(test[0]))) !== test[1];
-      }), 'crypto sha1');
-      assert(![
-        ['', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'],
-        ['abc', 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'],
-        ['c\'\u00e8', '1aa15c717afffd312acce2217ce1c2e5dabca53c92165999132ec9ca5decdaca'],
-        ['abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq', '248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1']
-      ].some(function(test) {
-        return toHex(modules.crypto.sha256(utf8(test[0]))) !== test[1];
-      }), 'crypto sha256');
-      assert(![{
-        key: '0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b',
-        data: '4869205468657265',
-        mac: 'b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7'
-      }, {
-        key: '4a656665',
-        data: '7768617420646f2079612077616e7420666f72206e6f7468696e673f',
-        mac: '5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843'
-      }, {
-        key: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        data: 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
-        mac: '773ea91e36800e46854db8ebd09181a72959098b3ef8c122d9635514ced565fe'
-      }, {
-        key: '0102030405060708090a0b0c0d0e0f10111213141516171819',
-        data: 'cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd',
-        mac: '82558a389a443c0ea4cc819899f2083a85f0faa3e578f8077a2e3ff46729665b'
-      }, {
-        key: '0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c',
-        data: '546573742057697468205472756e636174696f6e',
-        mac: 'a3b6167473100ee06e0c796c2955552b'
-      }, {
-        key: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        data: '5468697320697320612074657374207573696e672061206c6172676572207468616e20626c6f636b2d73697a65206b657920616e642061206c6172676572207468616e20626c6f636b2d73697a6520646174612e20546865206b6579206e6565647320746f20626520686173686564206265666f7265206265696e6720757365642062792074686520484d414320616c676f726974686d2e',
-        mac: '9b09ffa71b942fcb27635fbcd5b0e944bfdc63644f0713938a7f51535c3a35e2'
-      }].some(function(test) {
-        toHex(modules.crypto.hmac(hex(test.key), hex(test.data))) !== test.mac;
-      }), 'crypto hmac');
-      assert(
-        base64(modules.crypto.pbkdf2(utf8('password'), utf8('salt'))) === 'YywoEuRtRgQQK6dhjp1tfS+BKPYma0oDJk0qBGC33LM=' &&
-        base64(modules.crypto.pbkdf2(utf8('password'), utf8('salt'), 100)) === 'B+aZcYDPfxKQTwQQDUBdNIiP32KvbVBqDswjsZb+mdg=',
-        'crypto pbkdf2');
-      
-      modules.database.list(function(dbs) {
-        assert(Array.isArray(dbs), 'database list: '+dbs.join(', '));
-        if (!~dbs.indexOf('unit-tests')) return next();
-        modules.database.delete('unit-tests', function(error, blocked) {
-          if (!blocked && !error) next();
-        });
+  new Promise(function(resolve) {
+    var utf8 = modules.string.toUTF8Buffer,
+        hex = modules.string.hexToBuffer,
+        toHex = modules.string.hexFromBuffer,
+        base64 = modules.string.base64FromBuffer;
+    assert(![
+      ['', 'd41d8cd98f00b204e9800998ecf8427e'],
+      ['abc', '900150983cd24fb0d6963f7d28e17f72'],
+      ['The quick brown fox jumps over the lazy dog', '9e107d9d372bb6826bd81d3542a419d6'],
+      ['c\'\u00e8', '8ef7c2941d78fe89f31e614437c9db59']
+    ].some(function(test) {
+      return toHex(modules.crypto.md5(utf8(test[0]))) !== test[1];
+    }), 'crypto md5');
+    assert(![
+      ['', 'da39a3ee5e6b4b0d3255bfef95601890afd80709'],
+      ['abc', 'a9993e364706816aba3e25717850c26c9cd0d89d'],
+      ['The quick brown fox jumps over the lazy dog', '2fd4e1c67a2d28fced849ee1bb76e7391b93eb12'],
+      ['c\'\u00e8', '98c9a3f804daa73b68a5660d032499a447350c0d']
+    ].some(function(test) {
+      return toHex(modules.crypto.sha1(utf8(test[0]))) !== test[1];
+    }), 'crypto sha1');
+    assert(![
+      ['', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'],
+      ['abc', 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'],
+      ['c\'\u00e8', '1aa15c717afffd312acce2217ce1c2e5dabca53c92165999132ec9ca5decdaca'],
+      ['abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq', '248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1']
+    ].some(function(test) {
+      return toHex(modules.crypto.sha256(utf8(test[0]))) !== test[1];
+    }), 'crypto sha256');
+    assert(![{
+      key: '0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b',
+      data: '4869205468657265',
+      mac: 'b0344c61d8db38535ca8afceaf0bf12b881dc200c9833da726e9376c2e32cff7'
+    }, {
+      key: '4a656665',
+      data: '7768617420646f2079612077616e7420666f72206e6f7468696e673f',
+      mac: '5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843'
+    }, {
+      key: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      data: 'dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd',
+      mac: '773ea91e36800e46854db8ebd09181a72959098b3ef8c122d9635514ced565fe'
+    }, {
+      key: '0102030405060708090a0b0c0d0e0f10111213141516171819',
+      data: 'cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd',
+      mac: '82558a389a443c0ea4cc819899f2083a85f0faa3e578f8077a2e3ff46729665b'
+    }, {
+      key: '0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c',
+      data: '546573742057697468205472756e636174696f6e',
+      mac: 'a3b6167473100ee06e0c796c2955552b'
+    }, {
+      key: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+      data: '5468697320697320612074657374207573696e672061206c6172676572207468616e20626c6f636b2d73697a65206b657920616e642061206c6172676572207468616e20626c6f636b2d73697a6520646174612e20546865206b6579206e6565647320746f20626520686173686564206265666f7265206265696e6720757365642062792074686520484d414320616c676f726974686d2e',
+      mac: '9b09ffa71b942fcb27635fbcd5b0e944bfdc63644f0713938a7f51535c3a35e2'
+    }].some(function(test) {
+      toHex(modules.crypto.hmac(hex(test.key), hex(test.data))) !== test.mac;
+    }), 'crypto hmac');
+    assert(
+      base64(modules.crypto.pbkdf2(utf8('password'), utf8('salt'))) === 'YywoEuRtRgQQK6dhjp1tfS+BKPYma0oDJk0qBGC33LM=' &&
+      base64(modules.crypto.pbkdf2(utf8('password'), utf8('salt'), 100)) === 'B+aZcYDPfxKQTwQQDUBdNIiP32KvbVBqDswjsZb+mdg=',
+      'crypto pbkdf2');
+    
+    modules.database.list(function(dbs) {
+      assert(Array.isArray(dbs), 'database list: '+dbs.join(', '));
+      if (!~dbs.indexOf('unit-tests')) return resolve();
+      modules.database.delete('unit-tests', function(error, blocked) {
+        if (!blocked && !error) resolve();
       });
-    },
-    function(next) {
+    });
+  }).then(function() {
+    return new Promise(function(resolve) {
       var data = {array: ['elem', 1, {a: null, b: [1,2,3]}], object: {boolean: true}, string: 'value'},
           db = modules.database.open('unit-tests', data);
       db.get().get('array').then(function(root, array) {
@@ -198,7 +173,9 @@ function(modules) {
                       'database put/get encoded paths, unicode values');
                     db.close();
                     modules.database.delete('unit-tests', function(error, blocked) {
-                      if (!blocked) next(assert(!error, 'database delete'));
+                      if (blocked) return;
+                      assert(!error, 'database delete');
+                      resolve();
                     });
                   });
                 });
@@ -207,8 +184,9 @@ function(modules) {
           });
         });
       });
-    },
-    function(next) {
+    });
+  }).then(function() {
+    return new Promise(function(resolve) {
       var code = '/* comment */ var i = 0; // comment\n/** name: {fn: function(arg1:boolean|string, arg2=undefined:[number, ...]) -> {key:value}, str: string}\n\n first\n second\n\n third */',
           doc = modules.docs.generate(code);
       assert(compare(doc,[{spec:{name:'name',type:{object:[{name:'fn',type:{function:{args:[{name:'arg1',type:['boolean','string']},{name:'arg2',default:'undefined',type:{array:[{type:'number'},'...']}}],returns:{object:{name:'key',type:'value'}}}}},{name:'str',type:'string'}]}},error:null,text:[['first second'],['third']]}]),
@@ -273,7 +251,7 @@ function(modules) {
         response.error();
       }, function(error, server) {
         assert(!error, 'http listen on port 9123');
-        if (error) return next();
+        if (error) return resolve();
         var host = 'http://127.0.0.1:9123';
         fetch(host).then(function(r) {
           return Promise.all([r, r.text()]);
@@ -296,23 +274,24 @@ function(modules) {
                 fetch(host+'/first', {headers: {'X-Large-Header': large}}).then(function(r) {
                   assert(i++ < 13 && r.status == 431,
                     'http request header too large error');
-                  if (i == 13) next(server);
+                  if (i == 13) resolve(server);
                 });
                 fetch(host+'/second', {method: 'POST', body: '{"malformed": json}'}).then(function(r) {
                   return Promise.all([r, r.text()]);
                 }).then(function(r) {
                   assert(i++ < 13 && r[0].status == 400 && r[1] === '400 Bad Request',
                     'http response to malformed body');
-                  if (i == 13) next(server);
+                  if (i == 13) resolve(server);
                 });
               });
             });
           });
         });
       });
-    },
-    function(next, server) {
-      server.disconnect();
+    });
+  }).then(function(server) {
+    if (server) server.disconnect();
+    return new Promise(function(resolve) {
       var grammar = {
         addition: [
           'addition', '+', 'multiplication', function(e) { return e[0] + e[2]; },
@@ -411,7 +390,7 @@ function(modules) {
         return function(data) {
           assert(i++ == 2 && modules.string.fromUTF8Buffer(data) == 'pong', 'socket receive from client');
           server.disconnect();
-          next();
+          resolve();
         };
       }, function(error, s) {
         server = s;
@@ -424,8 +403,9 @@ function(modules) {
           };
         });
       });
-    },
-    function(next) {
+    });
+  }).then(function() {
+    return new Promise(function(resolve) {
       var utf8Str = 'test 123 áéíóú',
           utf8Chk = new Uint8Array([0x74,0x65,0x73,0x74,0x20,0x31,0x32,0x33,0x20,0xc3,0xa1,0xc3,0xa9,0xc3,0xad,0xc3,0xb3,0xc3,0xba]),
           utf8Buf = modules.string.toUTF8Buffer(utf8Str),
@@ -454,14 +434,15 @@ function(modules) {
               assert(info, 'system network info');
               modules.system.storage.getInfo(function(info) {
                 assert(info, 'system storage info');
-                next();
+                resolve();
               });
             });
           });
         });
       });
-    },
-    function(next) {
+    });
+  }).then(function() {
+    return new Promise(function(resolve) {
       var i = 0;
       modules.http.serve({port: 9123, address: '127.0.0.1'}, function(request, response) {
         modules.websocket.accept(request, response, function(connection, protocol, extensions) {
@@ -473,7 +454,7 @@ function(modules) {
           };
         }, {protocols: ['myprotocol']});
       }, function(error, server) {
-        if (error) return next();
+        if (error) return resolve();
         var ws = new WebSocket('ws://localhost:9123', 'myprotocol');
         ws.binaryType = 'arraybuffer';
         ws.onopen = function() {
@@ -490,13 +471,12 @@ function(modules) {
         ws.onclose = function() {
           assert(i++ == 5, 'websocket close');
           server.disconnect();
-          next();
+          resolve();
         };
         ws.onerror = function() { i++; };
       });
-    },
-    function() {
-      assert(passed == 97, 'tests complete ('+passed+'/97 in '+(Date.now()-start)+'ms)');
-    }
-  );
+    });
+  }).then(function() {
+    assert(passed == 92, 'tests complete ('+passed+'/92 in '+(Date.now()-start)+'ms)');
+  });
 }
