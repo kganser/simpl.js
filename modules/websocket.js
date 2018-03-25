@@ -103,7 +103,7 @@ simpl.add('websocket', function(modules) {
           'Sec-WebSocket-Accept': encode(hash),
           'Sec-WebSocket-Version': 13,
           'Sec-WebSocket-Protocol': protocol,
-          'Sec-WebSocket-Extension': (extensions || []).join(', ')
+          'Sec-WebSocket-Extension': (extensions || []).join(', ') || null
         }, 101, function(info) {
           if (info.error) return error(1006);
           var receive = callback(connection = {
