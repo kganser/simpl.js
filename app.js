@@ -53,18 +53,18 @@ simpl.add('app', function(o) {
         callback = options;
         options = {};
       }
-      options.responseType = 'json';
-      o.xhr(path+(~path.indexOf('?') ? '&token=' : '?token=')+token, options, function(e) {
-        e = e.target;
-        var response = e.response || {};
-        if (typeof response != 'object') try {
-          response = JSON.parse(e.response);
-        } catch (e) {}
-        if (e.status >= 400 && !response.error) response.error = 'Unknown error';
-        if (e.status != 401) return callback(response);
-        login.open(function(response) {
-          if (!response || response.error) callback(response);
-          else request(path, options, callback);
+      fetch(path+(~path.indexOf('?') ? '&token=' : '?token=')+token, options).then(function(response) {
+        response.json().then(function(body) {
+          return body || {};
+        }, function() {
+          return {};
+        }).then(function(body) {
+          if (response.status >= 400 && !body.error) body.error = 'Unknown error';
+          if (response.status != 401) return callback(body);
+          login.open(function(response) {
+            if (!response || response.error) callback(response);
+            else request(path, options, callback);
+          });
         });
       });
     };
@@ -229,7 +229,7 @@ simpl.add('app', function(o) {
     var create = function(callback) {
       var entry = selected.entry;
       if (entry.published) return callback();
-      request(url(selected), {method: 'PUT', data: entry.code}, function(response) {
+      request(url(selected), {method: 'PUT', body: entry.code}, function(response) {
         if (response.error)
           return status('failure', response.error);
         entry.published = [];
@@ -640,7 +640,7 @@ simpl.add('app', function(o) {
               var entry = selected.entry,
                   code = entry.doc.getValue();
               status('info', 'Saving...');
-              request(url(selected), {method: 'PUT', data: code}, function(response) {
+              request(url(selected), {method: 'PUT', body: code}, function(response) {
                 if (response.error)
                   return status('failure', response.error);
                 status('success', 'Saved');
@@ -719,7 +719,7 @@ simpl.add('app', function(o) {
                       suggest();
                       fork(function() {
                         create(function() {
-                          request(url(current)+'/dependencies', {method: 'POST', json: match}, function(response) {
+                          request(url(current)+'/dependencies', {method: 'POST', body: JSON.stringify(match)}, function(response) {
                             if (response.error)
                               return status('failure', response.error);
                             entry.dependencies[match.name] = match.version;
@@ -778,7 +778,7 @@ simpl.add('app', function(o) {
                     else delete config[key];
                   });
                   create(function() {
-                    request(url(current)+'/config', {method: 'PUT', json: selected.entry.config}, function(response) {
+                    request(url(current)+'/config', {method: 'PUT', body: JSON.stringify(selected.entry.config)}, function(response) {
                       if (response.error)
                         status('failure', response.error);
                     });
@@ -976,8 +976,8 @@ simpl.add('app', function(o) {
               handler = callback;
               (function render() {
                 dom({div: [{iframe: {src: '/login'+(id ? '?socket='+id : '')}}]}, elem, true);
-                o.xhr('/online', function(e) {
-                  if (e.target.status == 200 || !elem.classList.contains('visible')) return;
+                fetch('/online').then(function(response) {
+                  if (response.ok || !elem.classList.contains('visible')) return;
                   dom({div: [
                     {strong: 'Network Error'}, {br: null},
                     {p: 'Please check your internet connection'},
@@ -1005,4 +1005,4 @@ simpl.add('app', function(o) {
     })();
     connect();
   };
-}, 0, {html: 0, xhr: 0, jsonv: 0, docs: 0});
+}, 0, {html: 0, jsonv: 0, docs: 0});

@@ -1,4 +1,4 @@
-simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, websocket: 0, xhr: 0}, function(o, proxy) {
+simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, websocket: 0}, function(o, proxy) {
 
   var server, loader, lines, icons, workspace,
       db = o.database.open('simpl'),
@@ -9,29 +9,33 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       csrf, ping, localApiPort;
 
   var api = function(path, token, callback, method, data, text) {
+    // serve session from cache
     if (path == 'user' && sessions[token]) return callback(sessions[token]);
-    o.xhr(localApiPort ? 'http://localhost:'+localApiPort+'/'+path : 'https://api.simpljs.com/'+path, {
+    fetch(localApiPort ? 'http://localhost:'+localApiPort+'/'+path : 'https://api.simpljs.com/'+path, {
       method: method,
-      responseType: 'json',
-      headers: {Authorization: token ? 'Bearer '+token : null},
-      json: text ? undefined : data,
-      data: text ? data : undefined
-    }, function(e) {
-      e = e.target;
-      var response = e.response || {};
-      if (!e.status || e.status >= 400 && !response.error)
-        response.error = e.status ? o.http.statusMessage(e.status) : 'Connection failed';
-      if (path == 'user' && !response.error) {
-        var now = Date.now();
-        Object.keys(sessions).forEach(function(token) {
-          if (sessions[token].expires < now) delete sessions[token];
-        });
-        response.expires = now + 86400000; // TODO: use expires_in from runtime.onMessageExternal?
-        response.image = '//www.gravatar.com/avatar/'+o.string.hexFromBuffer(
-          o.crypto.md5(o.string.toUTF8Buffer(response.email.toLowerCase())))+'?d=retro';
-        sessions[token] = response;
-      }
-      callback(response, e.status);
+      headers: token ? {Authorization: 'Bearer '+token} : undefined,
+      body: text ? data : JSON.stringify(data)
+    }).then(function(response) {
+      var status = response.status,
+          error = response.ok ? false : (status ? o.http.statusMessage(status) : 'Connection failed');
+      response.json().then(function(body) {
+        if (!body) body = {};
+        if (!body.error && error) body.error = error;
+        // refresh session cache
+        if (path == 'user' && !body.error) {
+          var now = Date.now();
+          Object.keys(sessions).forEach(function(token) {
+            if (sessions[token].expires < now) delete sessions[token];
+          });
+          body.expires = now + 86400000; // TODO: use expires_in from runtime.onMessageExternal?
+          body.image = '//www.gravatar.com/avatar/'+o.string.hexFromBuffer(
+            o.crypto.md5(o.string.toUTF8Buffer(response.email.toLowerCase())))+'?d=retro';
+          sessions[token] = body;
+        }
+        callback(body, status);
+      }, function() {
+        callback({error: error || 'Server error'}, status);
+      });
     });
   };
   var authenticate = function(token, callback) {
@@ -52,8 +56,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     workspace.forEach(function(item) {
       if (scope != 'both' && scope == 'apps' == !item.file) return;
       pending++;
-      o.xhr((item.file ? '/apps/'+item.file : '/modules/'+item.name)+'.js', function(e) {
-        var code = e.target.responseText;
+      fetch((item.file ? '/apps/'+item.file : '/modules/'+item.name)+'.js').then(function(r) { return r.text(); }).then(function(code) {
         if (item.file) {
           data.apps[item.name] = {versions: [{
             code: code,
@@ -121,7 +124,11 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     }(function(app) {
       if (!app || app.error) return broadcast('error', {app: name, version: version, message: app.error || 'App not found'}, user);
       logs[id] = [];
-      apps[id] = proxy(null, loader+'var config = '+JSON.stringify(app.config)+';simpl.user='+JSON.stringify(user)+';simpl.use('+JSON.stringify(app.dependencies)+','+app.code+','+JSON.stringify(name.split('@')[1])+');', function(module, callback) {
+      apps[id] = proxy(null, [
+        loader+'var config = '+JSON.stringify(app.config),
+        'simpl.user='+JSON.stringify(user),
+        'simpl.use('+JSON.stringify(app.dependencies)+','+app.code+','+JSON.stringify(name.split('@')[1])+');'
+      ].join(';'), function(module, callback) {
         var path = 'modules/'+encodeURIComponent(module.name),
             v = module.version,
             current = v < 1;
@@ -172,24 +179,19 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     clearInterval(ping);
   };
   
-  (function(parts, count) {
-    parts.forEach(function(file, i) {
-      o.xhr(file, function(e) {
-        parts[i] = e.target.responseText;
-        if (--count) return;
-        loader = parts.join('');
-        lines = loader.match(/\n/g).length;
-      });
-    });
-  }(['/simpl.js', '/loader.js'], 2));
-  o.xhr('/icons.json', {responseType: 'json'}, function(e) {
-    var o = e.target.response;
-    icons = Object.keys(o).map(function(name) {
-      return {symbol: {id: 'icon-'+name, viewBox: '0 0 20 20', children: {path: {d: o[name]}}}};
+  Promise.all(['/simpl.js', '/loader.js'].map(function(file) {
+    return fetch(file).then(function(r) { return r.text(); });
+  })).then(function(values) {
+    loader = values.join('');
+    lines = loader.match(/\n/g).length;
+  });
+  fetch('/icons.json').then(function(r) { return r.json(); }).then(function(r) {
+    icons = Object.keys(r).map(function(name) {
+      return {symbol: {id: 'icon-'+name, viewBox: '0 0 20 20', children: {path: {d: r[name]}}}};
     });
   });
-  o.xhr('/workspace.json', {responseType: 'json'}, function(e) {
-    workspace = e.target.response;
+  fetch('/workspace.json').then(function(r) { return r.json(); }).then(function(r) {
+    workspace = r;
     restore(function() {});
   });
   
@@ -414,8 +416,8 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             });
           }, 'json');
         if (request.path == '/online')
-          return o.xhr('https://api.simpljs.com', {method: 'head'}, function(e) {
-            response.generic(e.target.status ? 200 : 502);
+          return fetch('https://api.simpljs.com', {method: 'head'}).then(function(r) {
+            response.generic(r.ok ? 200 : 502);
           });
         if (request.path == '/connect')
           return authenticate(request.query.token, function(session) {
@@ -500,7 +502,6 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                   {svg: {id: 'icons', children: icons}},
                   {script: {src: '/simpl.js'}},
                   {script: {src: '/modules/html.js'}},
-                  {script: {src: '/modules/xhr.js'}},
                   {script: {src: '/modules/parser.js'}},
                   {script: {src: '/modules/docs.js'}},
                   {script: {src: '/codemirror.js'}},
@@ -517,10 +518,11 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
               ]}
             ]), 'html');
           });
-        o.xhr(request.path, {responseType: 'arraybuffer'}, function(e) {
-          if (e.target.status != 200)
-            return response.generic(404);
-          response.end(e.target.response, (request.path.match(/\.([^.]*)$/) || [])[1]);
+        fetch(request.path).then(function(r) {
+          if (!r.ok) return response.generic(404);
+          r.arrayBuffer().then(function(body) {
+            response.end(body, (request.path.match(/\.([^.]*)$/) || [])[1]);
+          });
         });
       }, function(error, s) {
         if (!error) {
@@ -566,19 +568,19 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       }
     } else if (!ws) {
       ws = true;
-      o.xhr('http://169.254.169.254/computeMetadata/v1/instance/attributes/?recursive=true', {
-        responseType: 'json',
+      fetch('http://169.254.169.254/computeMetadata/v1/instance/attributes/?recursive=true', {
         headers: {'Metadata-Flavor': 'Google'}
-      }, function(e) {
-        if (e.target.status == 200) return callback(e);
-        o.xhr('http://169.254.169.254/latest/user-data', {responseType: 'json'}, callback);
-      });
-      function callback(e) {
-        e = e.target.response;
-        var token = e && e.token,
-            user = e && e.user,
-            port = e && e.port,
-            app = e && (e.app || '').split('@'), // name@version
+      }).then(function(r) {
+        if (r.ok) return r.json();
+        return fetch('http://169.254.169.254/latest/user-data').then(function(r) {
+          if (r.ok) return r.json();
+        });
+      }).then(function(e) {
+        if (!e) e = {};
+        var token = e.token,
+            user = e.user,
+            port = e.port,
+            app = (e.app || '').split('@'), // name@version
             connections, client, retries = 0;
         console.log('Simpl.js: Headless launch '+JSON.stringify(e));
         if (port && !server) onLauncher(null, function() {
@@ -625,7 +627,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             };
           }());
         }
-      }
+      });
     }
     launcher = true;
     chrome.app.window.create('simpl.html', {
