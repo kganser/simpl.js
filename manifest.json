@@ -32,7 +32,6 @@
         "modules/string.js",
         "modules/system.js",
         "modules/websocket.js",
-        "modules/xhr.js",
         "background.js"
       ]
     }
