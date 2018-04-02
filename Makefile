@@ -1,11 +1,10 @@
 chrome:
 	mkdir -p build/chrome
-	tar -czC src -f build/chrome/simpljs.zip .
+	cd src; zip -qr ../build/chrome/simpljs .
 linux:
 	mkdir -p build/linux
 	echo TODO
 #	curl -# https://dl.nwjs.io/v0.29.2/nwjs-sdk-v0.29.2-linux-x64.tar.gz | tar xz
-
 macos:
 	mkdir -p build/macos
 	curl -# https://dl.nwjs.io/v0.29.2/nwjs-v0.29.2-osx-x64.zip -o build/macos/nw.zip
