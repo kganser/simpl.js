@@ -66,7 +66,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           }]};
         } else {
           data.mods[item.name] = {versions: [{
-            code: 'function(modules'+(item.proxy ? ', proxy' : '')+') {\n'+code.split(/\n/).slice(1, -1).join('\n')+'\n}',
+            code: 'function(modules'+(item.proxy ? ', proxy' : '')+') {\n'+code.trim().split(/\n/).slice(1, -1).join('\n')+'\n}',
             dependencies: item.dependencies || {},
             published: []
           }]};
