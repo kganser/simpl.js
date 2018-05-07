@@ -6,7 +6,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       decode = o.string.base64ToBuffer,
       utf8 = o.string.fromUTF8Buffer,
       apps = {}, logs = {}, clients = {}, sessions = {},
-      csrf, ping, localApiPort;
+      csrf, ping, localApiPort, debug;
 
   var api = function(path, token, callback, method, data, text) {
     // serve session from cache
@@ -97,6 +97,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     });
   };
   var broadcast = function(event, data, user) {
+    if (debug) console.log(event+' '+JSON.stringify(data));
     Object.keys(clients).forEach(function(socketId) {
       var client = clients[socketId];
       if (client.user == user) send(client.connection, event, data);
@@ -403,15 +404,15 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           }, 'url');
         if (request.path == '/action' && request.method == 'POST')
           return request.slurp(function(body) {
-            authenticate(body && body.token, function(session, local) {
+            var token = body && body.token;
+            authenticate(token, function(session, local) {
               var command = body.command,
-                  user = session ? session.username : '',
-                  token = body.token;
+                  user = session ? session.username : '';
               if (!token && !local) return response.generic(401);
               if (command == 'stop' || command == 'restart')
                 stop(user, body.app, body.version);
               if (command == 'run' || command == 'restart')
-                run(user, body.app, body.version, token);
+                run(user, body.app, body.version, !local && token);
               response.generic(200);
             });
           }, 'json');
@@ -421,8 +422,6 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           });
         if (request.path == '/connect')
           return authenticate(request.query.token, function(session) {
-            if (request.headers.Origin != 'http://'+request.headers.Host)
-              return response.generic(401);
             var socketId = response.socket.socketId,
                 user = session ? session.username : '';
             o.websocket.accept(request, response, function(client) {
@@ -550,7 +549,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
 
   chrome.app.runtime.onLaunched.addListener(function(source) {
     console.log('Simpl.js launched', source);
-    var args = (source.url || '').match(/^https:\/\/simpljs\.com\/launch(\/.*)?/);
+    var url = (source.url || '').match(/^https:\/\/simpljs\.com\/launch(\/.*)?/);
     var onLauncher = function(callback, loaded) {
       return function(x, fn) {
         if (fn && loaded) fn();
@@ -559,75 +558,86 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         else loaded = true;
       };
     }();
-    if (source.source != 'file_handler') {
-      path = args ? '/login?redirect='+encodeURIComponent(args[1] || '') : '';
+    var launch = function(args) {
+      if (!args) args = {};
+      var token = args.token,
+          user = args.user,
+          port = args.port,
+          app = args.app && args.app.split('@'), // name@version
+          connections, client, retries = 0;
+      console.log('Simpl.js: Headless launch '+JSON.stringify(args));
+      debug = 'debug' in args;
+      if (port && !server) onLauncher(null, function() {
+        var doc = launcher.contentWindow.document;
+        if (typeof port == 'number' || typeof port == 'string' && +port)
+          doc.getElementById('port').value = +port;
+        doc.launcher.onsubmit();
+      });
+      if (app) run('', app[0], +app[1] || 1);
+      if (token && user) {
+        localApiPort = +args.localApiPort;
+        (function connect() {
+          console.log('Simpl.js: attempting headless connection '+retries);
+          ws = new WebSocket((localApiPort ? 'ws://localhost:'+localApiPort : 'wss://api.simpljs.com')+'/connect?access_token='+token);
+          ws.onopen = function() {
+            console.log('Simpl.js: headless connection opened');
+            connections = retries = 0;
+            client = {user: user, connection: ws};
+          };
+          ws.onmessage = function(e) {
+            try { var message = JSON.parse(e.data); } catch (e) { return; }
+            var command = message.command;
+            if (command == 'connect') {
+              if (!connections++)
+                clients[-1] = client;
+              return state(user, ws);
+            }
+            if (command == 'disconnect') {
+              if (!--connections)
+                delete clients[-1];
+              return;
+            }
+            if (command == 'stop' || command == 'restart')
+              stop(user, message.app, message.version);
+            if (command == 'run' || command == 'restart')
+              run(user, message.app, message.version, token);
+          };
+          ws.onclose = function() {
+            console.log('Simpl.js: headless connection closed');
+            delete clients[-1];
+            if (retries < 6) setTimeout(connect, (1 << retries++) * 1000);
+            else if (localApiPort) setTimeout(connect, 64000);
+            else console.log('Simpl.js: headless connection failed');
+          };
+        }());
+      }
+    };
+    if (source.source != 'file_handler' && source.source != 'load_and_launch') {
+      path = url ? '/login?redirect='+encodeURIComponent(url[1] || '') : '';
       if (launcher.focus) {
         if (!server) return launcher.focus();
         chrome.browser.openTab({url: 'http://localhost:'+port+path});
         return path = '';
       }
-    } else if (!ws) {
+    } else if (!ws && typeof require == 'function') {
       ws = true;
-      fetch('http://169.254.169.254/computeMetadata/v1/instance/attributes/?recursive=true', {
-        headers: {'Metadata-Flavor': 'Google'}
-      }).then(function(r) {
-        if (r.ok) return r.json();
-        return fetch('http://169.254.169.254/latest/user-data').then(function(r) {
-          if (r.ok) return r.json();
-        });
-      }).then(function(e) {
-        if (!e) e = {};
-        var token = e.token,
-            user = e.user,
-            port = e.port,
-            app = (e.app || '').split('@'), // name@version
-            connections, client, retries = 0;
-        console.log('Simpl.js: Headless launch '+JSON.stringify(e));
-        if (port && !server) onLauncher(null, function() {
-          var doc = launcher.contentWindow.document;
-          if (typeof port == 'number' || typeof port == 'string' && +port)
-            doc.getElementById('port').value = +port;
-          doc.launcher.onsubmit();
-        });
-        if (app) run('', app[0], +app[1] || 1);
-        if (token && user) {
-          localApiPort = +e.localApiPort;
-          (function connect() {
-            console.log('Simpl.js: attempting headless connection '+retries);
-            ws = new WebSocket((localApiPort ? 'ws://localhost:'+localApiPort : 'wss://api.simpljs.com')+'/connect?access_token='+token);
-            ws.onopen = function() {
-              console.log('Simpl.js: headless connection opened');
-              connections = retries = 0;
-              client = {user: user, connection: ws};
-            };
-            ws.onmessage = function(e) {
-              try { var message = JSON.parse(e.data); } catch (e) { return; }
-              var command = message.command;
-              if (command == 'connect') {
-                if (!connections++)
-                  clients[-1] = client;
-                return state(user, ws);
-              }
-              if (command == 'disconnect') {
-                if (!--connections)
-                  delete clients[-1];
-                return;
-              }
-              if (command == 'stop' || command == 'restart')
-                stop(user, message.app, message.version);
-              if (command == 'run' || command == 'restart')
-                run(user, message.app, message.version, token);
-            };
-            ws.onclose = function() {
-              console.log('Simpl.js: headless connection closed');
-              delete clients[-1];
-              if (retries < 6) setTimeout(connect, (1 << retries++) * 1000);
-              else if (localApiPort) setTimeout(connect, 64000);
-              else console.log('Simpl.js: headless connection failed');
-            };
-          }());
-        }
+      var args = {};
+      require('nw.gui').App.argv.forEach(function(flag) {
+        flag = flag.split('=');
+        args[flag[0].replace(/^--?/, '')] = flag[1];
       });
+      if ('metadata' in args) {
+        fetch('http://169.254.169.254/computeMetadata/v1/instance/attributes/?recursive=true', {
+          headers: {'Metadata-Flavor': 'Google'}
+        }).then(function(r) {
+          if (r.ok) return r.json();
+          return fetch('http://169.254.169.254/latest/user-data').then(function(r) {
+            if (r.ok) return r.json();
+          });
+        }).then(launch);
+      } else {
+        launch(args);
+      }
     }
     launcher = true;
     chrome.app.window.create('simpl.html', {

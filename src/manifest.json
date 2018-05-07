@@ -8,6 +8,7 @@
   "version": "0.68",
   "minimum_chrome_version": "33",
   "permissions": [
+    "node",
     "unlimitedStorage",
     "system.cpu",
     "system.display",
