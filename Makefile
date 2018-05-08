@@ -7,23 +7,22 @@ chrome:
 	cd ..; \
 	rm -rf src
 linux:
-	mkdir -p build/linux; \
-	cd build/linux; \
-	test -f nwjs-sdk-v0.29.2.tar.gz || curl -# https://dl.nwjs.io/v0.29.2/nwjs-sdk-v0.29.2-linux-x64.tar.gz -o nwjs-sdk-v0.29.2.tar.gz; \
-	tar -xf nwjs-sdk-v0.29.2.tar.gz; \
-	mv nwjs-sdk-v0.29.2-linux-x64 Simpl.js; \
-	cp -R ../../src/ Simpl.js/package.nw
+	mkdir -p build/linux tmp; \
+	test -f tmp/nwjs-sdk-v0.29.2-linux.tar.gz || curl -# https://dl.nwjs.io/v0.29.2/nwjs-sdk-v0.29.2-linux-x64.tar.gz -o tmp/nwjs-sdk-v0.29.2-linux.tar.gz; \
+	tar -xf tmp/nwjs-sdk-v0.29.2-linux.tar.gz; \
+	mv tmp/nwjs-sdk-v0.29.2-linux-x64 build/linux/Simpl.js; \
+	cp -R src/ build/linux/Simpl.js/package.nw
 macos:
-	mkdir -p build/macos; \
-	cd build/macos; \
-	test -f nwjs-sdk-v0.29.2.zip || curl -# https://dl.nwjs.io/v0.29.2/nwjs-sdk-v0.29.2-osx-x64.zip -o nwjs-sdk-v0.29.2.zip; \
-	unzip -q nwjs-sdk-v0.29.2.zip; \
-	mv nwjs-sdk-v0.29.2-osx-x64/nwjs.app Simpl.js.app; \
-	rm -rf nwjs-sdk-v0.29.2-osx-x64; \
-	mkdir -p Simpl.js.app/Contents/Resources/app.nw; \
-	cp -R ../../src/ Simpl.js.app/Contents/Resources/app.nw; \
-	cp ../../assets/simpljs.icns Simpl.js.app/Contents/Resources/app.icns; \
-	touch Simpl.js.app
+	mkdir -p build/macos tmp; \
+	rm -rf build/macos/* tmp/nwjs-sdk-v0.29.2-osx-x64; \
+	test -f tmp/nwjs-sdk-v0.29.2-osx.zip || curl -# https://dl.nwjs.io/v0.29.2/nwjs-sdk-v0.29.2-osx-x64.zip -o tmp/nwjs-sdk-v0.29.2-osx.zip; \
+	unzip -q tmp/nwjs-sdk-v0.29.2-osx.zip -d tmp; \
+	mv -f tmp/nwjs-sdk-v0.29.2-osx-x64/nwjs.app build/macos/Simpl.js.app; \
+	rm -rf tmp/nwjs-sdk-v0.29.2-osx-x64; \
+	mkdir -p build/macos/Simpl.js.app/Contents/Resources/app.nw; \
+	cp -R src/ build/macos/Simpl.js.app/Contents/Resources/app.nw; \
+	cp assets/simpljs.icns build/macos/Simpl.js.app/Contents/Resources/app.icns; \
+	touch build/macos/Simpl.js.app
 test:
 	if [ `uname` = 'Darwin' ]; then \
 	  if [ ! -x build/macos/Simpl.js.app/Contents/MacOS/nwjs ]; then \
@@ -53,6 +52,6 @@ test:
 	kill $$pid; \
 	wait $$pid
 clean:
-	rm -rf build
+	rm -rf build tmp
 
 PHONY: chrome linux macos test
