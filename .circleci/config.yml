@@ -1,0 +1,23 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: circleci/buildpack-deps:stable-curl
+    steps:
+      - checkout
+      - restore_cache:
+          key: downloads
+      - run:
+          name: Build app
+          command: |
+            sudo apt-get install -y make libglib2.0-0 libnss3 libxcomposite1 libxcursor1 libxi6 libxtst6 libcups2 libxss1 libxrandr2 libasound2 libpangocairo-1.0-0 libatk1.0-0 libgtk-3-0
+            make linux
+      - save_cache:
+          key: downloads
+          paths:
+            - tmp
+      - run:
+          name: Run tests
+          command: make test
+      - store_test_results:
+          path: reports

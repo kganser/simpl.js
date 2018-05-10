@@ -12,7 +12,7 @@ curl localhost:8123/apps/test/1/dependencies?token=$TOKEN -d '{"name":"http","ve
 curl localhost:8123/apps/test/1/config?token=$TOKEN -X PUT -d '{"port":8124,"apiPort":8123}' -so /dev/null
 curl localhost:8123/action -d "{\"command\":\"run\",\"app\":\"test\",\"version\":1,\"token\":\"$TOKEN\"}" -so /dev/null
 sleep 1
-mkdir -p reports
-curl localhost:8124 -so reports/junit.xml
+mkdir -p reports/test.js
+curl localhost:8124 -so reports/test.js/junit.xml
 kill $PID
 wait $PID
