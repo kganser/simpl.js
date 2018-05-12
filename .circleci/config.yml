@@ -23,9 +23,13 @@ jobs:
           path: reports
       - store_artifacts:
           path: build/chrome/simpljs.zip
+          destination: chrome
       - store_artifacts:
           path: build/linux/Simpl.js.tar.gz
+          destination: linux
       - store_artifacts:
           path: build/macos/Simpl.js.zip
+          destination: macos
       - store_artifacts:
           path: build/windows/Simpl.js.zip
+          destination: windows

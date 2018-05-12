@@ -202,15 +202,15 @@ function(modules) {
         'html markup nested');
       assert(modules.html.markup([{link: {rel: 'stylesheet'}}, {br: null}]) === '<link rel="stylesheet"><br>',
         'html markup self-closing tags');
-      assert(modules.html.markup({script: function(a) { if (!a) return 'a'; }}) === '<script>(function (a) { if (!a) return \'a\'; }("a"));</script>',
+      assert(modules.html.markup({script: function(a) { if (!a) return 'a'; }}) === '<script>(function(a) { if (!a) return \'a\'; }("a"));</script>',
         'html markup inline code');
-      assert(modules.html.markup({script: function() { code = true; }}) === '<script>(function () { code = true; }());</script>' && code !== true,
+      assert(modules.html.markup({script: function() { code = true; }}) === '<script>(function() { code = true; }());</script>' && code !== true,
         'html markup inline code no params');
-      assert(modules.html.markup({script: function(a) { if (!a) return ['a', 'b']; }}) === '<script>(function (a) { if (!a) return [\'a\', \'b\']; }(["a","b"]));</script>',
+      assert(modules.html.markup({script: function(a) { if (!a) return ['a', 'b']; }}) === '<script>(function(a) { if (!a) return [\'a\', \'b\']; }(["a","b"]));</script>',
         'html markup inline code single param');
-      assert(modules.html.markup({script: function(a, b) { if (!a) return ['a', 'b']; }}) === '<script>(function (a, b) { if (!a) return [\'a\', \'b\']; }("a","b"));</script>',
+      assert(modules.html.markup({script: function(a, b) { if (!a) return ['a', 'b']; }}) === '<script>(function(a, b) { if (!a) return [\'a\', \'b\']; }("a","b"));</script>',
         'html markup inline code multiple params');
-      assert(modules.html.markup([{a: {title: '"hello & goodbye"', children: 'hello <& goodbye'}}, {script: function() { '</script>'; }}]) === '<a title="&quot;hello &amp; goodbye&quot;">hello &lt;&amp; goodbye</a><script>(function () { \'<\\/script>\'; }());</script>',
+      assert(modules.html.markup([{a: {title: '"hello & goodbye"', children: 'hello <& goodbye'}}, {script: function() { '</script>'; }}]) === '<a title="&quot;hello &amp; goodbye&quot;">hello &lt;&amp; goodbye</a><script>(function() { \'<\\/script>\'; }());</script>',
         'html markup escaped');
       
       var i = 1, large = new Array(1000).join('yabadabadoo');
