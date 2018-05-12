@@ -11,7 +11,7 @@ jobs:
           name: Build app
           command: |
             sudo apt-get install -y make libglib2.0-0 libnss3 libxcomposite1 libxcursor1 libxi6 libxtst6 libcups2 libxss1 libxrandr2 libasound2 libpangocairo-1.0-0 libatk1.0-0 libgtk-3-0
-            make linux
+            make
       - save_cache:
           key: downloads
           paths:
@@ -21,3 +21,11 @@ jobs:
           command: make test
       - store_test_results:
           path: reports
+      - store_artifacts:
+          path: build/chrome/simpljs.zip
+      - store_artifacts:
+          path: build/linux/Simpl.js.tar.gz
+      - store_artifacts:
+          path: build/macos/Simpl.js.zip
+      - store_artifacts:
+          path: build/windows/Simpl.js.zip
