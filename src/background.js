@@ -29,7 +29,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           });
           body.expires = now + 86400000; // TODO: use expires_in from runtime.onMessageExternal?
           body.image = '//www.gravatar.com/avatar/'+o.string.hexFromBuffer(
-            o.crypto.md5(o.string.toUTF8Buffer(response.email.toLowerCase())))+'?d=retro';
+            o.crypto.md5(o.string.toUTF8Buffer((body.email || '').toLowerCase())))+'?d=retro';
           sessions[token] = body;
         }
         callback(body, status);

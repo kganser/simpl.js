@@ -10,7 +10,7 @@ jobs:
       - run:
           name: Build app
           command: |
-            sudo apt-get install -y make libglib2.0-0 libnss3 libxcomposite1 libxcursor1 libxi6 libxtst6 libcups2 libxss1 libxrandr2 libasound2 libpangocairo-1.0-0 libatk1.0-0 libgtk-3-0
+            sudo apt-get install -qy make libglib2.0-0 libnss3 libxcomposite1 libxcursor1 libxi6 libxtst6 libcups2 libxss1 libxrandr2 libasound2 libpangocairo-1.0-0 libatk1.0-0 libgtk-3-0
             make linux
       - save_cache:
           key: downloads-1
