@@ -6,7 +6,7 @@
 }
 body {
   margin: 0;
-  font: 13px sans-serif;
+  font: 13px -apple-system, BlinkMacSystemFont, sans-serif;
   -webkit-text-size-adjust: none;
 }
 #icons {
@@ -69,9 +69,9 @@ nav:after {
   box-shadow: 0 0 3px rgba(0, 0, 0, .3);
 }
 h1 {
-  font: 500 2em "Segoe UI", ArialMT, sans-serif;
+  font: 500 2em -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   margin: 0 0 .5em 0;
-} 
+}
 #home h1 {
   background: url(/icon.png) left/32px no-repeat;
   image-rendering: pixelated;
@@ -88,7 +88,7 @@ nav h2, #settings h2 {
   color: #ddd;
 }
 .home {
-  font: 500 15px/25px "Segoe UI", ArialMT, sans-serif;
+  font: 500 15px/25px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   background: url(/icon.png) 10px/16px no-repeat;
   image-rendering: pixelated;
   padding-left: 30px;
