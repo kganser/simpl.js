@@ -23,3 +23,4 @@ jobs:
           path: reports
       - store_artifacts:
           path: reports
+          destination: reports

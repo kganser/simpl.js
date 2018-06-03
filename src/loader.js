@@ -5,7 +5,7 @@ simpl = function(s) {
   if (inWorker) {
     var console = function(level) {
       return function() {
-        var loc = new Error().stack.split('\n')[2].match(/(blob:chrome-extension.+):(\d+):(\d+)\)?$/);
+        var loc = (new Error().stack.split('\n')[2] || '').match(/(blob:chrome-extension.+):(\d+):(\d+)\)?$/);
         proxy('log', {
           level: level,
           args: Array.prototype.slice.call(arguments),

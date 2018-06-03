@@ -36,13 +36,14 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       }, function() {
         callback({error: error || 'Server error'}, status);
       });
+    }).catch(function(e) {
+      callback({error: e.toString()}, 0);
     });
   };
   var authenticate = function(token, callback) {
     if (token == csrf) return callback(null, true);
     if (!token) return callback();
     api('user', token, function(body) {
-      if (body.error) return callback();
       callback(body);
     });
   };
@@ -408,7 +409,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             authenticate(token, function(session, local) {
               var command = body.command,
                   user = session ? session.username : '';
-              if (!token && !local) return response.generic(401);
+              if (!token || session && session.error) return response.generic(401);
               if (command == 'stop' || command == 'restart')
                 stop(user, body.app, body.version);
               if (command == 'run' || command == 'restart')
@@ -424,6 +425,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           return authenticate(request.query.token, function(session) {
             var socketId = response.socket.socketId,
                 user = session ? session.username : '';
+            if (session && session.error) return response.generic(401);
             o.websocket.accept(request, response, function(client) {
               var self = clients[socketId] = {
                 user: user,
