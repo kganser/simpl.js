@@ -18,6 +18,9 @@ sleep 1
 mkdir -p reports/test.js
 curl localhost:8124/results -so reports/test.js/junit.xml
 curl localhost:8124/log -so reports/test.js/log.txt
-curl localhost:8124/screenshot -so reports/test.js/screenshot.png
+curl localhost:8124/screenshot-code -so reports/test.js/screenshot-code.png
+curl localhost:8124/screenshot-docs -so reports/test.js/screenshot-docs.png
+curl localhost:8124/screenshot-config -so reports/test.js/screenshot-config.png
+curl localhost:8124/screenshot-log -so reports/test.js/screenshot-log.png
 kill $PID
 wait $PID
