@@ -107,9 +107,12 @@ function(modules) {
             return ~message.indexOf('tests complete');
           });
         }).then(function() {
-          return send('Runtime.evaluate', {expression:
-            "document.querySelector('nav li:nth-child(4) .name').click();"+
-            "document.querySelector('nav .toggle').click();"}).then(function() {
+          return Promise.all([
+            load('/apps/Unit%20Tests/1'),
+            send('Runtime.evaluate', {expression:
+              "document.querySelector('nav li:nth-child(4) .name').click();"+
+              "document.querySelector('nav .toggle').click();"})
+          ]).then(function() {
             return send('Page.captureScreenshot').then(function(result) {
               assert(typeof result.data == 'string', 'Log screenshot');
               screenshots.log = string.base64ToBuffer(result.data).buffer;
@@ -130,9 +133,12 @@ function(modules) {
             });
           });
         }).then(function() {
-          return send('Runtime.evaluate', {expression:
-            "document.querySelector('nav > ul:nth-of-type(2) li:nth-child(2) .name').click();"+
-            "document.querySelector('nav .toggle').click();"}).then(function() {
+          return Promise.all([
+            load('/modules/database/1'),
+            send('Runtime.evaluate', {expression:
+              "document.querySelector('nav > ul:nth-of-type(2) li:nth-child(2) .name').click();"+
+              "document.querySelector('nav .toggle').click();"})
+          ]).then(function() {
             return send('Page.captureScreenshot').then(function(result) {
               assert(typeof result.data == 'string', 'Docs screenshot');
               screenshots.docs = string.base64ToBuffer(result.data).buffer;
@@ -183,7 +189,7 @@ function(modules) {
         }).finally(finish);
       };
       socket.onmessage = function(e) {
-        log.push(e.data.substr(0, 1000));
+        log.push(e.data.length > 1000 ? e.data.substr(0, 1000)+'...' : e.data);
         try { var data = JSON.parse(e.data); } catch (e) { return; }
         var key = data.id || data.method;
         var callback = callbacks[key];
