@@ -16,19 +16,43 @@ function(modules) {
     return new Promise(function(finish) {
       var socket = new WebSocket(page.webSocketDebuggerUrl),
           callbacks = {},
-          id = 1;
+          timeout = 5000,
+          id = 1,
+          token;
       var send = function(method, params) {
         var message = JSON.stringify({id: id, method: method, params: params});
         log.push('> '+message);
         socket.send(message);
         return new Promise(function(resolve) {
-          callbacks[id++] = resolve;
+          var i = id++;
+          callbacks[i] = resolve;
+          setTimeout(function() {
+            if (!callbacks[i]) return;
+            log.push('> command id='+id+' timed out');
+            resolve();
+          }, timeout);
         });
       };
-      var wait = function(method) {
+      var wait = function(method, test) {
         log.push('> wait for '+method);
         return new Promise(function(resolve) {
           callbacks[method] = resolve;
+          setTimeout(function() {
+            if (!callbacks[method]) return;
+            log.push('> wait for '+method+' timed out');
+            resolve();
+          }, timeout);
+        }).then(function(result) {
+          return !test || test(result) ? result : wait(method, test);
+        });
+      };
+      var load = function(url) {
+        return wait('Network.requestWillBeSent', function(result) {
+          return result.request.url.split('?')[0] == host+url;
+        }).then(function(req) {
+          return wait('Network.loadingFinished', function(result) {
+            return result.requestId == req.requestId;
+          });
         });
       };
       var assert = function(test, description) {
@@ -37,6 +61,11 @@ function(modules) {
       };
       socket.onopen = function() {
         log.push('> debugger connection opened');
+
+        wait('Network.webSocketCreated').then(function(result) {
+          token = result.url.split('?token=')[1];
+        });
+
         Promise.all([
           send('Runtime.enable'),
           send('Page.enable'),
@@ -62,39 +91,41 @@ function(modules) {
             assert(result.result.type == 'undefined', 'Ran Unit Tests app');
           });
         }).then(function() {
-          return function read() {
-            return wait('Network.webSocketFrameReceived').then(function(params) {
-              var message = '';
-              try {
-                var payload = JSON.parse(params.response.payloadData),
-                    data = payload.data;
-                if (payload.event == 'log' && data.app == 'Unit Tests') {
-                  message = data.message[0];
-                  var type = message[0];
-                  if (type == '✓' || type == '✗') {
-                    assert(type == '✓', 'Unit tests:'+message.substr(1));
-                  }
+          return wait('Network.webSocketFrameReceived', function(result) {
+            var message = '';
+            try {
+              var payload = JSON.parse(result.response.payloadData),
+                  data = payload.data;
+              if (payload.event == 'log' && data.app == 'Unit Tests') {
+                message = data.message[0];
+                var type = message[0];
+                if (type == '✓' || type == '✗') {
+                  assert(type == '✓', 'Unit tests:'+message.substr(1));
                 }
-              } catch (e) {}
-              if (message.indexOf('tests complete') < 0)
-                return read();
-            });
-          }();
+              }
+            } catch (e) {}
+            return ~message.indexOf('tests complete');
+          });
         }).then(function() {
           return send('Runtime.evaluate', {expression:
             "document.querySelector('nav li:nth-child(4) .name').click();"+
             "document.querySelector('nav .toggle').click();"}).then(function() {
             return send('Page.captureScreenshot').then(function(result) {
+              assert(typeof result.data == 'string', 'Log screenshot');
               screenshots.log = string.base64ToBuffer(result.data).buffer;
             });
           });
         }).then(function() {
-          return send('Runtime.evaluate', {expression:
-            "document.querySelector('nav li:nth-child(6)').style.display = 'none';"+
-            "document.querySelector('nav li:nth-child(4) .stop').click();"+
-            "document.querySelector('nav li:nth-child(5) .name').click();"+
-            "document.querySelector('nav .toggle').click();"}).then(function() {
+          return Promise.all([
+            load('/apps/Web%20Server/1'),
+            send('Runtime.evaluate', {expression:
+              "document.querySelector('nav li:nth-child(6)').style.display = 'none';"+
+              "document.querySelector('nav li:nth-child(4) .stop').click();"+
+              "document.querySelector('nav li:nth-child(5) .name').click();"+
+              "document.querySelector('nav .toggle').click();"})
+          ]).then(function() {
             return send('Page.captureScreenshot').then(function(result) {
+              assert(typeof result.data == 'string', 'Code screenshot');
               screenshots.code = string.base64ToBuffer(result.data).buffer;
             });
           });
@@ -103,32 +134,53 @@ function(modules) {
             "document.querySelector('nav > ul:nth-of-type(2) li:nth-child(2) .name').click();"+
             "document.querySelector('nav .toggle').click();"}).then(function() {
             return send('Page.captureScreenshot').then(function(result) {
+              assert(typeof result.data == 'string', 'Docs screenshot');
               screenshots.docs = string.base64ToBuffer(result.data).buffer;
             });
           });
         }).then(function() {
-          return send('Runtime.evaluate', {expression:
-            "document.querySelector('nav li:nth-child(5) .name').click();"}).then(function() {
-            //return wait('Network.loadingFinished').then(function() {
-            //  return send('Runtime.evaluate', {expression:
-            //    "document.querySelector('#settings .publish[style=\"display: inline-block;\"]').click();"+
-            //    "var _rect = document.querySelector('.CodeMirror-code > div:nth-child(10) .CodeMirror-line .cm-string').getBoundingClientRect();"+
-            //    "Math.ceil(_rect.x)+','+Math.ceil(_rect.y)"}).then(function(result) {
-            //    var xy = result.result.value.split(',');
-            //    return send('Input.dispatchMouseEvent', {type: 'mousePressed', x: +xy[0]+20, y: +xy[1], button: 'left', clickCount: 2}).then(function() {
-            //      return send('Input.dispatchKeyEvent', {type: 'char', text: 'g'}).then(function(result) {
-                    return send('Runtime.evaluate', {expression:
-                      "document.querySelector('nav .selected .view').click();"}).then(function() {
-                      return send('Page.captureScreenshot').then(function(result) {
-                        screenshots.config = string.base64ToBuffer(result.data).buffer;
-                      });
-                    });
-            //      });
-            //    });
-            //  });
-            //});
+          // publish socket, string
+          return Promise.all([
+            fetch(host+'/modules/socket/1?token='+token, {method: 'POST'}),
+            fetch(host+'/modules/string/1?token='+token, {method: 'POST'})
+          ]).then(function() {
+            // add published socket, string as dependencies to http
+            return Promise.all([
+              fetch(host+'/modules/http/1/dependencies?token='+token, {method: 'POST', body: '{"name":"socket",version:1}'}),
+              fetch(host+'/modules/http/1/dependencies?token='+token, {method: 'POST', body: '{"name":"string",version:1}'})
+            ]);
+          }).then(function() {
+            // publish http
+            return fetch(host+'/modules/http/1?token='+token, {method: 'POST'});
+          }).then(function() {
+            // add published http as dependency to Web Server
+            return fetch(host+'/apps/Web%20Server/1/dependencies?token='+token, {method: 'POST', body: '{"name":"http","version":1}'});
+          }).then(function() {
+            // publish Web Server
+            return fetch(host+'/apps/Web%20Server/1?token='+token, {method: 'POST'});
+          }).then(function() {
+            // edit code
+            return fetch(host+'/apps/Web%20Server/1').then(function(response) {
+              return response.json();
+            }).then(function(app) {
+              return fetch(host+'/apps/Web%20Server/1?token='+token, {method: 'PUT', body: app.code.replace('First', 'Second')});
+            });
+          }).then(function(result) {
+            return send('Page.navigate', {url: host+'/apps/Web%20Server/1/settings'});
+          }).then(function(result) {
+            return load('/apps/Web%20Server/1');
+          }).then(function(result) {
+            return send('Runtime.evaluate', {expression:
+              "document.querySelector('nav .toggle').click();"+
+              "document.querySelector('.timeline li:last-child').click();"+
+              "document.querySelector('.timeline li:first-child').click();"});
+          }).then(function(result) {
+            return send('Page.captureScreenshot').then(function(result) {
+              assert(typeof result.data == 'string', 'Config screenshot');
+              screenshots.config = string.base64ToBuffer(result.data).buffer;
+            });
           });
-        }).then(finish);
+        }).finally(finish);
       };
       socket.onmessage = function(e) {
         log.push(e.data.substr(0, 1000));
@@ -137,7 +189,7 @@ function(modules) {
         var callback = callbacks[key];
         if (callback) {
           delete callbacks[key];
-          callback(data.result || data.params);
+          callback(data.result || data.params)
         }
       };
     });
@@ -147,7 +199,7 @@ function(modules) {
 
     if (req.path == '/results')
       return run.then(function() {
-        res.end('<?xml version="1.0" encoding="UTF-8"?><testsuite tests="96">'+tests.map(function(test) {
+        res.end('<?xml version="1.0" encoding="UTF-8"?><testsuite tests="100">'+tests.map(function(test) {
           return '<testcase name="'+test.name+'"'+(test.pass ? '/>' : '><failure message="test failed"/></testcase>');
         }).join('')+'</testsuite>', {'Content-Type': 'text/xml; charset=utf-8'});
       });
@@ -159,7 +211,7 @@ function(modules) {
       return run.then(function() {
         var screenshot = screenshots[req.path.substr(12)];
         if (screenshot) return res.end(screenshot, 'png');
-        res.generic(404);
+        res.generic(404, 'txt');
       });
     res.generic(404);
   });

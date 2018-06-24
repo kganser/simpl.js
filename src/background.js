@@ -5,13 +5,14 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       encode = o.string.base64FromBuffer,
       decode = o.string.base64ToBuffer,
       utf8 = o.string.fromUTF8Buffer,
+      apiHost = 'api.simpljs.com',
       apps = {}, logs = {}, clients = {}, sessions = {},
       csrf, ping, localApiPort, debug;
 
   var api = function(path, token, callback, method, data, text) {
     // serve session from cache
     if (path == 'user' && sessions[token]) return callback(sessions[token]);
-    fetch(localApiPort ? 'http://localhost:'+localApiPort+'/'+path : 'https://api.simpljs.com/'+path, {
+    fetch(localApiPort ? 'http://localhost:'+localApiPort+'/'+path : 'https://'+apiHost+'/'+path, {
       method: method,
       headers: token ? {Authorization: 'Bearer '+token} : undefined,
       body: text ? data : JSON.stringify(data)
@@ -418,7 +419,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             });
           }, 'json');
         if (request.path == '/online')
-          return fetch('https://api.simpljs.com', {method: 'head'}).then(function(r) {
+          return fetch('https://'+apiHost, {method: 'head'}).then(function(r) {
             response.generic(r.ok ? 200 : 502);
           });
         if (request.path == '/connect')
@@ -433,7 +434,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                 connect: function(plan, token) {
                   self.token = token;
                   if (self.remote || plan != 'pro') return;
-                  self.remote = new WebSocket('wss://api.simpljs.com/connect?access_token='+token);
+                  self.remote = new WebSocket('wss://'+apiHost+'/connect?access_token='+token);
                   self.remote.onmessage = function(e) {
                     if (typeof e.data == 'string' && e.data != 'ping')
                       client.send(e.data);
@@ -524,6 +525,8 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
           r.arrayBuffer().then(function(body) {
             response.end(body, (request.path.match(/\.([^.]*)$/) || [])[1]);
           });
+        }).catch(function() {
+          response.generic(404);
         });
       }, function(error, s) {
         if (!error) {
@@ -580,7 +583,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         localApiPort = +args.localApiPort;
         (function connect() {
           console.log('Simpl.js: attempting headless connection '+retries);
-          ws = new WebSocket((localApiPort ? 'ws://localhost:'+localApiPort : 'wss://api.simpljs.com')+'/connect?access_token='+token);
+          ws = new WebSocket((localApiPort ? 'ws://localhost:'+localApiPort : 'wss://'+apiHost)+'/connect?access_token='+token);
           ws.onopen = function() {
             console.log('Simpl.js: headless connection opened');
             connections = retries = 0;

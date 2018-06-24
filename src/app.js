@@ -632,8 +632,10 @@ simpl.add('app', function(o) {
             extraKeys: {Tab: 'indentMore', 'Shift-Tab': 'indentLess'}
           });
           code.on('changes', function() {
-            selected.entry.dirty = true;
-            selected.entry.tab.classList.add('changed');
+            var entry = selected.entry,
+                dirty = entry.doc.getValue() !== entry.code;
+            entry.dirty = dirty;
+            entry.tab.classList.toggle('changed', dirty);
           });
           CodeMirror.commands.save = function() {
             fork(function() {
