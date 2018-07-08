@@ -14,7 +14,7 @@ linux:
 	tar -C tmp -xf tmp/nwjs-sdk-$(nwver)-linux.tar.gz
 	mv tmp/nwjs-sdk-$(nwver)-linux-x64 build/linux/Simpl.js
 	cp -R src/ build/linux/Simpl.js/package.nw
-	tar -C build/linux -czf build/linux/Simpl.js.tar.gz Simpl.js
+	#tar -C build/linux -czf build/linux/Simpl.js.tar.gz Simpl.js
 macos:
 	mkdir -p build/macos tmp
 	rm -rf build/macos/* tmp/nwjs-sdk-$(nwver)-osx-x64
@@ -26,7 +26,7 @@ macos:
 	cp -R src/ build/macos/Simpl.js.app/Contents/Resources/app.nw
 	cp assets/simpljs.icns build/macos/Simpl.js.app/Contents/Resources/app.icns
 	touch build/macos/Simpl.js.app
-	cd build/macos; zip -yrq Simpl.js.zip Simpl.js.app
+	#cd build/macos; zip -yrq Simpl.js.zip Simpl.js.app
 windows:
 	mkdir -p build/windows tmp
 	rm -rf build/windows/* tmp/nwjs-sdk-$(nwver)-win-x64
@@ -34,7 +34,10 @@ windows:
 	unzip -q tmp/nwjs-sdk-$(nwver)-win.zip -d tmp
 	mv -f tmp/nwjs-sdk-$(nwver)-win-x64 build/windows/Simpl.js
 	cp -R src/ build/windows/Simpl.js/package.nw
-	cd build/windows; zip -yrq Simpl.js.zip Simpl.js
+	#cd build/windows; zip -yrq Simpl.js.zip Simpl.js
+docker: build/linux/Simpl.js
+	cp -p docker/launch.sh build/linux/Simpl.js/
+	docker build -t simpljs -f docker/Dockerfile build/linux
 test:
 	if [ `uname` = 'Darwin' ]; then ./test.sh build/macos/Simpl.js.app/Contents/MacOS/nwjs; \
 	else xvfb-run ./test.sh build/linux/Simpl.js/nw; fi
@@ -42,4 +45,4 @@ test:
 clean:
 	rm -rf build tmp
 
-PHONY: all chrome linux macos windows test
+.PHONY: all chrome linux macos windows docker test

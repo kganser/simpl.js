@@ -16,7 +16,7 @@ function(modules) {
     return new Promise(function(finish) {
       var socket = new WebSocket(page.webSocketDebuggerUrl),
           callbacks = {},
-          timeout = 5000,
+          ttl = 5000,
           id = 1,
           token;
       var send = function(method, params) {
@@ -30,20 +30,22 @@ function(modules) {
             if (!callbacks[i]) return;
             log.push('> command id='+id+' timed out');
             resolve();
-          }, timeout);
+          }, ttl);
         });
       };
       var wait = function(method, test) {
         log.push('> wait for '+method);
+        var timeout;
         return new Promise(function(resolve) {
           callbacks[method] = resolve;
           setTimeout(function() {
             if (!callbacks[method]) return;
             log.push('> wait for '+method+' timed out');
+            timeout = true;
             resolve();
-          }, timeout);
+          }, ttl);
         }).then(function(result) {
-          return !test || test(result) ? result : wait(method, test);
+          return timeout || !test || test(result) ? result : wait(method, test);
         });
       };
       var load = function(url) {
