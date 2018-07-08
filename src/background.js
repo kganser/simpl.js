@@ -204,6 +204,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         socket = ((message.redirect_uri || '').match(/^wss?:\/\/(\d+)$/) || [])[1],
         client = socket && clients[socket];
     var callback = function(data) {
+      // TODO: background.js must be running on same browser as app.js (check state?)
       if (client) send(client.connection, 'login', data);
       reply(data.error ? data : {status: 'success'});
     };
@@ -378,6 +379,8 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
             });
           }
           secret = encode(crypto.getRandomValues(new Uint8Array(24)), true);
+          // TODO: store secret in client object
+          // TODO: if client is not on same browser as BE, use http redirect
           return response.generic(303, {
             'Set-Cookie': [
               'state='+secret+'; Path=/',
