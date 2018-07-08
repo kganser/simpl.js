@@ -19,6 +19,14 @@ jobs:
       - run:
           name: Run tests
           command: make test
+      - run:
+          name: Build docker image
+          command: |
+            make docker
+            echo ${GOOGLE_AUTH} > gcp-key.json
+            gcloud auth activate-service-account --key-file gcp-key.json
+            gcloud --quiet config set project simpl-js
+            gcloud docker -- push simpljs
       - store_test_results:
           path: reports
       - store_artifacts:
