@@ -37,7 +37,7 @@ windows:
 	#cd build/windows; zip -yrq Simpl.js.zip Simpl.js
 docker: build/linux/Simpl.js
 	cp -p docker/launch.sh build/linux/Simpl.js/
-	docker build -t simpljs -f docker/Dockerfile build/linux
+	docker build -t kganser/simpljs:`sed -n 's/^ *"version": "\([^"]*\)", */\1/p' build/linux/Simpl.js/package.nw/manifest.json` -f docker/Dockerfile build/linux
 test:
 	if [ `uname` = 'Darwin' ]; then ./test.sh build/macos/Simpl.js.app/Contents/MacOS/nwjs; \
 	else xvfb-run ./test.sh build/linux/Simpl.js/nw; fi

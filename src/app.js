@@ -53,6 +53,7 @@ simpl.add('app', function(o) {
         callback = options;
         options = {};
       }
+      options.credentials = 'same-origin';
       fetch(path+(~path.indexOf('?') ? '&token=' : '?token=')+token, options).then(function(response) {
         response.json().then(function(body) {
           return body || {};
@@ -382,7 +383,7 @@ simpl.add('app', function(o) {
               });
               if (socket) return send('connect');
               if (!window.WebSocket) return status('WebSockets are not supported in this browser.', 'fatal');
-              socket = new WebSocket('ws://'+location.host+'/connect?token='+token);
+              socket = new WebSocket((location.protocol == 'https:' ? 'wss://' : 'ws://')+location.host+'/connect?token='+token);
               socket.onopen = function() {
                 status();
                 send('connect');
