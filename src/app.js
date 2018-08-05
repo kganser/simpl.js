@@ -683,31 +683,38 @@ simpl.add('app', function(o) {
             {h2: 'Dependencies'},
             {div: {className: 'search', children: [
               icons.search,
-              {input: {type: 'text', placeholder: 'Search Modules', children: function(e) { search = e; }, onkeydown: function(e) {
-                if (e.keyCode != 9 || e.shiftKey) return;
-                var second = this.nextSibling.firstChild;
-                if (second = second && second.nextSibling.firstChild) {
-                  e.preventDefault()
-                  second.focus();
-                }
-              }, onkeyup: function(e) {
-                if (e.keyCode != 13) {
-                  var results = [], value = this.value;
-                  if (value) Object.keys(modules).forEach(function(name) {
-                    var parts = name.split('@');
-                    if (~parts[0].indexOf(value) && (selected.app || name != selected.id)) {
-                      var versions = modules[name].versions;
-                      Object.keys(versions).forEach(function(version) {
-                        if (!parts[1]) results.push({name: name, version: 1-version}); // current
-                        if (versions[version].minor) results.push({name: name, version: +version}); // published
-                      });
+              {input: {
+                type: 'text',
+                placeholder: 'Search Modules',
+                children: function(e) { search = e; },
+                onkeydown: function(e) {
+                  if (e.keyCode == 9 && !e.shiftKey || e.keyCode == 40) {
+                    var second = this.nextSibling.firstChild;
+                    if (second = second && second.nextSibling.firstChild) {
+                      e.preventDefault()
+                      second.focus();
                     }
-                  });
-                  suggest(results);
-                } else if (this.nextSibling.firstChild) {
-                  this.nextSibling.firstChild.firstChild.click();
+                  }
+                },
+                onkeyup: function(e) {
+                  if (e.keyCode != 13) {
+                    var results = [], value = this.value;
+                    if (value) Object.keys(modules).forEach(function(name) {
+                      var parts = name.split('@');
+                      if (~parts[0].indexOf(value) && (selected.app || name != selected.id)) {
+                        var versions = modules[name].versions;
+                        Object.keys(versions).forEach(function(version) {
+                          if (!parts[1]) results.push({name: name, version: 1-version}); // current
+                          if (versions[version].minor) results.push({name: name, version: +version}); // published
+                        });
+                      }
+                    });
+                    suggest(results);
+                  } else if (this.nextSibling.firstChild) {
+                    this.nextSibling.firstChild.firstChild.click();
+                  }
                 }
-              }}},
+              }},
               {ul: {className: 'suggest', children: function(e) {
                 // TODO: up/down arrow selection
                 suggest = function(matches) {
@@ -715,23 +722,40 @@ simpl.add('app', function(o) {
                     var module = modules[match.name],
                         v = match.version;
                     if (v < 0 || !v && module.versions[1].minor) v--;
-                    return {li: [{button: {className: 'name', children: [match.name, {span: v ? v > 0 ? 'v'+v : 'v'+-v+' current' : ''}], onclick: function() {
-                      var current = selected,
-                          entry = selected.entry;
-                      search.value = '';
-                      suggest();
-                      fork(function() {
-                        create(function() {
-                          request(url(current)+'/dependencies', {method: 'POST', body: JSON.stringify(match)}, function(response) {
-                            if (response.error)
-                              return status('failure', response.error);
-                            entry.dependencies[match.name] = match.version;
-                            if (selected && selected.entry == entry)
-                              dependencies(entry.dependencies);
+                    return {li: [{button: {
+                      className: 'name',
+                      children: [match.name, {span: v ? v > 0 ? 'v'+v : 'v'+-v+' current' : ''}],
+                      onclick: function() {
+                        var current = selected,
+                            entry = selected.entry;
+                        search.value = '';
+                        suggest();
+                        fork(function() {
+                          create(function() {
+                            request(url(current)+'/dependencies', {method: 'POST', body: JSON.stringify(match)}, function(response) {
+                              if (response.error)
+                                return status('failure', response.error);
+                              entry.dependencies[match.name] = match.version;
+                              if (selected && selected.entry == entry)
+                                dependencies(entry.dependencies);
+                            });
                           });
                         });
-                      });
-                    }}}]};
+                      },
+                      onkeydown: function(e) {
+                        if (e.keyCode == 9 && !e.shift || e.keyCode == 40) { // tab, down arrow
+                          e.preventDefault()
+                          if (this.parentNode.nextSibling)
+                            this.parentNode.nextSibling.firstChild.focus();
+                        } else if (e.keyCode == 9 && e.shift || e.keyCode == 38) { // shift-tab, up arrow
+                          e.preventDefault()
+                          if (this.parentNode.previousSibling)
+                            this.parentNode.previousSibling.firstChild.focus();
+                          else
+                            this.parentNode.parentNode.previousSibling.focus();
+                        }
+                      }
+                    }}]};
                   }), e, true);
                 };
               }}}
