@@ -55,7 +55,7 @@ simpl = function(s) {
   var receive = function(e) {
     var id = e.data.id;
     if ('result' in e.data) {
-      if (log[id]) log[id].apply(null, e.data.result);
+      if (typeof log[id] == 'function') log[id].apply(null, e.data.result);
       delete log[id];
     } else {
       var worker = !inWorker && workers.filter(function(o) { return o.worker === e.target; })[0],

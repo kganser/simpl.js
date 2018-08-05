@@ -570,15 +570,14 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       if (!args) args = {};
       var token = args.token,
           user = args.user,
-          port = args.port,
+          port = Math.max(+args.port, 0),
           app = args.app && args.app.split('@'), // name@version
           connections, client, retries = 0;
-      console.log('Simpl.js: Headless launch '+JSON.stringify(args));
+      console.log('Simpl.js: launch '+JSON.stringify(args));
       debug = 'debug' in args;
       if (port && !server) onLauncher(null, function() {
         var doc = launcher.contentWindow.document;
-        if (typeof port == 'number' || typeof port == 'string' && +port)
-          doc.getElementById('port').value = +port;
+        doc.getElementById('port').value = port;
         doc.launcher.onsubmit();
       });
       if (app) run('', app[0], +app[1] || 1);
@@ -629,23 +628,11 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       }
     } else if (!ws && typeof require == 'function') {
       ws = true;
-      var args = {};
-      require('nw.gui').App.argv.forEach(function(flag) {
+      launch(require('nw.gui').App.argv.reduce(function(args, flag) {
         flag = flag.split('=');
-        args[flag[0].replace(/^--?/, '')] = flag[1];
-      });
-      if ('metadata' in args) {
-        fetch('http://169.254.169.254/computeMetadata/v1/instance/attributes/?recursive=true', {
-          headers: {'Metadata-Flavor': 'Google'}
-        }).then(function(r) {
-          if (r.ok) return r.json();
-          return fetch('http://169.254.169.254/latest/user-data').then(function(r) {
-            if (r.ok) return r.json();
-          });
-        }).then(launch);
-      } else {
-        launch(args);
-      }
+        args[flag[0].replace(/^--?/, '')] = flag[1] || flag[1] == null;
+        return args;
+      }, {}));
     }
     launcher = true;
     chrome.app.window.create('simpl.html', {
