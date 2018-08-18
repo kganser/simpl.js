@@ -207,7 +207,7 @@ function(modules) {
 
     if (req.path == '/results')
       return run.then(function() {
-        res.end('<?xml version="1.0" encoding="UTF-8"?><testsuite tests="100">'+tests.map(function(test) {
+        res.end('<?xml version="1.0" encoding="UTF-8"?><testsuite tests="'+tests.length+'">'+tests.map(function(test) {
           return '<testcase name="'+test.name+'"'+(test.pass ? '/>' : '><failure message="test failed"/></testcase>');
         }).join('')+'</testsuite>', {'Content-Type': 'text/xml; charset=utf-8'});
       });

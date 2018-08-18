@@ -114,11 +114,15 @@ function(modules) {
                           this.delete('array/3').then(function() {
                             this.get('array').then(function(result) {
                               assert(compare(['elem', 1, 2, {object: {}}], result), 'database delete array element');
-                              this.put('array/4', 4).then(function() {
-                                this.get('array').then(function(result) {
-                                  assert(compare(['elem', 1, 2, {object: {}}, 4], result), 'database array index resolution');
-                                }).get('array/1').then(function(result) {
-                                  assert(result === 1, 'database multiple transaction callbacks');
+                              this.get(['array', 1]).get(['array', '4']).get(['array', 4, 'object']).then(function(a, b, c) {
+                                assert(a === 1 && b === undefined, 'database unencoded array path');
+                                assert(c === undefined, 'database array index resolution 1');
+                                this.put('array/4', 4).then(function() {
+                                  this.get('array').then(function(result) {
+                                    assert(compare(['elem', 1, 2, {object: {}}, 4], result), 'database array index resolution 2');
+                                  }).get('array/1').then(function(result) {
+                                    assert(result === 1, 'database multiple transaction callbacks');
+                                  });
                                 });
                               });
                             });
@@ -202,15 +206,21 @@ function(modules) {
         'html markup nested');
       assert(modules.html.markup([{link: {rel: 'stylesheet'}}, {br: null}]) === '<link rel="stylesheet"><br>',
         'html markup self-closing tags');
-      assert(modules.html.markup({script: function(a) { if (!a) return 'a'; }}) === '<script>(function(a) { if (!a) return \'a\'; }("a"));</script>',
+      var fn = function(a) { if (!a) return 'a'; };
+      assert(modules.html.markup({script: fn}) === '<script>('+fn+'("a"));</script>',
         'html markup inline code');
-      assert(modules.html.markup({script: function() { code = true; }}) === '<script>(function() { code = true; }());</script>' && code !== true,
+      fn = function() { code = true; };
+      assert(modules.html.markup({script: fn}) === '<script>('+fn+'());</script>' && code !== true,
         'html markup inline code no params');
-      assert(modules.html.markup({script: function(a) { if (!a) return ['a', 'b']; }}) === '<script>(function(a) { if (!a) return [\'a\', \'b\']; }(["a","b"]));</script>',
+      fn = function(a) { if (!a) return ['a', 'b']; };
+      assert(modules.html.markup({script: fn}) === '<script>('+fn+'(["a","b"]));</script>',
         'html markup inline code single param');
-      assert(modules.html.markup({script: function(a, b) { if (!a) return ['a', 'b']; }}) === '<script>(function(a, b) { if (!a) return [\'a\', \'b\']; }("a","b"));</script>',
+      fn = function(a, b) { if (!a) return ['a', 'b']; };
+      assert(modules.html.markup({script: fn}) === '<script>('+fn+'("a","b"));</script>',
         'html markup inline code multiple params');
-      assert(modules.html.markup([{a: {title: '"hello & goodbye"', children: 'hello <& goodbye'}}, {script: function() { '</script>'; }}]) === '<a title="&quot;hello &amp; goodbye&quot;">hello &lt;&amp; goodbye</a><script>(function() { \'<\\/script>\'; }());</script>',
+      fn = function() { '</script>'; };
+      assert(modules.html.markup([{a: {title: '"hello & goodbye"', children: 'hello <& goodbye'}}, {script: fn}])
+        === '<a title="&quot;hello &amp; goodbye&quot;">hello &lt;&amp; goodbye</a><script>('+fn.toString().replace(/<\//, '<\\/')+'());</script>',
         'html markup escaped');
       
       var i = 1, large = new Array(1000).join('yabadabadoo');
@@ -477,6 +487,6 @@ function(modules) {
       });
     });
   }).then(function() {
-    assert(passed == 92, 'tests complete ('+passed+'/92 in '+(Date.now()-start)+'ms)');
+    assert(passed == 94, 'tests complete ('+passed+'/94 in '+(Date.now()-start)+'ms)');
   });
 }

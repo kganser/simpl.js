@@ -183,6 +183,8 @@ function(modules) {
         r.arrayBuffer().then(function(body) {
           response.end(body, (path.match(/\.([^.]*)$/) || [])[1]);
         });
+      }).catch(function() {
+        response.generic(404);
       });
     var open = function() {
       var upgrade;
@@ -246,7 +248,7 @@ function(modules) {
             var action = function() {
               if (i++ == 100) return 'stop';
             };
-            return after == null ? action : { // null bound possible?
+            return after == null ? action : {
               lowerBound: after,
               lowerExclusive: true,
               action: action
