@@ -288,6 +288,9 @@ simpl.add('database', function() {
               store = trans.objectStore(store);
               if (!Array.isArray(path))
                 path = path ? path.split('/').map(decodeURIComponent) : [];
+              else if (path.some(function(segment) {
+                return !{number: 1, string: 1}[typeof segment];
+              })) throw new Error('Invalid path: '+path);
               // resolve path: substitute array indices in path with numeric keys;
               // if path represents an empty array slot, fills in with next available index
               (function(callback) {
