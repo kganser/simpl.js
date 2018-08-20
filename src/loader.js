@@ -10,14 +10,24 @@ simpl = function(s) {
           level: level,
           args: Array.prototype.slice.call(arguments),
           module: loc && blobs[loc[1]],
-          line: loc && parseInt(loc[2], 10),
-          column: loc && parseInt(loc[3], 10)
+          line: loc && +loc[2],
+          column: loc && +loc[3]
         });
       };
     };
     self.console = {};
     'log warn error info'.split(' ').forEach(function(level) {
       self.console[level] = console(level);
+    });
+    self.addEventListener('unhandledrejection', function(e) {
+      var loc = (String(e.reason && e.reason.stack).split('\n')[1] || '').match(/(blob:chrome-extension.+):(\d+):(\d+)\)?$/);
+      proxy('log', {
+        level: 'error',
+        args: ['Uncaught (in promise) '+String(e.reason)],
+        module: loc && blobs[loc[1]],
+        line: loc && +loc[2],
+        column: loc && +loc[3]
+      });
     });
   }
   
