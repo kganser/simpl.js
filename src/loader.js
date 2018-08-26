@@ -23,7 +23,7 @@ simpl = function(s) {
       var loc = (String(e.reason && e.reason.stack).split('\n')[1] || '').match(/(blob:chrome-extension.+):(\d+):(\d+)\)?$/);
       proxy('log', {
         level: 'error',
-        args: ['Uncaught (in promise) '+String(e.reason)],
+        args: ['Uncaught (in promise) '+e.reason],
         module: loc && blobs[loc[1]],
         line: loc && +loc[2],
         column: loc && +loc[3]

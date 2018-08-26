@@ -346,12 +346,12 @@ simpl.add('database', function() {
       };
       /** Database: {
             transaction: function(writable=false:boolean, stores='data':[string, ...]|string) -> Transaction|ScopedTransaction,
-            get: function(path='':string, writable=false:boolean, cursor='deep':Cursor, store='data':string) -> ScopedTransaction,
-            count: function(path='':string, writable=false:boolean, bounds=undefined:Bounds, store='data':string) -> ScopedTransaction,
-            put: function(path='':string, value:json, store='data':string) -> ScopedTransaction,
-            insert: function(path='':string, value:json, store='data':string) -> ScopedTransaction,
-            append: function(path='':string, value:json, store='data':string) -> ScopedTransaction,
-            delete: function(path='':string, store='data':string) -> ScopedTransaction,
+            get: function(path='':Path, writable=false:boolean, cursor='deep':Cursor, store='data':string) -> ScopedTransaction,
+            count: function(path='':Path, writable=false:boolean, bounds=undefined:Bounds, store='data':string) -> ScopedTransaction,
+            put: function(path='':Path, value:json, store='data':string) -> ScopedTransaction,
+            insert: function(path='':Path, value:json, store='data':string) -> ScopedTransaction,
+            append: function(path='':Path, value:json, store='data':string) -> ScopedTransaction,
+            delete: function(path='':Path, store='data':string) -> ScopedTransaction,
             close: function
           }
           
@@ -392,7 +392,7 @@ simpl.add('database', function() {
               By default, `cursor` buffers all data at the requested path as the result of a `get` operation. `count`
               returns a count of the number of elements in an object or array at `path` (with optional `bounds`).
               `insert` will splice the given `value` into the parent array at the specified position, shifting any
-               subsequent elements forward.
+              subsequent elements forward.
               
               When all its pending operations complete, `callback` is called with the result of each queued operation in
               order. More operations can be queued onto the same transaction at that time via `this`.
