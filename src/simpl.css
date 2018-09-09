@@ -676,7 +676,7 @@ nav .selected button {
   white-space: nowrap;
   float: left;
   width: 83px;
-  margin: -4px 0 0 -83px;
+  margin-left: -83px;
   z-index: 1;
 }
 .timeline li {
@@ -734,29 +734,36 @@ nav .selected button {
   background: #36c;
 }
 #history h2 {
-  margin: 0 0 4px -83px;
+  margin: 0 0 2px -83px;
+}
+#history h3 {
+  font-size: 11px;
+  font-weight: normal;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  background: #f7f7f7;
+  padding: 2px 7px;
+  margin: 0 0 2px;
 }
 #history table {
   width: 100%;
-  margin-top: -4px;
   white-space: pre-wrap;
   border-collapse: collapse;
   border-spacing: 0;
+  margin-bottom: 10px;
 }
 #history tbody {
   border-bottom: 2px solid white;
 }
 #history td {
   vertical-align: top;
-  padding: 0 4px 0 2px;
+  padding: 0 7px;
 }
 #history .line {
   width: 1%;
   color: #999;
   background: #f7f7f7;
   text-align: right;
-  padding-left: 5px;
-  border-right: 2px solid white;
   -webkit-user-select: none;
 }
 #history .delete {
@@ -764,6 +771,32 @@ nav .selected button {
 }
 #history .insert {
   background: #dfd;
+}
+#history .delete .line {
+  background: #fcc;
+  color: #666;
+}
+#history .insert .line {
+  background: #bfb;
+  color: #666;
+}
+#history .placeholder {
+  background: #f1f8ff;
+  color: transparent;
+  cursor: pointer;
+  -webkit-user-select: none;
+}
+#history .placeholder:hover,
+#history .placeholder.unchanged {
+  color: #666;
+}
+#history .placeholder .line {
+  color: white;
+  background: #def;
+  text-align: center;
+}
+#history .placeholder:hover .line {
+  background: #36c;
 }
 #history .delete span {
   background: #faa;
@@ -779,20 +812,8 @@ nav .selected button {
 #history .unchanged .placeholder {
   display: table-row;
 }
-#history .unchanged .placeholder {
-  color: white;
-  cursor: pointer;
-  -webkit-user-select: none;
-}
-#history .unchanged,
-#history .unchanged .placeholder .line,
-#history .unchanged .placeholder:hover,
-#history .unchanged .placeholder.unchanged {
+#history .unchanged {
   color: #999;
-}
-#history .unchanged .placeholder:hover .line {
-  background: #aaa;
-  color: white;
 }
 #docs pre {
   overflow: auto;

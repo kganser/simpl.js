@@ -716,7 +716,6 @@ simpl.add('app', function(o) {
                 }
               }},
               {ul: {className: 'suggest', children: function(e) {
-                // TODO: up/down arrow selection
                 suggest = function(matches) {
                   dom(matches && matches.map(function(match) {
                     var module = modules[match.name],
@@ -817,43 +816,34 @@ simpl.add('app', function(o) {
           {section: {id: 'history', children: [
             {h2: 'History'},
             {ul: {className: 'timeline', children: function(elem) {
-              var first, last, diff = function(dmp) {
-                return function(a, b) {
-                  var diff = dmp.diff_main(a.replace(/\r\n/g, '\n'), b.replace(/\r\n/g, '\n')),
-                      lines = [], insert = [],
-                      ln = {change: 0, spans: []},
-                      rm = {change: 0, spans: []};
-                  dmp.diff_cleanupSemantic(diff);
-                  diff.forEach(function(chunk) {
-                    var change = chunk[0];
-                    chunk[1].split('\n').forEach(function(chunk, i) {
-                      if (i) {
-                        if (change <= 0) {
-                          if (rm.change) lines.push(rm);
-                          rm = {change: 0, spans: []};
-                        }
-                        if (change >= 0) {
-                          insert.push(ln);
-                          ln = {change: 0, spans: []};
-                        }
-                        if (!change) {
-                          lines = lines.concat(insert);
-                          insert = [];
-                        }
-                      }
-                      if (chunk) {
-                        if (change < 0 || ln.spans.length) rm.change = -1;
-                        if (change > 0 || rm.spans.length) ln.change = 1;
-                        if (change <= 0) rm.spans.push({change: change, text: chunk});
-                        if (change >= 0) ln.spans.push({change: change, text: chunk});
-                      }
-                    });
-                  });
-                  if (rm.change) lines.push(rm);
-                  if (ln.spans.length) insert.push(ln);
-                  return lines.concat(insert);
-                };
-              }(new diff_match_patch);
+              var first, last;
+              var diff = function(pair, lines) {
+                return {table: o.diff.diffChunks(pair[0], pair[1], 3).map(function(chunk, i, chunks) {
+                    if (!chunk.change) chunk.lines.push(null); // expander
+                    return {tbody: {className: chunk.change ? 'changed' : 'unchanged', children: chunk.lines.map(function(line) {
+                      return line ? {tr: {className: ['delete', 'unchanged', 'insert'][line.change+1], children: [
+                        {td: {className: 'line', children: lines ? line.number[0] : ['-', '\xa0', '+'][line.change+1]}},
+                        lines && {td: {className: 'line', children: line.number[1]}},
+                        {td: line.spans.map(function(span) {
+                          return span.change ? {span: span.text} : span.text;
+                        })}
+                      ]}} : {tr: {className: chunks.length == 1 ? 'placeholder unchanged' : 'placeholder', children: [
+                        {td: {className: 'line', colSpan: lines && 2, children: '⋮'}},
+                        {td: chunks.length == 1 ? 'No Changes' : 'Expand'}
+                      ]}};
+                    })}};
+                })};
+              };
+              var dependencyString = function(dependencies) {
+                return Object.keys(dependencies).map(function(name) {
+                  var v = dependencies[name];
+                  if (v < 0 || !v && modules[name] && modules[name].versions[1].minor) v--;
+                  return name+(v ? v > 0 ? ' v'+v : ' v'+-v+' current' : '');
+                }).join('\n');
+              };
+              var configString = function(config) {
+                return JSON.stringify(config, null, 2);
+              }
               var render = function(current, minors) {
                 var entry = current.entry,
                     loading;
@@ -874,53 +864,39 @@ simpl.add('app', function(o) {
                 if (loading) {
                   history('Loading...');
                 } else if (versions.length == 2) {
-                  var sections = [], gap = [], section = {lines: []},
-                      context = 3, i = 0, a = 1, b = 1;
-                  diff(versions[0].code, versions[1].code).forEach(function(line) {
-                    if (line.change) {
-                      i = 0;
-                      section.change = true;
-                    } else if (!section.change && i == context) {
-                      gap.push(section.lines.shift());
-                    } else if (section.change && i == context*2) {
-                      if (gap.length) sections.push({lines: gap});
-                      sections.push(section);
-                      gap = section.lines.splice(-context, 1);
-                      section = {lines: section.lines.splice(-context+1)};
-                      i = context;
-                    } else {
-                      i++;
-                    }
-                    line.number = [line.change <= 0 && a++, line.change >= 0 && b++];
-                    section.lines.push(line);
-                  });
-                  if (!section.change) gap = gap.concat(section.lines);
-                  if (gap.length) sections.push({lines: gap});
-                  if (section.change) {
-                    sections.push(section);
-                    if (i > context) sections.push({lines: section.lines.splice(context-i)});
-                  }
-                  var ellipses = [a, b].map(function(n) { return String(n).replace(/./g, '·'); });
-                  history({table: sections.map(function(section) {
-                    if (!section.change) section.lines.push(null);
-                    return {tbody: {className: section.change ? 'changed' : 'unchanged', children: section.lines.map(function(line) {
-                      return line ? {tr: {className: ['delete', 'unchanged', 'insert'][line.change+1], children: [
-                        {td: {className: 'line', children: line.number[0]}},
-                        {td: {className: 'line', children: line.number[1]}},
-                        {td: line.spans.map(function(span) {
-                          return span.change ? {span: span.text} : span.text;
-                        })}
-                      ]}} : {tr: {className: sections.length == 1 ? 'placeholder unchanged' : 'placeholder', children: [
-                        {td: {className: 'line', children: ellipses[0]}},
-                        {td: {className: 'line', children: ellipses[1]}},
-                        {td: sections.length == 1 ? 'No Changes' : 'Expand'}
-                      ]}};
-                    })}};
-                  })});
+                  history([
+                    {h3: 'Dependencies'},
+                    diff(versions.map(function(version) {
+                      return dependencyString(version.dependencies);
+                    })),
+                    current.app && [
+                      {h3: 'Configuration'},
+                      diff(versions.map(function(version) {
+                        return configString(version.config);
+                      }))
+                    ],
+                    {h3: 'Code'},
+                    diff(versions.map(function(version) {
+                      return version.code;
+                    }), true)
+                  ]);
                 } else {
-                  history(versions[0] && {table: [{tbody: versions[0].code.split('\n').map(function(line, i) {
-                    return {tr: [{td: {className: 'line', children: i+1}}, {td: line}]};
-                  })}]});
+                  history(versions[0] && [
+                    {h3: 'Dependencies'},
+                    {table: [{tbody: dependencyString(versions[0].dependencies).split('\n').map(function(line) {
+                      return {tr: [{td: line}]};
+                    })}]},
+                    current.app && [
+                      {h3: 'Configuration'},
+                      {table: [{tbody: configString(versions[0].config).split('\n').map(function(line) {
+                        return {tr: [{td: line}]};
+                      })}]}
+                    ],
+                    {h3: 'Code'},
+                    {table: [{tbody: versions[0].code.split('\n').map(function(line, i) {
+                      return {tr: [{td: {className: 'line', children: i+1}}, {td: line}]};
+                    })}]}
+                  ]);
                 }
               };
               elem.onclick = function(e) {
@@ -954,7 +930,7 @@ simpl.add('app', function(o) {
                 first = last = null;
                 history();
                 var minor = record.versions[major].minor;
-                dom(new Array(minor+1).join().split(',').map(function(x, i) {
+                dom(Array.apply(null, {length: minor+1}).map(function(x, i) {
                   return {li: [{span: null}, i ? 'v'+major+'.'+(minor-i) : 'Current']};
                 }).slice(record.source ? 1 : 0), elem, true);
               };
@@ -1032,4 +1008,4 @@ simpl.add('app', function(o) {
     })();
     connect();
   };
-}, 0, {html: 0, jsonv: 0, docs: 0});
+}, 0, {html: 0, jsonv: 0, docs: 0, diff: 0});

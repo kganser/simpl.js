@@ -509,8 +509,8 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
                   {script: {src: '/modules/html.js'}},
                   {script: {src: '/modules/parser.js'}},
                   {script: {src: '/modules/docs.js'}},
+                  {script: {src: '/modules/diff.js'}},
                   {script: {src: '/codemirror.js'}},
-                  {script: {src: '/diff_match_patch.js'}},
                   {script: {src: '/jsonv.js'}},
                   {script: {src: '/app.js'}},
                   {script: function(apps, modules, user, token) {
