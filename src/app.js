@@ -165,6 +165,7 @@ simpl.add('app', function(o) {
         entry.view.className = 'view '+next;
         entry.view.title = 'Show '+next[0].toUpperCase()+next.substr(1);
         if (selected.panel == 'code') {
+          code.refresh(); // redo measurements with parent node display=block
           if ('code' in entry && code.doc != entry.doc) {
             code.swapDoc(entry.doc);
             if (!entry.rendered) {
@@ -623,6 +624,7 @@ simpl.add('app', function(o) {
         {div: {id: 'code', children: function(e) {
           code = CodeMirror(e, {
             value: selected && selected.entry.doc || '',
+            rulers: [120],
             lineNumbers: true,
             matchBrackets: true,
             styleActiveLine: true,
