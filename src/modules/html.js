@@ -3,13 +3,11 @@ simpl.add('html', function() {
   /** html: {
         markup: function(node:any) -> string,
         dom: function(node:any, parent=null:DOMElement, clear=false:boolean) -> DOMNode|undefined,
-        model: function(data:object|array, insert:function(value:any, key:number|string, index:number, model:Model) -> any) -> Model,
         css: function(styles:object) -> string
       }
       
       Utilities for generating HTML using native javascript data structures: `markup` produces an HTML string, `dom`
-      builds a DOM structure using the client browser API, `model` synchronizes the client's DOM view to an underlying
-      data structure, and `css` renders CSS from an object representation. */
+      builds a DOM structure using the client browser API, and `css` renders CSS from an object representation. */
   return self = {
     /** markup: function(node:any) -> string
         
@@ -136,98 +134,57 @@ simpl.add('html', function() {
           return parent ? parent.appendChild(node) : node;
       }
     },
-    /** model: function(data:object|array, insert:function(value:any, key:number|string, index:number, model:Model) -> any) -> Model
-        
-        `model` returns a `Model` object that supports modification of both the underlying `data` and corresponding DOM
-        view using the given `insert` function. `insert` should return a `node` structure as interpreted by the `dom`
-        method given the `value` to be inserted to `data` at `key` and `index` (note: `key === index` if `data` is an
-        array.
-        
-        The `view` property of the returned `Model` object can be used inside a `node` structure parsed by the `dom`
-        method to embed this managed view into a larger DOM structure. */
-        
-    /** Model: {
-          get: function(key=null:number|string) -> any,
-          remove: function(key:number|string) -> Model,
-          insert: function(value:any, key=null:number|string) -> Model,
-          insertAll: function(values:object|array) -> Model,
-          sort: function(compare:function(a:any, b:any)) -> Model,
-          view: function(parent:DOMElement)
-        } */
-    model: function(data, insert) {
-      if (typeof data != 'object' || !data) throw new Error('Model data must be object or array');
-      var model, elem,
-          keys = !Array.isArray(data) && Object.keys(data);
-      return model = {
-        get: function(key) {
-          if (key == null) return data;
-          return data[key];
-        },
-        remove: function(key) {
-          var index = keys ? keys.indexOf(key) : key;
-          if (index >= 0) {
-            if (keys) {
-              keys.splice(index, 1);
-              delete data[key];
-            } else {
-              data.splice(index, 1);
-            }
-            if (elem) elem.removeChild(elem.childNodes[index]);
-          }
-          return model;
-        },
-        insert: function(value, key) {
-          if (keys && key == null) throw new Error('Insert to object must specify a key');
-          var index = key == null ? data.length : key;
-          if (keys) {
-            if ((index = keys.indexOf(key)) < 0) {
-              index = keys.length;
-              keys.push(key);
-            } else if (elem) {
-              elem.removeChild(elem.childNodes[index]);
-            }
-            data[key] = value;
-          } else {
-            data.splice(index, 0, value);
-          }
-          if (elem) elem.insertBefore(self.dom(insert(value, key, index, model)), elem.childNodes[index]);
-          return model;
-        },
-        insertAll: function(values) {
-          if (keys) {
-            if (typeof values != 'object' || Array.isArray(values) || !values) throw new Error('Inserted values must be an object');
-            Object.keys(values).forEach(function(key) {
-              model.insert(values[key], key);
-            });
-          } else {
-            if (!Array.isArray(values)) throw new Error('Inserted values must be an array');
-            values.forEach(function(value) {
-              model.insert(value);
-            });
-          }
-          return model;
-        },
-        view: function(parent) {
-          var data_ = data;
-          elem = parent;
-          data = keys ? {} : [];
-          keys = keys && [];
-          model.insertAll(data_);
-        }
-      };
-    },
     /** css: function(styles:object) -> string
     
         Generates a string of CSS from its object representation. The `styles` object consists of selectors as keys
-        mapping to objects with CSS property keys (in camelCase) and values. If a `styles` key begins with `'@media'`,
-        its value object is treated as an embedded `styles` object wrapped with the media query. */
+        mapping to objects with CSS property keys (in camelCase) and values. Descendant selectors (identified by object
+        type values) can also be specified recursively within a parent selector's styles. If `&` is present within the
+        child selector, its resolved parent selector will be inserted there instead. If a top-level `styles` key begins
+        with `'@media'`, its value object is treated as an embedded `styles` object wrapped with the media query. */
     css: function css(styles) {
-      return styles ? Object.keys(styles).map(function(selector) {
-        var attrs = styles[selector];
-        return selector+'{'+(selector.indexOf('@media ') ? Object.keys(attrs).map(function(property) {
-          return property.replace(/([a-z])([A-Z])/g, '$1-$2').replace(/^(webkit|moz|o|ms)-/, '-$1-').toLowerCase()+':'+attrs[property];
-        }).join(';') : css(attrs))+'}';
-      }).join('') : '';
+      
+      // styles     := { rule* }
+      // rule       := selector : properties
+      // properties := { (property|rule)* }
+      // property   := name : value
+      
+      var rule = function(selector, properties) {
+        var rules = [],
+            styles = [];
+        Object.keys(properties).forEach(function(name) {
+          var value = properties[name];
+          if (typeof value == 'object') {
+            if (styles.length) {
+              rules.push(selector+'{'+styles.join(';')+'}');
+              styles = [];
+            }
+            selector.split(',').forEach(function(s) {
+              s = s.trim();
+              name.split(',').forEach(function(n) {
+                n = n.trim();
+                rule(~n.indexOf('&') ? n.replace('&', s) : s+' '+n, value).forEach(function(rule) {
+                  rules.push(rule);
+                });
+              });
+            });
+          } else {
+            styles.push(
+              name.replace(/([a-z])([A-Z])/g, '$1-$2').replace(/^(webkit|moz|o|ms)-/, '-$1-').toLowerCase()
+              +':'+(value === '' ? '""' : value));
+          }
+        });
+        if (styles.length)
+          rules.push(selector+'{'+styles.join(';')+'}');
+        return rules;
+      };
+      
+      return Object.keys(styles || {}).reduce(function(rules, selector) {
+        var properties = styles[selector];
+        return rules.concat(
+          selector.indexOf('@media ')
+            ? rule(selector, properties)
+            : selector+'{'+css(properties)+'}');
+      }, []).join('');
     }
   };
 });

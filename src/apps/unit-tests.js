@@ -222,6 +222,18 @@ function(modules) {
       assert(modules.html.markup([{a: {title: '"hello & goodbye"', children: 'hello <& goodbye'}}, {script: fn}])
         === '<a title="&quot;hello &amp; goodbye&quot;">hello &lt;&amp; goodbye</a><script>('+fn.toString().replace(/<\//, '<\\/')+'());</script>',
         'html markup escaped');
+      assert(modules.html.css({body: {margin: '0', fontFamily: 'sans-serif'}}) === 'body{margin:0;font-family:sans-serif}',
+        'html css');
+      assert(modules.html.css({'@media screen': {body: {margin: 0}}}) === '@media screen{body{margin:0}}',
+        'html css @media query');
+      assert(modules.html.css({':before': {content: ''}}) === ':before{content:""}',
+        'html css empty string');
+      assert(modules.html.css({body: {margin: 0, '.a': {display: 'block'}, '&.b': {width: 'auto'}}}) === 'body{margin:0}body .a{display:block}body.b{width:auto}',
+        'html css recursive');
+      assert(modules.html.css({body: {margin: 0, '.a': {display: 'block'}, 'padding': 0}}) === 'body{margin:0}body .a{display:block}body{padding:0}',
+        'html css recursive preserve ordering');
+      assert(modules.html.css({body: {'div, span': {'html &': {color: 'red'}}}}) === 'html body div{color:red}html body span{color:red}',
+        'html css recursive complex selectors');
       
       var i = 1, large = new Array(1000).join('yabadabadoo');
       modules.http.serve({port: 9123, address: '127.0.0.1'}, function(request, response) {
@@ -487,6 +499,6 @@ function(modules) {
       });
     });
   }).then(function() {
-    assert(passed == 94, 'tests complete ('+passed+'/94 in '+(Date.now()-start)+'ms)');
+    assert(passed == 100, 'tests complete ('+passed+'/100 in '+(Date.now()-start)+'ms)');
   });
 }
