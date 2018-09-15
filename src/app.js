@@ -110,7 +110,7 @@ simpl.add('app', function(o) {
             minor.textContent = 'Publish v'+version+'.'+entry.minor;
             timeline(record, version);
             if (app)
-              log.populate(entry.log);
+              log.render(entry.log);
             else if (!docs(record.name, entry.code))
               return navigate(name, version, app, 'code', ln); // redirect to /code if no docs exist
           } else if (!entry.loading) {
@@ -442,7 +442,7 @@ simpl.add('app', function(o) {
                       if (entry) entry.tab.classList.add(entry.state = 'running');
                     });
                     if (selected && selected.app) {
-                      log.clear();
+                      log.render();
                       navigate(selected.id, selected.version, true, selected.panel);
                     }
                     appList.classList.remove('disabled');
@@ -464,17 +464,18 @@ simpl.add('app', function(o) {
                       log.append(message);
                     break;
                   case 'run':
-                  case 'stop':
-                    entry.state = event == 'run' ? 'running' : null;
-                    entry.tab.classList.toggle('running', event == 'run');
+                    entry.state = 'running';
+                    entry.tab.classList.add('running');
                     entry.tab.classList.remove('error');
-                    if (entry.state) {
-                      entry.log = [];
-                      if (selected && selected.entry == entry) {
-                        log.clear();
-                        navigate(data.app, data.version, true, 'log');
-                      }
+                    entry.log = [];
+                    if (selected && selected.entry == entry) {
+                      log.render();
+                      navigate(data.app, data.version, true, 'log');
                     }
+                    break;
+                  case 'stop':
+                    entry.state = null;
+                    entry.tab.classList.remove('running', 'error');
                     break;
                 }
               };
@@ -933,7 +934,8 @@ simpl.add('app', function(o) {
             log = function(queue, entry, handle) {
               var render = function() {
                 handle = handle || requestIdleCallback(function next() {
-                  if (!selected || selected.entry != entry) return;
+                  if (!selected || selected.entry != entry)
+                    return handle = null;
                   var panel = body.lastChild,
                       scroll = body.classList.contains('show-log') && panel.scrollTop + panel.clientHeight >= panel.scrollHeight;
                   dom(queue.slice(0, 20).map(function(entry) {
@@ -965,24 +967,20 @@ simpl.add('app', function(o) {
                   }), e);
                   if (scroll) panel.scrollTop = panel.scrollHeight;
                   queue = queue.slice(20);
-                  handle = queue.length && requestIdleCallback(next);
-                });
+                  handle = queue.length && requestIdleCallback(next, {timeout: 500});
+                }, {timeout: 500});
               };
               return {
-                populate: function(lines) {
-                  log.clear();
+                render: function(lines) {
+                  var len = e.childNodes.length;
+                  while (len--) e.removeChild(e.lastChild);
                   entry = selected.entry;
-                  queue = lines.slice(0);
+                  queue = (lines || []).slice(0);
                   render();
                 },
                 append: function(line) {
                   queue.push(line);
                   render();
-                },
-                clear: function() {
-                  var len = e.childNodes.length;
-                  while (len--) e.removeChild(e.lastChild);
-                  queue = [];
                 }
               };
             }([]);
