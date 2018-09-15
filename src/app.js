@@ -1,10 +1,20 @@
 simpl.add('app', function(o) {
 
+  // polyfills & shims
   (function(list, rm) {
     list.add('a', 'b');
     if (!list.contains('b'))
       DOMTokenList.prototype.remove = function() { Array.prototype.forEach.call(arguments, rm.bind(this)); };
   }(document.createElement('div').classList, DOMTokenList.prototype.remove));
+  window.cancelIdleCallback = window.cancelIdleCallback || clearTimeout;
+  window.requestIdleCallback = window.requestIdleCallback || function(cb) {
+    return setTimeout(function() {
+      var start = Date.now();
+      cb({didTimeout: false, timeRemaining: function() {
+        return Math.max(0, 50 - (Date.now() - start));
+      }});
+    }, 1);
+  };
   
   return function(apps, modules, user, token, body) {
     Object.keys(apps).forEach(function(name) {
@@ -69,33 +79,6 @@ simpl.add('app', function(o) {
         });
       });
     };
-    var logLine = function(entry) {
-      var message = [], link;
-      entry.message.forEach(function(part, i) {
-        if (i) message.push(' ');
-        if (typeof part == 'string') {
-          while (link = /\b(https?|ftp):\/\/[^\s/$.?#].\S*/i.exec(part)) {
-            var url = link[0];
-            if (link.index) message.push({span: part.substr(0, link.index)});
-            message.push({a: {href: url, target: '_blank', children: url}});
-            part = part.substr(link.index+url.length);
-          }
-          if (part) message.push({span: part});
-        } else {
-          message.push({div: function(e) {
-            o.jsonv(e, part, {collapsed: true});
-          }});
-        }
-      });
-      return {div: {className: 'entry '+entry.level, children: [
-        {div: {className: 'location', children: entry.module+(entry.line ? ':'+entry.line : ''), dataset: {
-          module: entry.module,
-          version: entry.version,
-          line: entry.line
-        }}},
-        {div: {className: 'message', children: message}}
-      ]}};
-    };
     var navigate = function(name, version, app, panel, ln) {
       var record = (app ? apps : modules)[name];
       if (record) {
@@ -127,7 +110,7 @@ simpl.add('app', function(o) {
             minor.textContent = 'Publish v'+version+'.'+entry.minor;
             timeline(record, version);
             if (app)
-              dom(entry.log.map(logLine), log, true);
+              log.populate(entry.log);
             else if (!docs(record.name, entry.code))
               return navigate(name, version, app, 'code', ln); // redirect to /code if no docs exist
           } else if (!entry.loading) {
@@ -329,6 +312,7 @@ simpl.add('app', function(o) {
             {div: {className: 'controls', children: {a: user
               ? {id: 'logout', href: '/logout', title: 'Log Out', children: icons.logout}
               : {id: 'login', href: '/login', title: 'Log In or Register', children: icons.login, onclick: function(e) {
+                  e.stopPropagation();
                   e.preventDefault();
                   login.open();
                 }}}}},
@@ -458,7 +442,7 @@ simpl.add('app', function(o) {
                       if (entry) entry.tab.classList.add(entry.state = 'running');
                     });
                     if (selected && selected.app) {
-                      log.textContent = '';
+                      log.clear();
                       navigate(selected.id, selected.version, true, selected.panel);
                     }
                     appList.classList.remove('disabled');
@@ -476,12 +460,8 @@ simpl.add('app', function(o) {
                       version: data.module ? data.module.version : '',
                       line: data.line
                     }) > 1000) entry.log.shift();
-                    if (selected && selected.entry == entry) {
-                      var panel = body.lastChild,
-                          scroll = body.classList.contains('show-log') && panel.scrollTop + panel.clientHeight >= panel.scrollHeight;
-                      dom(logLine(message), log);
-                      if (scroll) panel.scrollTop = panel.scrollHeight;
-                    }
+                    if (selected && selected.entry == entry)
+                      log.append(message);
                     break;
                   case 'run':
                   case 'stop':
@@ -491,7 +471,7 @@ simpl.add('app', function(o) {
                     if (entry.state) {
                       entry.log = [];
                       if (selected && selected.entry == entry) {
-                        log.textContent = '';
+                        log.clear();
                         navigate(data.app, data.version, true, 'log');
                       }
                     }
@@ -947,15 +927,75 @@ simpl.add('app', function(o) {
             }}
           ]}}
         ]}},
-        {pre: {id: 'log', children: function(e) { log = e; }, onclick: function(e) {
-          if (e.target.className == 'location') {
+        {pre: {
+          id: 'log',
+          children: function(e) {
+            log = function(queue, entry, handle) {
+              var render = function() {
+                handle = handle || requestIdleCallback(function next() {
+                  if (!selected || selected.entry != entry) return;
+                  var panel = body.lastChild,
+                      scroll = body.classList.contains('show-log') && panel.scrollTop + panel.clientHeight >= panel.scrollHeight;
+                  dom(queue.slice(0, 20).map(function(entry) {
+                    var message = [], link;
+                    entry.message.forEach(function(part, i) {
+                      if (i) message.push(' ');
+                      if (typeof part == 'string') {
+                        while (link = /\b(https?|ftp):\/\/[^\s/$.?#].\S*/i.exec(part)) {
+                          var url = link[0];
+                          if (link.index) message.push({span: part.substr(0, link.index)});
+                          message.push({a: {href: url, target: '_blank', children: url}});
+                          part = part.substr(link.index+url.length);
+                        }
+                        if (part) message.push({span: part});
+                      } else {
+                        message.push({div: function(e) {
+                          o.jsonv(e, part, {collapsed: true});
+                        }});
+                      }
+                    });
+                    return {div: {className: 'entry '+entry.level, children: [
+                      {div: {className: 'location', children: entry.module+(entry.line ? ':'+entry.line : ''), dataset: {
+                        module: entry.module,
+                        version: entry.version,
+                        line: entry.line
+                      }}},
+                      {div: {className: 'message', children: message}}
+                    ]}};
+                  }), e);
+                  if (scroll) panel.scrollTop = panel.scrollHeight;
+                  queue = queue.slice(20);
+                  handle = queue.length && requestIdleCallback(next);
+                });
+              };
+              return {
+                populate: function(lines) {
+                  log.clear();
+                  entry = selected.entry;
+                  queue = lines.slice(0);
+                  render();
+                },
+                append: function(line) {
+                  queue.push(line);
+                  render();
+                },
+                clear: function() {
+                  var len = e.childNodes.length;
+                  while (len--) e.removeChild(e.lastChild);
+                  queue = [];
+                }
+              };
+            }([]);
+          },
+          onclick: function(e) {
+            if (e.target.className != 'location') return;
             var ref = e.target.dataset,
                 name = ref.module || selected.id,
                 version = ref.version ? 1-ref.version : selected.version;
             if (version > 0)
               navigate(name, version, !ref.module, 'code', ref.line);
           }
-        }}},
+        }},
         {div: {id: 'docs', children: function(e) {
           docs = function(name, code) {
             var docs = o.docs.generateDom(code);

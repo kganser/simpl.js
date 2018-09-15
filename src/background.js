@@ -155,7 +155,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         }));
       }, function(level, args, module, line, column) {
         var data = {app: name, version: version, level: level, message: args, module: module, line: module ? line : line > lines ? line-lines : undefined, column: column};
-        if (logs[id].push(data) > 100) logs[id].unshift();
+        if (logs[id].push(data) > 100) logs[id].shift();
         broadcast('log', data, user);
       }, function(message, module, line) {
         delete apps[id];
