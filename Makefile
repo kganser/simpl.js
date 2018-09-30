@@ -1,4 +1,4 @@
-nwver := v0.30.3
+nwver := v0.33.4
 nwurl := https://dl.nwjs.io/$(nwver)
 
 all: chrome linux macos windows
