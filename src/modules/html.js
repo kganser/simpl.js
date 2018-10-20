@@ -1,5 +1,4 @@
 simpl.add('html', function() {
-  var self;
   /** html: {
         markup: function(node:any) -> string,
         dom: function(node:any, parent=null:DOMElement, clear=false:boolean) -> DOMNode|undefined,
@@ -8,7 +7,7 @@ simpl.add('html', function() {
       
       Utilities for generating HTML using native javascript data structures: `markup` produces an HTML string, `dom`
       builds a DOM structure using the client browser API, and `css` renders CSS from an object representation. */
-  return self = {
+  return {
     /** markup: function(node:any) -> string
         
         In `markup`, `node` represents an HTML node. An object is translated to an element using its first key and
@@ -28,36 +27,32 @@ simpl.add('html', function() {
         
         `{ul: [{li: 'first'}, {li: 'second'}]} → <ul><li>first</li><li>second</li></ul>`
         
-        If `node` is a function, it is output as a self-invoking function `'('+node+'('+node()+'));'`*. This allows
-        client-side scripts to be inlined into markup generated on the server and run on the client with any needed
-        json data passed in:
+        If `node` is a function, it is output as a self-invoking function `'('+node+'('+toString(node.args)+'));'`,
+        where `toString` serializes elements in an `args` array property of the function (if present); functions in the
+        `args` array are stringified and other values are JSON-encoded. This allows client-side scripts to be inlined
+        into markup generated on the server and run on the client with any needed data passed in:
 
-       `var data = [1,2,3];
-        markup({script: function(numbers) {
-          if (!numbers) return data;
-          console.log(numbers);
-        }});`
+       `markup({script: Object.assign(function(square, numbers) {
+          console.log(numbers.map(square)); // prints 1,4,9
+        }, {
+          args: [
+            function(x) { return x * x; },
+            [1, 2, 3]
+          ]
+        })});`
         
         becomes
         
-       `<script>(function(numbers) {
-          if (!numbers) return data;
-          console.log(numbers);
-        }([1,2,3]));</script>`
+       `<script>(function(square, numbers) {
+          console.log(numbers.map(square)); // prints 1,4,9
+        }(function(x) { return x * x; },[1,2,3]));</script>`
         
-        Here, `return data;` only executes in the server's closure context, where `data` is defined, and `console.log`
-        only runs in the client browser.
+        Note that any function used as a `node` or passed as an argument to it will not have access to values in the
+        server context, so functions accessing only known client-side global variables should be used.
         
         If `node` is a number, it is treated as a string. Other data types return '', so boolean operators can be used
         to toggle sections of markup. Within elements in the markup, `&` and `<` are encoded as `&amp;` and `&gt;`, and
-        within element attributes, `&` and `"` are encoded as `&amp;` and `&quot;`.
-        
-        * function `node` is actually stringified as follows:
-        
-       `var args;
-        return '('+node+'('+(
-          node.length && (args = node()) !== undefined ? Array.isArray(args) && node.length >= args.length ? args : [args] : []
-        ).map(function(arg) { return JSON.stringify(arg); }).join(',')+'));';` */
+        within element attributes, `&` and `"` are encoded as `&amp;` and `&quot;`. */
     markup: function markup(node) {
       switch (typeof node) {
         case 'object':
@@ -69,13 +64,25 @@ simpl.add('html', function() {
               object = value && typeof value == 'object' && !Array.isArray(value);
           return '<'+tag+(object ? Object.keys(value) : []).map(function(attr) {
             var v = value[attr];
-            return attr == 'children' || v === false ? '' : ' '+attr+(v == null || v === true ? '' : '="'+String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;')+'"');
-          }).join('')+'>'+markup(object ? value.children : value)+({'!doctype':1,area:1,base:1,br:1,col:1,command:1,
-          embed:1,hr:1,img:1,input:1,keygen:1,link:1,meta:1,param:1,source:1,track:1,wbr:1}[tag] ? '' : '</'+tag+'>');
+            if (!attr || attr[0] == '_' || attr == 'children' || v === false) return '';
+            v = v == null || v === true ? '' : '="'+String(v).replace(/&/g, '&amp;').replace(/"/g, '&quot;')+'"';
+            return ' '+attr+v;
+          }).join('')+'>'+
+            (object && value._html != null ? value._html : markup(object ? value.children : value))+
+          ({'!doctype':1,area:1,base:1,br:1,col:1,command:1,embed:1,hr:1,img:1,input:1,keygen:1,link:1,meta:1,param:1,
+            source:1,track:1,wbr:1}[tag] ? '' : '</'+tag+'>');
         case 'function':
-          var args;
-          return ('('+node+'('+(node.length && (args = node()) !== undefined ? Array.isArray(args) && node.length >= args.length ? args : [args] : [])
-            .map(function(arg) { return typeof arg == 'function' ? arg : JSON.stringify(arg); }).join(',')+'));').replace(/<\/(script)>/ig, '<\\/$1>');
+          var args = node.args;
+          if (args === undefined) {
+            // DEPRECATED: use Object.assign(function() {}, {args: []}) form instead
+            args = node.length ? node() : undefined;
+            args = args !== undefined ? Array.isArray(args) && node.length >= args.length ? args : [args] : [];
+          } else if (!Array.isArray(args)) {
+            args = [args];
+          }
+          return ('('+node+'('+args.map(function(arg) {
+            return typeof arg == 'function' ? arg : JSON.stringify(arg);
+          }).join(',')+'));').replace(/<\/(script)>/ig, '<\\/$1>');
         case 'string':
           return node.replace(/&/g, '&amp;').replace(/</g, '&lt;');
         case 'number':

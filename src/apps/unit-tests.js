@@ -206,18 +206,15 @@ function(modules) {
         'html markup nested');
       assert(modules.html.markup([{link: {rel: 'stylesheet'}}, {br: null}]) === '<link rel="stylesheet"><br>',
         'html markup self-closing tags');
-      var fn = function(a) { if (!a) return 'a'; };
-      assert(modules.html.markup({script: fn}) === '<script>('+fn+'("a"));</script>',
+      var fn = function(a) { return 'a'; };
+      assert(modules.html.markup({script: Object.assign(fn, {args: []})}) === '<script>('+fn+'());</script>',
         'html markup inline code');
-      fn = function() { code = true; };
-      assert(modules.html.markup({script: fn}) === '<script>('+fn+'());</script>' && code !== true,
-        'html markup inline code no params');
-      fn = function(a) { if (!a) return ['a', 'b']; };
-      assert(modules.html.markup({script: fn}) === '<script>('+fn+'(["a","b"]));</script>',
-        'html markup inline code single param');
-      fn = function(a, b) { if (!a) return ['a', 'b']; };
-      assert(modules.html.markup({script: fn}) === '<script>('+fn+'("a","b"));</script>',
-        'html markup inline code multiple params');
+      assert(modules.html.markup({script: Object.assign(fn, {args: 'a'})}) === '<script>('+fn+'("a"));</script>' && code !== true,
+        'html markup inline code single arg');
+      assert(modules.html.markup({script: Object.assign(fn, {args: [1,2]})}) === '<script>('+fn+'(1,2));</script>',
+        'html markup inline code multiple args');
+      assert(modules.html.markup({script: Object.assign(fn, {args: [fn, {}]})}) === '<script>('+fn+'('+fn+',{}));</script>',
+        'html markup inline code function args');
       fn = function() { '</script>'; };
       assert(modules.html.markup([{a: {title: '"hello & goodbye"', children: 'hello <& goodbye'}}, {script: fn}])
         === '<a title="&quot;hello &amp; goodbye&quot;">hello &lt;&amp; goodbye</a><script>('+fn.toString().replace(/<\//, '<\\/')+'());</script>',
