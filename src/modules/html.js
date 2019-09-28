@@ -188,9 +188,9 @@ simpl.add('html', function() {
       return Object.keys(styles || {}).reduce(function(rules, selector) {
         var properties = styles[selector];
         return rules.concat(
-          selector.indexOf('@media ')
-            ? rule(selector, properties)
-            : selector+'{'+css(properties)+'}');
+          selector.startsWith('@media ') || selector.startsWith('@keyframes ')
+            ? selector+'{'+css(properties)+'}'
+            : rule(selector, properties));
       }, []).join('');
     }
   };

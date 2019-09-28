@@ -20,7 +20,11 @@ simpl = function(s) {
       self.console[level] = console(level);
     });
     self.addEventListener('unhandledrejection', function(e) {
-      var loc = (String(e.reason && e.reason.stack).split('\n')[1] || '').match(/(blob:chrome-extension.+):(\d+):(\d+)\)?$/);
+      var loc = String(e.reason && e.reason.stack).split('\n').slice(1).map(function(line) {
+        return line.match(/(blob:chrome-extension.+):(\d+):(\d+)\)?$/);
+      }).find(function(match) {
+        return match && blobs[match[1]];
+      });
       proxy('log', {
         level: 'error',
         args: ['Uncaught (in promise) '+e.reason],

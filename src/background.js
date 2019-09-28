@@ -1,52 +1,33 @@
-simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, websocket: 0}, function(o, proxy) {
+simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, string: 0, system: 0, webapp:0, websocket: 0}, function(o, proxy) {
 
-  var server, loader, lines, icons, workspace,
+  var server, loader, lines, workspace,
       db = o.database.open('simpl'),
       encode = o.string.base64FromBuffer,
-      decode = o.string.base64ToBuffer,
-      utf8 = o.string.fromUTF8Buffer,
-      apiHost = 'api.simpljs.com',
-      apps = {}, logs = {}, clients = {}, sessions = {},
+      baseSiteUrl = 'https://simpljs.com', // 'http://dev.simpljs.com:1080',
+      baseApiUrl = baseSiteUrl.replace('://', '://api.'),
+      apps = {}, logs = {}, clients = {}, logins = {},
       csrf, ping, localApiPort, debug;
 
-  var api = function(path, token, callback, method, data, text) {
-    // serve session from cache
-    if (path == 'user' && sessions[token]) return callback(sessions[token]);
-    fetch(localApiPort ? 'http://localhost:'+localApiPort+'/'+path : 'https://'+apiHost+'/'+path, {
-      method: method,
-      headers: token ? {Authorization: 'Bearer '+token} : undefined,
-      body: text ? data : JSON.stringify(data)
-    }).then(function(response) {
-      var status = response.status,
-          error = response.ok ? false : (status ? o.http.statusMessage(status) : 'Connection failed');
-      response.json().then(function(body) {
-        if (!body) body = {};
-        if (!body.error && error) body.error = error;
-        // refresh session cache
-        if (path == 'user' && !body.error) {
-          var now = Date.now();
-          Object.keys(sessions).forEach(function(token) {
-            if (sessions[token].expires < now) delete sessions[token];
-          });
-          body.expires = now + 86400000; // TODO: use expires_in from runtime.onMessageExternal?
-          body.image = '//www.gravatar.com/avatar/'+o.string.hexFromBuffer(
-            o.crypto.md5(o.string.toUTF8Buffer((body.email || '').toLowerCase())))+'?d=retro';
-          sessions[token] = body;
-        }
-        callback(body, status);
-      }, function() {
-        callback({error: error || 'Server error'}, status);
-      });
-    }).catch(function(e) {
-      callback({error: e.toString()}, 0);
+  const query = o => Object.entries(o).map(([key, value]) =>
+    value !== undefined &&
+      encodeURIComponent(key) + (value == null ? '' : '=' + encodeURIComponent(value))
+  ).filter(Boolean).join('&');
+
+  const api = async (path, config) => {
+    console.log(new Error('api call').stack);
+    const {method, body, headers, token} = config || {};
+    const response = await fetch(baseApiUrl+path, {
+      method,
+      headers: {
+        ...headers,
+        ...(token && {Authorization: 'Bearer '+token}),
+      },
+      body
     });
-  };
-  var authenticate = function(token, callback) {
-    if (token == csrf) return callback(null, true);
-    if (!token) return callback();
-    api('user', token, function(body) {
-      callback(body);
-    });
+    return {
+      response,
+      data: await response.json()
+    };
   };
   var restore = function(callback, scope, sparse) {
     if (!scope)
@@ -91,11 +72,11 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     });
   };
   var wrap = function(name, code, version, dependencies) {
-    return 'simpl.add('+[JSON.stringify(name), code, version, JSON.stringify(dependencies)]+');';
+    return 'simpl.add(' + [JSON.stringify(name), code, version, JSON.stringify(dependencies)] + ');';
   };
-  var send = function(client, event, data) {
-    client.send(JSON.stringify({event: event, data: data}), function(info) {
-      if (info.error) delete clients[client.socket.socketId];
+  var send = function(connection, event, data) {
+    connection.send(JSON.stringify({event: event, data: data}), function(info) {
+      if (info.error) delete clients[connection.socket.socketId];
     });
   };
   var broadcast = function(event, data, user) {
@@ -105,66 +86,72 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       if (client.user == user) send(client.connection, event, data);
     });
   };
-  var state = function(user, client) {
-    send(client, 'state', Object.keys(apps).reduce(function(apps, id) {
+  var state = function(user, connection) {
+    send(connection, 'state', Object.keys(apps).reduce(function(apps, id) {
       var i = id.indexOf('@');
       if (id.substr(0, i) == user) apps.push(id.substr(i+1));
       return apps;
     }, []));
     Object.keys(logs).forEach(function(id) {
       if (id.split('@', 1)[0] == user) logs[id].forEach(function(e) {
-        send(client, e.fatal ? 'error' : 'log', e.fatal ? e.fatal : e);
+        send(connection, e.fatal ? 'error' : 'log', e.fatal ? e.fatal : e);
       });
     });
   };
-  var run = function(user, name, version, token) {
-    var id = [user, name, version].join('@');
+  var run = async function(user, name, version, token) {
+    const id = [user, name, version].join('@');
     if (apps[id]) return;
-    (function(callback) {
-      var path = 'apps/'+encodeURIComponent(name);
-      if (!token) return db.get(path+'/versions/'+(version-1)).then(callback);
-      api(path+'/'+version, token, callback);
-    }(function(app) {
-      if (!app || app.error) return broadcast('error', {app: name, version: version, message: app.error || 'App not found'}, user);
+    try {
+      const app = await new Promise(resolve => {
+        (user
+          ? api('/apps/' + encodeURIComponent(name) + '/' + version, {token})
+          : db.get('apps/' + encodeURIComponent(name) + '/versions/' + (version - 1))
+        ).then(resolve);
+      });
+      if (!app || app.error)
+        throw new Error(app ? app.error : 'App not found');
       logs[id] = [];
       apps[id] = proxy(null, [
-        loader+'var config = '+JSON.stringify(app.config),
-        'simpl.user='+JSON.stringify(user),
-        'simpl.use('+JSON.stringify(app.dependencies)+','+app.code+','+JSON.stringify(name.split('@')[1])+');'
-      ].join(';'), function(module, callback) {
-        var path = 'modules/'+encodeURIComponent(module.name),
-            v = module.version,
-            current = v < 1;
-        if (current) v = 1-v;
-        (function(callback) {
-          if (!token) return db.get(path+'/versions/'+(v-1)).then(callback);
-          api(path+'/'+v, token, callback);
-        }(function(record) {
-          var error = !record ? 'Module '+module.name+' not found'
-            : record.error && 'Module '+module.name+': '+record.error;
-          if (!error) {
-            if (!current) record = record.published.pop();
-            if (record) return callback(wrap(module.name, record.code, module.version, record.dependencies));
-          }
+        loader + 'var config = ' + JSON.stringify(app.config),
+        'simpl.user=' + JSON.stringify(user),
+        'simpl.use(' + JSON.stringify(app.dependencies) + ',' + app.code + ',' + JSON.stringify(name.split('@')[1]) + ');'
+      ].join(';'), async (module, callback) => {
+        let v = module.version;
+        const current = v < 1;
+        if (current) v = 1 - v;
+        try {
+          let record = await new Promise(resolve => {
+            (user
+              ? api('/modules/' + encodeURIComponent(module.name) + '/' + v, {token})
+              : db.get('modules/' + encodeURIComponent(module.name) + '/versions/' + (v - 1))
+            ).then(resolve);
+          });
+          if (!record || record.error)
+            throw new Error(record ? 'Module ' + module.name + ': ' + record.error : 'Module ' + module.name + ' not found');
+          if (!current) record = record.published.pop();
+          callback(wrap(module.name, record.code, module.version, record.dependencies));
+        } catch (e) {
           if (!apps[id]) return;
           apps[id].terminate();
           delete apps[id];
-          var data = {app: name, version: version, message: 'Required module not found: '+module.name};
+          const data = {app: name, version, message: e.message};
           logs[id].push({fatal: data});
           broadcast('error', data, user);
-        }));
-      }, function(level, args, module, line, column) {
-        var data = {app: name, version: version, level: level, message: args, module: module, line: module ? line : line > lines ? line-lines : undefined, column: column};
+        }
+      }, (level, message, module, line, column) => {
+        const data = {app: name, version, level, message, module, line: module ? line : line > lines ? line - lines : undefined, column};
         if (logs[id].push(data) > 100) logs[id].shift();
         broadcast('log', data, user);
-      }, function(message, module, line) {
+      }, (message, module, line) => {
         delete apps[id];
-        var data = {app: name, version: version, message: message, module: module, line: module ? line : line > lines ? line-lines : undefined};
+        const data = {app: name, version, message, module, line: module ? line : line > lines ? line - lines : undefined};
         logs[id].push({fatal: data});
         broadcast('error', data, user);
       });
-      broadcast('run', {app: name, version: version}, user);
-    }));
+      broadcast('run', {app: name, version}, user);
+    } catch (e) {
+      broadcast('error', {app: name, version, message: e.message}, user);
+    }
   };
   var stop = function(user, name, version) {
     var id = [user, name, version].join('@');
@@ -197,24 +184,473 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
     workspace = r;
     restore(function() {});
   });
-  
-  chrome.runtime.onMessageExternal.addListener(function(message, sender, reply) {
-    message = message || {};
-    var token = message.token,
-        socket = ((message.redirect_uri || '').match(/^wss?:\/\/(\d+)$/) || [])[1],
-        client = socket && clients[socket];
-    var callback = function(data) {
-      // TODO: background.js must be running on same browser as app.js (check state?)
-      if (client) send(client.connection, 'login', data);
-      reply(data.error ? data : {status: 'success'});
-    };
-    if (!token) return callback({error: 'Unable to authenticate'});
-    return !api('user', token, function(response) {
-      if (socket) client = clients[socket];
-      if (response.error) return callback({error: response.error});
-      callback({username: response.username, token: token});
-      if (client) client.connect(response.plan, token);
+
+  const app = o.webapp();
+
+  app.request = function(request) {
+    return (path, handler, method, options) => {
+      return request(path, (req, res) => {
+        req.token = (req.headers.Authorization || '').replace(/^Bearer /i, '');
+        if (method == 'GET' || options && options.auth == false || req.token == csrf)
+          return handler(req, res);
+        res.generic(401);
+      }, method, options);
+    }
+  }(app.request);
+
+  const updateConsole = () => !debug || o.console.exp > Date.now() ||
+    (o.console.next = o.console.next || new Promise(resolve => {
+      console.log('fetching updated console module');
+      const items = {console: 1, jsonv: 1};
+      simpl = {
+        add: (name, mod) => {
+          if (name in items) {
+            o[name] = {...mod(), exp: Date.now()+1000};
+            items[name]();
+          }
+        }
+      };
+      Promise.all(Object.keys(items).map(name => new Promise(resolve => {
+        const script = document.createElement('script');
+        script.src = '/modules/' + name + '.js';
+        document.head.appendChild(script);
+        items[name] = resolve;
+      }))).then(resolve);
+    }));
+
+  app.get([
+    '/',
+    '/apps/:name/:version/code',
+    '/apps/:name/:version/settings',
+    '/apps/:name/:version/log',
+    '/modules/:name/:version/code',
+    '/modules/:name/:version/settings',
+    '/modules/:name/:version/docs'
+  ], async (req, res) => {
+    const {user, servers, workspace} = await new Promise(async resolve => {
+      const {token} = req.cookie;
+      if (token) {
+        try {
+          const [user, workspace] = await Promise.all([ // TODO: consolidate
+            api('/user', {token}),
+            api('/workspace', {token})
+          ]);
+          if (!user.response.ok)
+            throw new Error(user.data.error);
+          const servers = user.data.plan == 'pro' // TODO
+            ? await api('/servers', {token})
+            : {data: {servers: []}};
+          return resolve({
+            user: user.data,
+            servers: servers.data.servers,
+            workspace: workspace.data
+          });
+        } catch (e) {
+          console.error(e);
+        }
+      }
+      db.get('', false, function(path) {
+        // apps,modules,sessions/<name>/versions/<#>/code,config,dependencies,published/<#>
+        return [
+          function(key) { if (key != 'apps' && key != 'modules') return 'skip'; },
+          true, true, true,
+          function(key) { if (key != 'published') return 'skip'; },
+          true
+        ][path.length] || false;
+      }).then(function(data) {
+        resolve({
+          workspace: Object.entries(data || {}).reduce((groups, [name, group]) => ({
+            ...groups,
+            [name]: Object.entries(group).reduce((entries, [name, entry]) => ({
+              ...entries,
+              [name]: {
+                versions: entry.versions.map(
+                  version => ({minor: version.published.length - 1})
+                )
+              }
+            }), {})
+          }), {})
+        });
+      });
     });
+    res.end(o.html.markup([
+      {'!doctype': {html: null}},
+      {html: [
+        {head: [
+          {title: 'Simpl.js'},
+          {meta: {charset: 'utf-8'}},
+          {meta: {name: 'viewport', content: 'width=device-width, initial-scale=1.0, user-scalable=no'}},
+          {link: {rel: 'stylesheet', href: '/codemirror.css'}},
+          {link: {rel: 'stylesheet', href: '/console.css'}},
+          {link: {rel: 'stylesheet', href: '/jsonv.css'}}
+        ]},
+        {body: {class: 'console', children: [
+          {div: {id: 'root'}},
+          {script: {src: '/react.js'}},
+          {script: {src: '/codemirror.js'}},
+          {script: {src: '/jsonv.js'}},
+          {script: {src: '/jshint.js'}},
+          {script: {src: '/console.js'}},
+          {script: Object.assign(function(props) {
+            Object.keys(components).forEach(function(name) {
+              var component = components[name],
+                  render = component.render;
+              component.render = function() {
+                return function jsx(node) {
+                  if (!Array.isArray(node)) return node;
+                  var type = node[0], props, children;
+                  if (!type || Array.isArray(type)) {
+                    type = React.Fragment;
+                    children = node;
+                  } else if (typeof node[1] == 'object' && !Array.isArray(node[1])) {
+                    props = node[1];
+                    children = node.slice(2);
+                  } else {
+                    children = node.slice(1);
+                  }
+                  return React.createElement.apply(null, [type, props].concat(children.map(jsx)));
+                }(render.call(this));
+              };
+              components[name] = createReactClass(component);
+            });
+            ReactDOM.render(
+              React.createElement(components.console, props),
+              document.getElementById('root')
+            );
+          }, {
+            args: [{
+              token: req.cookie.token || csrf,
+              login: user,
+              loginUrl: '/login',
+              baseApiUrl,
+              local: true,
+              servers,
+              workspace,
+            }]
+          })}
+        ]}}
+      ]}
+    ]), 'html');
+  });
+
+  app.get(['/console.css', '/jsonv.css'], async (req, res) => {
+    const name = req.path.substr(1).split('.')[0];
+    if (name == 'console') await updateConsole();
+    res.end(o.html.css(o[name].style), 'css');
+  });
+
+  app.get(['/console.js', '/jsonv.js'], async (req, res) => {
+    const name = req.path.substr(1).split('.')[0];
+    if (name == 'console') await updateConsole();
+    res.end('(components = window.components || {}).' + name + ' = ' + o[name].component + '();', 'js');
+  });
+
+  app.get([
+    '/:name.:version.js',
+    '/:name.:version.current.js'
+  ], (req, res) => {
+    const {name} = req.params;
+    const version = +req.params.version || 0;
+    const current = req.path.endsWith('current.js');
+    if (version <= 0) return res.generic(404);
+    db.get(['modules', name, 'versions', version - 1]).then(module => {
+      if (module && !current) module = module.published.pop();
+      if (!module) return res.generic(404);
+      res.end(wrap(name, module.code, version, module.dependencies), 'js');
+    })
+  });
+
+  // publish major
+  app.post(['/apps/:name', '/modules/:name'], (req, res) => {
+    const type = req.path.split('/')[1];
+    const {name} = req.params;
+    const source = +req.query.source || 0;
+    if (name.includes('@')) return res.error('Not found', 404);
+    if (source <= 0 || source % 1) return res.error('Invalid source version to publish as new major version');
+    db.get([type, name, 'versions', source - 1], true).then(function(version) {
+      if (!version) return res.error('Not found', 404);
+      const {code, config, dependencies} = version;
+      if (Object.keys(dependencies).some(name => dependencies[name] < 1))
+        return res.error('All dependencies must be published modules');
+      const published = version.published.pop();
+      if (!published || code == published.code &&
+          JSON.stringify(config) == JSON.stringify(published.config) &&
+          JSON.stringify(dependencies) == JSON.stringify(published.dependencies))
+        return res.error('No changes to publish');
+      const record = {
+        code,
+        config,
+        dependencies,
+        published: [{
+          code,
+          config,
+          dependencies
+        }],
+        source: {
+          major: source,
+          minor: version.published.length
+        }
+      };
+      if (type == 'modules') {
+        delete record.config;
+        delete record.published[0].config;
+      }
+      this.append([type, name, 'versions'], record).then(res.ok);
+    });
+  });
+
+  // publish minor
+  app.post(['/apps/:name/:version', '/modules/:name/:version'], (req, res) => {
+    const type = req.path.split('/')[1];
+    const {name, version} = req.params;
+    const path = [type, name, 'versions', +version-1];
+    db.get(path, true).then(function(version) {
+      if (!version) return res.error('Version does not exist', 404);
+      const {code, config, dependencies} = version;
+      if (Object.keys(dependencies).some(name => dependencies[name] < 1))
+        return res.error('All dependencies must be published modules');
+      const published = version.published.pop();
+      if (published && code == published.code &&
+          JSON.stringify(config) == JSON.stringify(published.config) &&
+          JSON.stringify(dependencies) == JSON.stringify(published.dependencies))
+        return res.error('No changes to publish');
+      this.append(
+        [...path, 'published'],
+        type == 'modules' ? {code, dependencies} : {code, config, dependencies}
+      ).then(res.ok);
+    });
+  });
+
+  // get current
+  app.get(['/apps/:name/:version', '/modules/:name/:version'], (req, res) => {
+    const type = req.path.split('/')[1];
+    const {name, version} = req.params;
+    db.get([type, name, 'versions', +version-1]).then(function(data) {
+      if (!data) return res.error('Not found', 404);
+      // TODO: change to {code, dependencies, config?, published: {minor, code, dependencies, config?}}
+      data.published.slice(0, -1).forEach(version => {
+        version.code = version.dependencies = version.config = undefined;
+      });
+      res.json(data);
+    });
+  });
+
+  // get minor (history)
+  app.get(['/apps/:name/:version/:minor', '/modules/:name/:version/:minor'], (req, res) => {
+    const type = req.path.split('/')[1];
+    const {name, version, minor} = req.params;
+    db.get([type, name, 'versions', +version - 1, 'published', +minor]).then(function(data) {
+      if (!data) return res.error('Not found', 404);
+      res.json(data);
+    });
+  });
+
+  // save module code
+  app.put(['/apps/:name/:version', '/modules/:name/:version'], (req, res) => {
+    const type = req.path.split('/')[1];
+    const {name} = req.params;
+    const version = +req.params.version || 0;
+    const code = req.body;
+    if (version <= 0 || version % 1) return res.error('Not found', 404);
+    db.put([type, name, 'versions', version-1, 'code'], code).then(function(error) { // TODO: check If-Match header
+      if (!error) return res.ok();
+      if (version > 1) return res.error('Module does not exist');
+      const record = {code, dependencies: {}, published: []};
+      if (type == 'apps') record.config = {};
+      this.put([type, name], {versions: [record]}).then(res.ok);
+    });
+  }, {bodyFormat: 'utf8', bodyMaxLength: 1048576});
+
+  // delete module
+  app.delete(['/apps/:name/:version', '/modules/:name/:version'], (req, res) => {
+    const type = req.path.split('/')[1];
+    const {name, version} = req.params;
+    if (version != '1') return res.error('Only unpublished modules can be deleted');
+    db.delete([type, name]).then(function() {
+      // Delete only possible on local workspace for unpublished module
+      if (type == 'apps') delete logs[stop('', name, 1)];
+      res.ok();
+    });
+  });
+
+  // update config
+  app.put('/apps/:name/:version/config', (req, res) => {
+    const type = req.path.split('/')[1];
+    const {name} = req.params;
+    const version = +req.params.version || 0;
+    if (version <= 0 || version % 1) return res.error('Not found', 404);
+    db.put([type, name, 'versions', version - 1, 'config'], req.body).then(res.ok);
+  }, {bodyFormat: 'json'});
+
+  // add dependency
+  app.post(['/apps/:name/:version/dependencies', '/modules/:name/:version/dependencies'], (req, res) => {
+    const type = req.path.split('/')[1];
+    const {name} = req.params;
+    const version = +req.params.version || 0;
+    const d = req.body || {};
+    if (version <= 0 || version % 1) return res.error('Not found', 404);
+    if (!d.name || typeof d.version != 'number' || d.version % 1) return res.error('Invalid dependency');
+    db.get(['modules', d.name, 'versions', Math.abs(d.version)], true, 'shallow').then(function(exists) {
+      if (!exists) return res.error('Module not found');
+      this.put([type, name, 'versions', version - 1, 'dependencies', d.name], d.version).then(res.ok);
+    });
+  }, {bodyFormat: 'json'});
+
+  // delete dependency
+  app.delete(['/apps/:name/:version/dependencies/:module', '/modules/:name/:version/dependencies/:module'], (req, res) => {
+    const type = req.path.split('/')[1];
+    const {name, version, module} = req.params;
+    db.delete([type, name, 'versions', +version - 1, 'dependencies', module]).then(res.ok);
+  });
+
+  app.get('/login', async (req, res) => {
+    var verifier = crypto.getRandomValues(new Uint8Array(24)),
+        state = encode(crypto.getRandomValues(new Uint8Array(24)), true),
+        now = Date.now();
+    // clean up expired sessions
+    Object.entries(logins).forEach(([state, login]) => {
+      if (login.exp > now) delete logins[state];
+    });
+    logins[state] = {
+      verifier: encode(verifier, true),
+      exp: now + 3600000
+    };
+    const hash = await crypto.subtle.digest('sha-256', verifier);
+    res.generic(302, {
+      'Set-Cookie': 'state='+state+'; Path=/',
+      Location: baseSiteUrl+'/authorize?'+query({
+        response_type: 'code',
+        client_id: 'simpljs',
+        redirect_uri: 'http://localhost:'+port+'/auth',
+        state: state,
+        code_challenge: encode(hash, true),
+        code_challenge_method: 'S256'
+      })+'#confirm'
+    });
+  });
+
+  app.get('/auth', async (req, res) => {
+    // check state, get token using auth code + verifier
+    const {state, authorization_code: code} = req.query;
+    const session = logins[state];
+    if (!session) return res.generic(400);
+    delete logins[state];
+    try {
+      const {data} = await api('/token', {
+        method: 'post',
+        body: query({
+          client_id: 'simpljs',
+          grant_type: 'authorization_code',
+          redirect_uri: 'http://localhost:'+port+'/auth',
+          code_verifier: session.verifier,
+          code
+        })
+      });
+      res.end(o.html.markup([
+        {'!doctype': {html: null}},
+        {script: Object.assign(function(response) {
+          if (parent) parent.postMessage(response, location.origin);
+        }, {
+          args: [data]
+        })}
+      ]), 'html');
+    } catch (e) {
+      res.generic(500);
+    }
+  });
+
+  app.get('/logout', (req, res) => {
+    res.generic(302, {
+      'Set-Cookie': 'token=; Expires='+new Date().toUTCString(),
+      Location: '/'
+    });
+  });
+
+  app.get('/token', (req, res) => res.end(csrf));
+
+  app.post('/restore', (req, res) => {
+    const full = req.body.scope == 'full';
+    restore(res.ok, full ? 'both' : 'modules', !full);
+  }, {bodyFormat: 'url'});
+
+  app.post('/action', async (req, res) => {
+    const {token, body: {command, app, version}} = req;
+    if (!token) return res.generic(401);
+    try {
+      const user = token == csrf ? '' : (await api('/user', {token})).data.username;
+      if (command == 'stop' || command == 'restart')
+        stop(user, app, version);
+      if (command == 'run' || command == 'restart')
+        run(user, app, version, token);
+      res.generic(200);
+    } catch (e) {
+      res.generic(401);
+    }
+  }, {auth: false, bodyFormat: 'json'});
+
+  app.get('/online', async (req, res) => {
+    const {ok} = await fetch(baseApiUrl, {method: 'head'});
+    res.generic(ok ? 200 : 502);
+  });
+
+  app.get('/connect', (req, res) => {
+    // Simpl.js service can run apps on this instance scoped to a user account;
+    // user-scoped state is returned from ws connection initiated by the instance
+    o.websocket.accept(req, res, function(connection) {
+      const token = req.query.access_token;
+      if (!token) return connection.close(4001, 'Forbidden');
+      const id = res.socket.socketId;
+      let user;
+      (token == csrf
+        ? Promise.resolve({data: {}})
+        : api('/user', {token})
+      ).then(({data: {username, plan}}) => {
+        if (plan == 'pro') { // TODO: boolean for connection support instead of plan string
+          const remote = new WebSocket(baseApiUrl.replace(/^http/, 'ws')+'/connect?access_token='+token);
+          remote.onmessage = e => {
+            if (typeof e.data == 'string' && e.data != 'ping')
+              connection.send(e.data);
+          };
+          remote.onclose = e => {
+            console.log('api closed connection', e);
+            connection.close(e.code, e.message);
+          };
+        }
+        user = username || '';
+        send(connection, 'connect', {name: 'Localhost'});
+      }, () => {
+        // Force client to reset token
+        connection.close(4001, 'Forbidden');
+      });
+      return function(data) {
+        if (user == null) return; // client should not issue a command until 'connect' event is sent
+        try {
+          const {command, app, version, token} = JSON.parse(data) || {};
+          if (command == 'connect') {
+            clients[id] = {connection, user};
+            connection.socket.onDisconnect = () => delete clients[id];
+            return state(user, connection);
+          }
+          if (command == 'stop' || command == 'restart')
+            stop(user, app, version);
+          if (command == 'run' || command == 'restart')
+            run(user, app, version, token);
+        } catch (e) {
+          console.log(e);
+        }
+      };
+    });
+  });
+
+  app.get(/.*/, async (req, res) => {
+    try {
+      const response = await fetch(req.path);
+      if (!response.ok) throw new Error('Not found');
+      res.end(await response.arrayBuffer(), (req.path.match(/\.([^.]*)$/) || [])[1]);
+    } catch (e) {
+      console.log(req.path, 404);
+      res.generic(404);
+    }
   });
   
   chrome.runtime.onSuspend.addListener(shutdown);
@@ -227,310 +663,22 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       }
       
       csrf = encode(crypto.getRandomValues(new Uint8Array(24)), true);
-      o.http.serve({port: command.port}, function(request, response) {
-        
-        var match;
-        var forward = function(path, fallback, callback, method, data, text) {
-          var token = request.query.token || request.cookie.token;
-          authenticate(token, function(session, local) {
-            if (local || !session && !method) return fallback(callback);
-            if (!session) return response.generic(401);
-            api(path, token, function(body, status) {
-              if (body.error) return path == 'workspace'
-                ? response.generic(302, {'Set-Cookie': 'token=; Expires='+new Date().toUTCString(), Location: '/'})
-                : response.end(JSON.stringify(body), 'json', status);
-              callback(body, session);
-            }, method, data, text);
-          });
+      o.http.serve({port: command.port}, function(req, res) {
+
+        res.json = (data, status) => res.end(JSON.stringify(data), 'json', status);
+        res.ok = () => res.json({status: 'success'});
+        res.error = (code, description, status) => {
+          if (typeof description == 'number') {
+            status = description;
+            description = undefined;
+          }
+          if (code instanceof Error)
+            code = code.message;
+          res.json({error: code, error_description: description}, status || 400);
         };
         
-        if (match = request.path.match(/^\/([^\/]+)\.(\d+)(\.current)?\.js$/))
-          return db.get('modules/'+match[1]+'/versions/'+(match[2]-1)).then(function(module) {
-            if (module && !match[3]) module = module.published.pop();
-            if (module) return response.end(wrap(decodeURIComponent(match[1]), module.code, match[2], module.dependencies), 'js');
-            response.generic(404);
-          });
-        if (/^\/(apps|modules)\/[^\/]+(\/\d+(\/|$)|$)/.test(request.path)) {
-          var uri = request.path.substr(1),
-              parts = uri.split('/'),
-              app = parts[0] == 'apps',
-              name = decodeURIComponent(parts[1]),
-              method = request.method;
-          
-          if (parts.length > 2) parts[2]--;
-          parts.splice(2, 0, 'versions');
-          if (parts.length == 5 && parts[4] >= 0) parts.splice(4, 0, 'published');
-          var path = parts.join('/');
-          
-          // publish app/module
-          if (parts.length < 5 && method == 'POST') {
-            var upgrade = parts.length == 3,
-                source = request.query.source;
-            if (upgrade && !/^\d+$/.test(source)) return response.error();
-            return forward(request.uri.substr(1), function(callback) {
-              db.get(upgrade ? path+'/'+(source-1) : path, true).then(function(version) {
-                if (!version) return response.error();
-                if (Object.keys(version.dependencies).some(function(name) { return version.dependencies[name] < 1; }))
-                  return response.error();
-                var published = version.published.pop();
-                if (!published && upgrade ||
-                    published && version.code == published.code &&
-                    JSON.stringify(version.config) == JSON.stringify(published.config) &&
-                    JSON.stringify(version.dependencies) == JSON.stringify(published.dependencies))
-                  return response.error();
-                var record = {
-                  code: version.code,
-                  config: version.config,
-                  dependencies: version.dependencies,
-                  published: [{
-                    code: version.code,
-                    config: version.config,
-                    dependencies: version.dependencies
-                  }],
-                  source: {
-                    major: +source,
-                    minor: version.published.length-1
-                  }
-                };
-                if (!app) {
-                  delete record.config;
-                  delete record.published[0].config;
-                }
-                return (upgrade
-                  ? this.append(path, record)
-                  : this.append(path+'/published', record.published[0])
-                ).then(callback);
-              });
-            }, function(data, session) {
-              if (app) delete logs[stop(session && session.username || '', name, parts[3]+1)];
-              response.ok();
-            }, method);
-          }
-          // get app/module
-          if ((parts.length == 4 || parts.length == 6 && parts[5] >= 0) && method == 'GET')
-            return forward(uri, function(callback) {
-              db.get(path).then(function(data) {
-                // TODO: change to {code, dependencies, config?, published: {minor, code, dependencies, config?}}
-                if (data && data.published) data.published.slice(0, -1).forEach(function(version) {
-                  version.code = version.dependencies = version.config = undefined;
-                });
-                callback(data);
-              });
-            }, function(data) {
-              if (!data) return response.generic(404);
-              response.end(JSON.stringify(data), 'json');
-            });
-          // save code
-          if (parts.length == 4 && method == 'PUT')
-            return request.slurp(function(code) {
-              forward(uri, function(callback) {
-                db.put(path+'/code', code).then(function(error) { // TODO: check If-Match header
-                  if (!error) return callback();
-                  if (parts[3]) return response.error();
-                  var record = {code: code, dependencies: {}, published: []};
-                  if (app) record.config = {};
-                  this.put(parts[0]+'/'+parts[1], {versions: [record]}).then(callback);
-                });
-              }, response.ok, method, code, true);
-            }, 'utf8', 1048576);
-          // delete app/module
-          if (parts.length == 3 && method == 'DELETE')
-            return forward(uri, function(callback) {
-              db.delete(uri).then(callback);
-            }, function(data, session) {
-              if (app) delete logs[stop(session && session.username || '', name, 1)];
-              response.ok();
-            }, method);
-          // update config
-          if (parts[4] == 'config' && method == 'PUT')
-            return request.slurp(function(body) {
-              if (body === undefined) return response.error();
-              forward(uri, function(callback) {
-                if (!app) return response.error();
-                db.put(path, body).then(callback);
-              }, response.ok, method, body);
-            }, 'json');
-          // update dependencies
-          if (parts[4] == 'dependencies') {
-            if (method == 'POST' && parts.length == 5)
-              return request.slurp(function(body) {
-                if (!body || !body.name || typeof body.version != 'number') return response.error();
-                forward(uri, function(callback) {
-                  db.put(path+'/'+encodeURIComponent(body.name), body.version).then(callback);
-                }, response.ok, method, body);
-              }, 'json');
-            if (method == 'DELETE' && parts.length == 6)
-              return forward(uri, function(callback) {
-                db.delete(path).then(callback);
-              }, response.ok, method);
-          }
-        }
-        if (request.path == '/login') {
-          var secret = request.query.state,
-              socket = request.query.socket;
-          if (secret) {
-            if (secret != request.cookie.state) return response.end('Invalid state parameter', null, 403);
-            var error = request.query.error_description || request.query.error,
-                token = request.query.access_token;
-            if (error || !token) return response.end(error || 'Missing access_token parameter', null, 400);
-            return response.generic(303, {
-              'Set-Cookie': 'token='+token+'; Path=/',
-              Location: request.cookie.redirect || '/'
-            });
-          }
-          secret = encode(crypto.getRandomValues(new Uint8Array(24)), true);
-          // TODO: store secret in client object
-          // TODO: if client is not on same browser as BE, use http redirect
-          return response.generic(303, {
-            'Set-Cookie': [
-              'state='+secret+'; Path=/',
-              'redirect='+encodeURIComponent(request.query.redirect || '/')+'; Path=/'
-            ],
-            Location: 'https://simpljs.com/authorize?client_id=simpljs&redirect_uri='+encodeURIComponent(
-              clients[socket] ? 'ws://'+socket : 'http://'+request.headers.Host+'/login')+'&state='+secret
-          });
-        }
-        if (request.path == '/logout') {
-          delete sessions[request.cookie.token];
-          return response.generic(302, {
-            'Set-Cookie': 'token=; Expires='+new Date().toUTCString(),
-            Location: '/'
-          });
-        }
-        if (request.path == '/token')
-          return response.end(csrf);
-        if (request.path == '/restore' && request.method == 'POST')
-          return request.slurp(function(body) {
-            if (body.token != csrf) return response.generic(401);
-            var full = body.scope == 'full';
-            restore(function() {
-              return response.generic(303, {Location: '/'});
-            }, full ? 'both' : 'modules', !full);
-          }, 'url');
-        if (request.path == '/action' && request.method == 'POST')
-          return request.slurp(function(body) {
-            var token = body && body.token;
-            authenticate(token, function(session, local) {
-              var command = body.command,
-                  user = session ? session.username : '';
-              if (!token || session && session.error) return response.generic(401);
-              if (command == 'stop' || command == 'restart')
-                stop(user, body.app, body.version);
-              if (command == 'run' || command == 'restart')
-                run(user, body.app, body.version, !local && token);
-              response.generic(200);
-            });
-          }, 'json');
-        if (request.path == '/online')
-          return fetch('https://'+apiHost, {method: 'head'}).then(function(r) {
-            response.generic(r.ok ? 200 : 502);
-          });
-        if (request.path == '/connect')
-          return authenticate(request.query.token, function(session) {
-            var socketId = response.socket.socketId,
-                user = session ? session.username : '';
-            if (session && session.error) return response.generic(401);
-            o.websocket.accept(request, response, function(client) {
-              var self = clients[socketId] = {
-                user: user,
-                connection: client,
-                connect: function(plan, token) {
-                  self.token = token;
-                  if (self.remote || plan != 'pro') return;
-                  self.remote = new WebSocket('wss://'+apiHost+'/connect?access_token='+token);
-                  self.remote.onmessage = function(e) {
-                    if (typeof e.data == 'string' && e.data != 'ping')
-                      client.send(e.data);
-                  };
-                  self.remote.onclose = function(e) {
-                    send(client, 'expire', {refresh: e.code != 4001});
-                    self.remote = null;
-                  };
-                }
-              };
-              send(client, 'connect', {token: request.query.token, id: socketId});
-              if (session) self.connect(session.plan, request.query.token);
-              client.socket.onDisconnect = function() {
-                if (self.remote) self.remote.close();
-                delete clients[socketId];
-              };
-              return function(data) {
-                try { var message = JSON.parse(data); } catch (e) { return; }
-                var instance = message.instance,
-                    command = message.command;
-                if (instance) return self.remote && self.remote.send(data);
-                if (command == 'connect')
-                  return state(user, client);
-                if (command == 'stop' || command == 'restart')
-                  stop(user, message.app, message.version);
-                if (command == 'run' || command == 'restart')
-                  run(user, message.app, message.version, self.token);
-              };
-            });
-          });
-        if (/^\/((apps|modules)\/[^\/]+\/\d+\/(code|settings|log|docs))?$/.test(request.path))
-          return forward('workspace', function(callback) {
-            db.get('', false, function(path) {
-              // apps,modules,sessions/<name>/versions/<#>/code,config,dependencies,published/<#>
-              return [
-                function(key) { if (key != 'apps' && key != 'modules') return 'skip'; },
-                true, true, true,
-                function(key) { if (key != 'published') return 'skip'; },
-                true
-              ][path.length] || false;
-            }).then(function(data) {
-              Object.keys(data || {}).forEach(function(group) {
-                Object.keys(data[group]).forEach(function(name) {
-                  (name = data[group][name]).versions = name.versions.map(function(version) {
-                    return version.published.length;
-                  });
-                });
-              });
-              callback(data, null);
-            });
-          }, function(data, session) {
-            if (!data) return response.generic(500);
-            Object.keys(data.apps).forEach(function(name) { data.apps[name] = data.apps[name].versions; });
-            Object.keys(data.modules).forEach(function(name) { data.modules[name] = data.modules[name].versions; });
-            response.end(o.html.markup([
-              {'!doctype': {html: null}},
-              {html: [
-                {head: [
-                  {title: 'Simpl.js'},
-                  {meta: {charset: 'utf-8'}},
-                  {meta: {name: 'viewport', content: 'width=device-width, initial-scale=1.0, user-scalable=no'}},
-                  {link: {rel: 'stylesheet', href: '/codemirror.css'}},
-                  {link: {rel: 'stylesheet', href: '/jsonv.css'}},
-                  {link: {rel: 'stylesheet', href: '/simpl.css'}}
-                ]},
-                {body: [
-                  {svg: {id: 'icons', children: icons}},
-                  {script: {src: '/simpl.js'}},
-                  {script: {src: '/modules/html.js'}},
-                  {script: {src: '/modules/parser.js'}},
-                  {script: {src: '/modules/docs.js'}},
-                  {script: {src: '/modules/diff.js'}},
-                  {script: {src: '/codemirror.js'}},
-                  {script: {src: '/jsonv.js'}},
-                  {script: {src: '/app.js'}},
-                  {script: function(apps, modules, user, token) {
-                    if (!apps) return [data.apps, data.modules, session, request.cookie.token || csrf];
-                    simpl.use({app: 0}, function(o) {
-                      o.app(apps, modules, user, token, document.body);
-                    });
-                  }}
-                ]}
-              ]}
-            ]), 'html');
-          });
-        fetch(request.path).then(function(r) {
-          if (!r.ok) return response.generic(404);
-          r.arrayBuffer().then(function(body) {
-            response.end(body, (request.path.match(/\.([^.]*)$/) || [])[1]);
-          });
-        }).catch(function() {
-          response.generic(404);
-        });
+        return app.route(req, res) || res.generic(404);
+        
       }, function(error, s) {
         if (!error) {
           server = s;
@@ -556,7 +704,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
   var ws, port, path = '', launcher = false;
 
   chrome.app.runtime.onLaunched.addListener(function(source) {
-    console.log('Simpl.js launched', source);
+    console.log('Simpl.js launched '+JSON.stringify(source));
     var url = (source.url || '').match(/^https:\/\/simpljs\.com\/launch(\/.*)?/);
     var onLauncher = function(callback, loaded) {
       return function(x, fn) {
@@ -585,7 +733,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
         localApiPort = +args.localApiPort;
         (function connect() {
           console.log('Simpl.js: attempting headless connection '+retries);
-          ws = new WebSocket((localApiPort ? 'ws://localhost:'+localApiPort : 'wss://'+apiHost)+'/connect?access_token='+token);
+          ws = new WebSocket((localApiPort ? 'ws://localhost:'+localApiPort : 'wss://'+baseApiUrl)+'/connect?access_token='+token);
           ws.onopen = function() {
             console.log('Simpl.js: headless connection opened');
             connections = retries = 0;
@@ -620,6 +768,7 @@ simpl.use({crypto: 0, database: 0, html: 0, http: 0, string: 0, system: 0, webso
       }
     };
     if (source.source != 'file_handler' && source.source != 'load_and_launch') {
+      // TODO: restore login site -> app
       path = url ? '/login?redirect='+encodeURIComponent(url[1] || '') : '';
       if (launcher.focus) {
         if (!server) return launcher.focus();

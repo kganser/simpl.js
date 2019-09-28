@@ -25,13 +25,16 @@
       "scripts": [
         "simpl.js",
         "loader.js",
+        "modules/console.js",
         "modules/crypto.js",
         "modules/database.js",
         "modules/html.js",
         "modules/http.js",
+        "modules/jsonv.js",
         "modules/socket.js",
         "modules/string.js",
         "modules/system.js",
+        "modules/webapp.js",
         "modules/websocket.js",
         "background.js"
       ]

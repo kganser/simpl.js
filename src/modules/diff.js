@@ -22,7 +22,7 @@ simpl.add('diff', function() {
     }
     var last = components[length - 1];
     if (length > 1 && last.value === '' && (last.added || last.removed)) {
-      components[length - 2].value += lastComponent.value;
+      components[length - 2].value += last.value;
       components.pop();
     }
     return components;

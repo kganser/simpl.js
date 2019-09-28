@@ -7,13 +7,14 @@ PID=$!
 while test -z "$TOKEN"; do
   sleep 1
   TOKEN=`curl -s localhost:8123/token`
+  AUTH="Authorization: Bearer $TOKEN"
 done
-curl localhost:8123/restore -d "scope=full&token=$TOKEN" -so /dev/null
-curl localhost:8123/apps/test/1?token=$TOKEN -X PUT --data-binary @test.js -so /dev/null
-curl localhost:8123/apps/test/1/dependencies?token=$TOKEN -d '{"name":"http","version":0}' -so /dev/null
-curl localhost:8123/apps/test/1/dependencies?token=$TOKEN -d '{"name":"string","version":0}' -so /dev/null
-curl localhost:8123/apps/test/1/config?token=$TOKEN -X PUT -d '{"port":8124,"apiPort":8123,"debuggerPort":8122}' -so /dev/null
-curl localhost:8123/action -d "{\"command\":\"run\",\"app\":\"test\",\"version\":1,\"token\":\"$TOKEN\"}" -so /dev/null
+curl localhost:8123/restore -H "$AUTH" -d 'scope=full' -so /dev/null
+curl localhost:8123/apps/test/1 -H "$AUTH" -X PUT --data-binary @test.js -so /dev/null
+curl localhost:8123/apps/test/1/dependencies -H "$AUTH" -d '{"name":"http","version":0}' -so /dev/null
+curl localhost:8123/apps/test/1/dependencies -H "$AUTH" -d '{"name":"string","version":0}' -so /dev/null
+curl localhost:8123/apps/test/1/config -H "$AUTH" -X PUT -d '{"port":8124,"apiPort":8123,"debuggerPort":8122}' -so /dev/null
+curl localhost:8123/action -H "$AUTH" -d "{\"command\":\"run\",\"app\":\"test\",\"version\":1}" -so /dev/null
 sleep 1
 mkdir -p reports/test.js
 curl localhost:8124/results -so reports/test.js/junit.xml

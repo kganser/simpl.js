@@ -69,13 +69,13 @@ function(modules) {
     }, {
       key: '0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c',
       data: '546573742057697468205472756e636174696f6e',
-      mac: 'a3b6167473100ee06e0c796c2955552b'
+      mac: 'a3b6167473100ee06e0c796c2955552bfa6f7c0a6a8aef8b93f860aab0cd20c5'
     }, {
       key: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       data: '5468697320697320612074657374207573696e672061206c6172676572207468616e20626c6f636b2d73697a65206b657920616e642061206c6172676572207468616e20626c6f636b2d73697a6520646174612e20546865206b6579206e6565647320746f20626520686173686564206265666f7265206265696e6720757365642062792074686520484d414320616c676f726974686d2e',
       mac: '9b09ffa71b942fcb27635fbcd5b0e944bfdc63644f0713938a7f51535c3a35e2'
     }].some(function(test) {
-      toHex(modules.crypto.hmac(hex(test.key), hex(test.data))) !== test.mac;
+      return toHex(modules.crypto.hmac(hex(test.key), hex(test.data))) !== test.mac;
     }), 'crypto hmac');
     assert(
       base64(modules.crypto.pbkdf2(utf8('password'), utf8('salt'))) === 'YywoEuRtRgQQK6dhjp1tfS+BKPYma0oDJk0qBGC33LM=' &&
@@ -465,7 +465,7 @@ function(modules) {
       var i = 0;
       modules.http.serve({port: 9123, address: '127.0.0.1'}, function(request, response) {
         modules.websocket.accept(request, response, function(connection, protocol, extensions) {
-          assert(i++ == 1 && protocol === 'myprotocol', 'websocket request');
+          assert(i++ < 2 && protocol === 'myprotocol', 'websocket request');
           connection.send('hello');
           return function(message) {
             assert(i++ == 3 && message === 'goodbye', 'websocket message from client');
@@ -477,7 +477,7 @@ function(modules) {
         var ws = new WebSocket('ws://localhost:9123', 'myprotocol');
         ws.binaryType = 'arraybuffer';
         ws.onopen = function() {
-          assert(!i++, 'websocket handshake');
+          assert(i++ < 2, 'websocket handshake');
         };
         ws.onmessage = function(e) {
           if (i == 2 && i++) {
@@ -492,7 +492,9 @@ function(modules) {
           server.disconnect();
           resolve();
         };
-        ws.onerror = function() { i++; };
+        ws.onerror = function(e) {
+          assert(false, 'websocket error: '+e.message);
+        };
       });
     });
   }).then(function() {

@@ -10233,6 +10233,149 @@ var CodeMirror = function() {
 (function() {
   "use strict";
 
+  function Bar(cls, orientation, scroll) {
+    this.orientation = orientation;
+    this.scroll = scroll;
+    this.screen = this.total = this.size = 1;
+    this.pos = 0;
+
+    this.node = document.createElement("div");
+    this.node.className = cls + "-" + orientation;
+    this.inner = this.node.appendChild(document.createElement("div"));
+
+    var self = this;
+    CodeMirror.on(this.inner, "mousedown", function(e) {
+      if (e.which != 1) return;
+      CodeMirror.e_preventDefault(e);
+      var axis = self.orientation == "horizontal" ? "pageX" : "pageY";
+      var start = e[axis], startpos = self.pos;
+      function done() {
+        CodeMirror.off(document, "mousemove", move);
+        CodeMirror.off(document, "mouseup", done);
+      }
+      function move(e) {
+        if (e.which != 1) return done();
+        self.moveTo(startpos + (e[axis] - start) * (self.total / self.size));
+      }
+      CodeMirror.on(document, "mousemove", move);
+      CodeMirror.on(document, "mouseup", done);
+    });
+
+    CodeMirror.on(this.node, "click", function(e) {
+      CodeMirror.e_preventDefault(e);
+      var innerBox = self.inner.getBoundingClientRect(), where;
+      if (self.orientation == "horizontal")
+        where = e.clientX < innerBox.left ? -1 : e.clientX > innerBox.right ? 1 : 0;
+      else
+        where = e.clientY < innerBox.top ? -1 : e.clientY > innerBox.bottom ? 1 : 0;
+      self.moveTo(self.pos + where * self.screen);
+    });
+
+    function onWheel(e) {
+      var moved = CodeMirror.wheelEventPixels(e)[self.orientation == "horizontal" ? "x" : "y"];
+      var oldPos = self.pos;
+      self.moveTo(self.pos + moved);
+      if (self.pos != oldPos) CodeMirror.e_preventDefault(e);
+    }
+    CodeMirror.on(this.node, "mousewheel", onWheel);
+    CodeMirror.on(this.node, "DOMMouseScroll", onWheel);
+  }
+
+  Bar.prototype.setPos = function(pos, force) {
+    if (pos < 0) pos = 0;
+    if (pos > this.total - this.screen) pos = this.total - this.screen;
+    if (!force && pos == this.pos) return false;
+    this.pos = pos;
+    this.inner.style[this.orientation == "horizontal" ? "left" : "top"] =
+      (pos * (this.size / this.total)) + "px";
+    return true
+  };
+
+  Bar.prototype.moveTo = function(pos) {
+    if (this.setPos(pos)) this.scroll(pos, this.orientation);
+  }
+
+  var minButtonSize = 10;
+
+  Bar.prototype.update = function(scrollSize, clientSize, barSize) {
+    var sizeChanged = this.screen != clientSize || this.total != scrollSize || this.size != barSize
+    if (sizeChanged) {
+      this.screen = clientSize;
+      this.total = scrollSize;
+      this.size = barSize;
+    }
+
+    var buttonSize = this.screen * (this.size / this.total);
+    if (buttonSize < minButtonSize) {
+      this.size -= minButtonSize - buttonSize;
+      buttonSize = minButtonSize;
+    }
+    this.inner.style[this.orientation == "horizontal" ? "width" : "height"] =
+      buttonSize + "px";
+    this.setPos(this.pos, sizeChanged);
+  };
+
+  function SimpleScrollbars(cls, place, scroll) {
+    this.addClass = cls;
+    this.horiz = new Bar(cls, "horizontal", scroll);
+    place(this.horiz.node);
+    this.vert = new Bar(cls, "vertical", scroll);
+    place(this.vert.node);
+    this.width = null;
+  }
+
+  SimpleScrollbars.prototype.update = function(measure) {
+    if (this.width == null) {
+      var style = window.getComputedStyle ? window.getComputedStyle(this.horiz.node) : this.horiz.node.currentStyle;
+      if (style) this.width = parseInt(style.height);
+    }
+    var width = this.width || 0;
+
+    var needsH = measure.scrollWidth > measure.clientWidth + 1;
+    var needsV = measure.scrollHeight > measure.clientHeight + 1;
+    this.vert.node.style.display = needsV ? "block" : "none";
+    this.horiz.node.style.display = needsH ? "block" : "none";
+
+    if (needsV) {
+      this.vert.update(measure.scrollHeight, measure.clientHeight,
+                       measure.viewHeight - (needsH ? width : 0));
+      this.vert.node.style.bottom = needsH ? width + "px" : "0";
+    }
+    if (needsH) {
+      this.horiz.update(measure.scrollWidth, measure.clientWidth,
+                        measure.viewWidth - (needsV ? width : 0) - measure.barLeft);
+      this.horiz.node.style.right = needsV ? width + "px" : "0";
+      this.horiz.node.style.left = measure.barLeft + "px";
+    }
+
+    return {right: needsV ? width : 0, bottom: needsH ? width : 0};
+  };
+
+  SimpleScrollbars.prototype.setScrollTop = function(pos) {
+    this.vert.setPos(pos);
+  };
+
+  SimpleScrollbars.prototype.setScrollLeft = function(pos) {
+    this.horiz.setPos(pos);
+  };
+
+  SimpleScrollbars.prototype.clear = function() {
+    var parent = this.horiz.node.parentNode;
+    parent.removeChild(this.horiz.node);
+    parent.removeChild(this.vert.node);
+  };
+
+  CodeMirror.scrollbarModel.simple = function(place, scroll) {
+    return new SimpleScrollbars("CodeMirror-simplescroll", place, scroll);
+  };
+  CodeMirror.scrollbarModel.overlay = function(place, scroll) {
+    return new SimpleScrollbars("CodeMirror-overlayscroll", place, scroll);
+  };
+}());
+
+(function() {
+  "use strict";
+
   var defaults = {
     style: "matchhighlight",
     minChars: 2,
@@ -10292,8 +10435,9 @@ var CodeMirror = function() {
 
   function addOverlay(cm, query, hasBoundary, style) {
     var state = cm.state.matchHighlighter;
+    var searchState = cm.state.search;
     cm.addOverlay(state.overlay = makeOverlay(query, hasBoundary, style));
-    if (state.options.annotateScrollbar && cm.showMatchesOnScrollbar) {
+    if (state.options.annotateScrollbar && cm.showMatchesOnScrollbar && !(searchState && searchState.annotate)) { // SIMPL.JS: skip on active search
       var searchFor = hasBoundary ? new RegExp("\\b" + query + "\\b") : query;
       state.matchesonscroll = cm.showMatchesOnScrollbar(searchFor, false,
         {className: "CodeMirror-selection-highlight-scrollbar"});
@@ -10331,7 +10475,7 @@ var CodeMirror = function() {
       var selection = cm.getRange(from, to)
       if (state.options.trim) selection = selection.replace(/^\s+|\s+$/g, "")
       if (selection.length >= state.options.minChars)
-        addOverlay(cm, selection, re /* SIMPL.JS (was false) */, state.options.style);
+        addOverlay(cm, selection, false /* SIMPL.JS (was false) */, state.options.style);
     });
   }
 
@@ -10740,6 +10884,7 @@ var CodeMirror = function() {
       value: deflt,
       selectValueOnOpen: true,
       closeOnEnter: false,
+      //closeOnBlur: false,
       onClose: function() { clearSearch(cm); },
       onKeyDown: onKeyDown
     });
@@ -11411,6 +11556,101 @@ var CodeMirror = function() {
 
   CodeMirror.registerHelper("fold", "brace", function(cm, start) {
     var line = start.line, lineText = cm.getLine(line);
+    var tokenType;
+
+    function findOpening(openCh) {
+      for (var at = start.ch, pass = 0;;) {
+        var found = at <= 0 ? -1 : lineText.lastIndexOf(openCh, at - 1);
+        if (found == -1) {
+          if (pass == 1) break;
+          pass = 1;
+          at = lineText.length;
+          continue;
+        }
+        if (pass == 1 && found < start.ch) break;
+        tokenType = cm.getTokenTypeAt(CodeMirror.Pos(line, found + 1));
+        if (!/^(comment|string)/.test(tokenType)) return found + 1;
+        at = found - 1;
+      }
+    }
+
+    var startToken = "{", endToken = "}", startCh = findOpening("{");
+    if (startCh == null) {
+      startToken = "[", endToken = "]";
+      startCh = findOpening("[");
+    }
+
+    if (startCh == null) return;
+    var count = 1, lastLine = cm.lastLine(), end, endCh;
+    outer: for (var i = line; i <= lastLine; ++i) {
+      var text = cm.getLine(i), pos = i == line ? startCh : 0;
+      for (;;) {
+        var nextOpen = text.indexOf(startToken, pos), nextClose = text.indexOf(endToken, pos);
+        if (nextOpen < 0) nextOpen = text.length;
+        if (nextClose < 0) nextClose = text.length;
+        pos = Math.min(nextOpen, nextClose);
+        if (pos == text.length) break;
+        if (cm.getTokenTypeAt(CodeMirror.Pos(i, pos + 1)) == tokenType) {
+          if (pos == nextOpen) ++count;
+          else if (!--count) { end = i; endCh = pos; break outer; }
+        }
+        ++pos;
+      }
+    }
+    if (end == null || line == end) return;
+    return {from: CodeMirror.Pos(line, startCh),
+            to: CodeMirror.Pos(end, endCh)};
+  });
+
+  CodeMirror.registerHelper("fold", "import", function(cm, start) {
+    function hasImport(line) {
+      if (line < cm.firstLine() || line > cm.lastLine()) return null;
+      var start = cm.getTokenAt(CodeMirror.Pos(line, 1));
+      if (!/\S/.test(start.string)) start = cm.getTokenAt(CodeMirror.Pos(line, start.end + 1));
+      if (start.type != "keyword" || start.string != "import") return null;
+      // Now find closing semicolon, return its position
+      for (var i = line, e = Math.min(cm.lastLine(), line + 10); i <= e; ++i) {
+        var text = cm.getLine(i), semi = text.indexOf(";");
+        if (semi != -1) return {startCh: start.end, end: CodeMirror.Pos(i, semi)};
+      }
+    }
+
+    var startLine = start.line, has = hasImport(startLine), prev;
+    if (!has || hasImport(startLine - 1) || ((prev = hasImport(startLine - 2)) && prev.end.line == startLine - 1))
+      return null;
+    for (var end = has.end;;) {
+      var next = hasImport(end.line + 1);
+      if (next == null) break;
+      end = next.end;
+    }
+    return {from: cm.clipPos(CodeMirror.Pos(startLine, has.startCh + 1)), to: end};
+  });
+
+  CodeMirror.registerHelper("fold", "include", function(cm, start) {
+    function hasInclude(line) {
+      if (line < cm.firstLine() || line > cm.lastLine()) return null;
+      var start = cm.getTokenAt(CodeMirror.Pos(line, 1));
+      if (!/\S/.test(start.string)) start = cm.getTokenAt(CodeMirror.Pos(line, start.end + 1));
+      if (start.type == "meta" && start.string.slice(0, 8) == "#include") return start.start + 8;
+    }
+
+    var startLine = start.line, has = hasInclude(startLine);
+    if (has == null || hasInclude(startLine - 1) != null) return null;
+    for (var end = startLine;;) {
+      var next = hasInclude(end + 1);
+      if (next == null) break;
+      ++end;
+    }
+    return {from: CodeMirror.Pos(startLine, has + 1),
+            to: cm.clipPos(CodeMirror.Pos(end))};
+  });
+}());
+
+(function() {
+  "use strict";
+
+  CodeMirror.registerHelper("fold", "brace", function(cm, start) {
+    var line = start.line, lineText = cm.getLine(line);
 
     function findOpening(openCh) {
       for (var at = start.ch, pass = 0;;) {
@@ -11615,4 +11855,472 @@ var CodeMirror = function() {
       cm.state.rulerDiv.appendChild(elt);
     }
   }
+}());
+
+(function() {
+  "use strict";
+  var GUTTER_ID = "CodeMirror-lint-markers";
+
+  function showTooltip(e, content) {
+    var tt = document.createElement("div");
+    tt.className = "CodeMirror-lint-tooltip";
+    tt.appendChild(content.cloneNode(true));
+    document.body.appendChild(tt);
+
+    function position(e) {
+      if (!tt.parentNode) return CodeMirror.off(document, "mousemove", position);
+      tt.style.top = Math.max(0, e.clientY - tt.offsetHeight - 5) + "px";
+      tt.style.left = (e.clientX + 5) + "px";
+    }
+    CodeMirror.on(document, "mousemove", position);
+    position(e);
+    if (tt.style.opacity != null) tt.style.opacity = 1;
+    return tt;
+  }
+  function rm(elt) {
+    if (elt.parentNode) elt.parentNode.removeChild(elt);
+  }
+  function hideTooltip(tt) {
+    if (!tt.parentNode) return;
+    if (tt.style.opacity == null) rm(tt);
+    tt.style.opacity = 0;
+    setTimeout(function() { rm(tt); }, 600);
+  }
+
+  function showTooltipFor(e, content, node) {
+    var tooltip = showTooltip(e, content);
+    function hide() {
+      CodeMirror.off(node, "mouseout", hide);
+      if (tooltip) { hideTooltip(tooltip); tooltip = null; }
+    }
+    var poll = setInterval(function() {
+      if (tooltip) for (var n = node;; n = n.parentNode) {
+        if (n && n.nodeType == 11) n = n.host;
+        if (n == document.body) return;
+        if (!n) { hide(); break; }
+      }
+      if (!tooltip) return clearInterval(poll);
+    }, 400);
+    CodeMirror.on(node, "mouseout", hide);
+  }
+
+  function LintState(cm, options, hasGutter) {
+    this.marked = [];
+    this.options = options;
+    this.timeout = null;
+    this.hasGutter = hasGutter;
+    this.onMouseOver = function(e) { onMouseOver(cm, e); };
+    this.waitingFor = 0
+  }
+
+  function parseOptions(_cm, options) {
+    if (options instanceof Function) return {getAnnotations: options};
+    if (!options || options === true) options = {};
+    return options;
+  }
+
+  function clearMarks(cm) {
+    var state = cm.state.lint;
+    if (state.hasGutter) cm.clearGutter(GUTTER_ID);
+    for (var i = 0; i < state.marked.length; ++i)
+      state.marked[i].clear();
+    state.marked.length = 0;
+  }
+
+  function makeMarker(labels, severity, multiple, tooltips) {
+    var marker = document.createElement("div"), inner = marker;
+    marker.className = "CodeMirror-lint-marker-" + severity;
+    if (multiple) {
+      inner = marker.appendChild(document.createElement("div"));
+      inner.className = "CodeMirror-lint-marker-multiple";
+    }
+
+    if (tooltips != false) CodeMirror.on(inner, "mouseover", function(e) {
+      showTooltipFor(e, labels, inner);
+    });
+
+    return marker;
+  }
+
+  function getMaxSeverity(a, b) {
+    if (a == "error") return a;
+    else return b;
+  }
+
+  function groupByLine(annotations) {
+    var lines = [];
+    for (var i = 0; i < annotations.length; ++i) {
+      var ann = annotations[i], line = ann.from.line;
+      (lines[line] || (lines[line] = [])).push(ann);
+    }
+    return lines;
+  }
+
+  function annotationTooltip(ann) {
+    var severity = ann.severity;
+    if (!severity) severity = "error";
+    var tip = document.createElement("div");
+    tip.className = "CodeMirror-lint-message-" + severity;
+    if (typeof ann.messageHTML != 'undefined') {
+        tip.innerHTML = ann.messageHTML;
+    } else {
+        tip.appendChild(document.createTextNode(ann.message));
+    }
+    return tip;
+  }
+
+  function lintAsync(cm, getAnnotations, passOptions) {
+    var state = cm.state.lint
+    var id = ++state.waitingFor
+    function abort() {
+      id = -1
+      cm.off("change", abort)
+    }
+    cm.on("change", abort)
+    getAnnotations(cm.getValue(), function(annotations, arg2) {
+      cm.off("change", abort)
+      if (state.waitingFor != id) return
+      if (arg2 && annotations instanceof CodeMirror) annotations = arg2
+      cm.operation(function() {updateLinting(cm, annotations)})
+    }, passOptions, cm);
+  }
+
+  function startLinting(cm) {
+    var state = cm.state.lint, options = state.options;
+    /*
+     * Passing rules in `options` property prevents JSHint (and other linters) from complaining
+     * about unrecognized rules like `onUpdateLinting`, `delay`, `lintOnChange`, etc.
+     */
+    var passOptions = options.options || options;
+    var getAnnotations = options.getAnnotations || cm.getHelper(CodeMirror.Pos(0, 0), "lint");
+    if (!getAnnotations) return;
+    if (options.async || getAnnotations.async) {
+      lintAsync(cm, getAnnotations, passOptions)
+    } else {
+      var annotations = getAnnotations(cm.getValue(), passOptions, cm);
+      if (!annotations) return;
+      if (annotations.then) annotations.then(function(issues) {
+        cm.operation(function() {updateLinting(cm, issues)})
+      });
+      else cm.operation(function() {updateLinting(cm, annotations)})
+    }
+  }
+
+  function updateLinting(cm, annotationsNotSorted) {
+    clearMarks(cm);
+    var state = cm.state.lint, options = state.options;
+
+    var annotations = groupByLine(annotationsNotSorted);
+
+    for (var line = 0; line < annotations.length; ++line) {
+      var anns = annotations[line];
+      if (!anns) continue;
+
+      var maxSeverity = null;
+      var tipLabel = state.hasGutter && document.createDocumentFragment();
+
+      for (var i = 0; i < anns.length; ++i) {
+        var ann = anns[i];
+        var severity = ann.severity;
+        if (!severity) severity = "error";
+        maxSeverity = getMaxSeverity(maxSeverity, severity);
+
+        if (options.formatAnnotation) ann = options.formatAnnotation(ann);
+        if (state.hasGutter) tipLabel.appendChild(annotationTooltip(ann));
+
+        if (ann.to) state.marked.push(cm.markText(ann.from, ann.to, {
+          className: "CodeMirror-lint-mark-" + severity,
+          __annotation: ann
+        }));
+      }
+
+      if (state.hasGutter)
+        cm.setGutterMarker(line, GUTTER_ID, makeMarker(tipLabel, maxSeverity, anns.length > 1,
+                                                       state.options.tooltips));
+    }
+
+    // SIMPL.JS: add annotation to scrollbar
+    if (state.scrollbarWarnings) {
+      state.scrollbarWarnings.update(annotations.reduce(function(result, line) {
+        return result.concat(!line || !line.length || line.some(function(item) {
+          return (item.severity || "error") == "error";
+        }) ? [] : line[0]);
+      }, []));
+      state.scrollbarErrors.update(annotations.reduce(function(result, line) {
+        return result.concat(line && line.length && line.some(function(item) {
+          return (item.severity || "error") == "error";
+        }) ? line[0] : []);
+      }, []));
+    }
+
+    if (options.onUpdateLinting) options.onUpdateLinting(annotationsNotSorted, annotations, cm);
+  }
+
+  function onChange(cm) {
+    var state = cm.state.lint;
+    if (!state) return;
+    clearTimeout(state.timeout);
+    state.timeout = setTimeout(function(){startLinting(cm);}, state.options.delay || 500);
+  }
+
+  function popupTooltips(annotations, e) {
+    var target = e.target || e.srcElement;
+    var tooltip = document.createDocumentFragment();
+    for (var i = 0; i < annotations.length; i++) {
+      var ann = annotations[i];
+      tooltip.appendChild(annotationTooltip(ann));
+    }
+    showTooltipFor(e, tooltip, target);
+  }
+
+  function onMouseOver(cm, e) {
+    var target = e.target || e.srcElement;
+    if (!/\bCodeMirror-lint-mark-/.test(target.className)) return;
+    var box = target.getBoundingClientRect(), x = (box.left + box.right) / 2, y = (box.top + box.bottom) / 2;
+    var spans = cm.findMarksAt(cm.coordsChar({left: x, top: y}, "client"));
+
+    var annotations = [];
+    for (var i = 0; i < spans.length; ++i) {
+      var ann = spans[i].__annotation;
+      if (ann) annotations.push(ann);
+    }
+    if (annotations.length) popupTooltips(annotations, e);
+  }
+
+  CodeMirror.defineOption("lint", false, function(cm, val, old) {
+    if (old && old != CodeMirror.Init) {
+      clearMarks(cm);
+      if (cm.state.lint.options.lintOnChange !== false)
+        cm.off("change", onChange);
+      CodeMirror.off(cm.getWrapperElement(), "mouseover", cm.state.lint.onMouseOver);
+      clearTimeout(cm.state.lint.timeout);
+      delete cm.state.lint;
+    }
+
+    if (val) {
+      var gutters = cm.getOption("gutters"), hasLintGutter = false;
+      for (var i = 0; i < gutters.length; ++i) if (gutters[i] == GUTTER_ID) hasLintGutter = true;
+      var state = cm.state.lint = new LintState(cm, parseOptions(cm, val), hasLintGutter);
+      if (state.options.lintOnChange !== false)
+        cm.on("change", onChange);
+      if (state.options.tooltips != false && state.options.tooltips != "gutter")
+        CodeMirror.on(cm.getWrapperElement(), "mouseover", state.onMouseOver);
+      // SIMPL.JS: add lint marks to scrollbar
+      if (state.options.annotateScrollbar && cm.annotateScrollbar) {
+        state.scrollbarWarnings = cm.annotateScrollbar({
+          className: "CodeMirror-lint-warning-scrollbar",
+          listenForChanges: false
+        });
+        state.scrollbarErrors = cm.annotateScrollbar({
+          className: "CodeMirror-lint-error-scrollbar",
+          listenForChanges: false
+        });
+      }
+
+      startLinting(cm);
+    }
+  });
+
+  CodeMirror.defineExtension("performLint", function() {
+    if (this.state.lint) startLinting(this);
+  });
+}());
+
+(function() {
+  "use strict";
+  // declare global: JSHINT
+
+  // https://github.com/jshint/jshint/blob/master/src/messages.js
+  var warningsWhitelist = {
+    W001: true, W003: true, W005: true, W006: true, W007: true,
+    W016: true, W017: true, W019: true,
+    W020: true, W021: true, W024: true, W025: true, W027: true, W028: true,
+    W030: true, W031: true, W032: true, W033: true, W034: true, W035: true, W036: true, W037: true, W038: true,
+    W040: true, W044: true, W045: true, W046: true, W047: true, W048: true, W049: true,
+    W051: true, W052: true, W053: true, W054: true, W056: true, W057: true, W058: true, W059: true,
+    W063: true, W065: true, W066: true, W067: true, W068: true, W069: true,
+    W070: true, W075: true, W076: true, W077: true, W078: true, W079: true,
+    W080: true, W082: true, W085: true, W086: true, W087: true, W088: true, W089: true,
+    W090: true, W094: true, W095: true, W096: true, W098: true,
+    W103: true,
+    W112: true, W113: true, W116: true, W117: true,
+    W120: true, W121: true, W122: true, W124: true, W125: true, W126: true, W127: true, W128: true,
+    W130: true, W133: true, W135: true, W137: true, W138: true,
+    W140: true, W141: true, W145: true, W146: true, W147: true, W148: true
+  };
+
+  var worker = new Worker('/jshint.js'),
+      current, next;
+  worker.onmessage = function(e) {
+    if (next) {
+      current.callback([]);
+      current = next;
+      next = null;
+      worker.postMessage({command: 'lint', text: current.text, options: current.options});
+    } else if (current) {
+      current.callback((e.data.result.errors || []).reduce(function(annotations, error) {
+        if (error) {
+          if (error.line <= 0) {
+            if (window.console)
+              window.console.warn("Cannot display JSHint error (invalid line " + error.line + ")", error);
+          } else {
+            var severity = String(error.code || '').startsWith('W') ? 'warning' : 'error';
+
+            if (severity == 'warning' && warningsWhitelist.hasOwnProperty(error.code)) {
+              var start = error.character - 1, end = start + 1;
+              if (error.evidence) {
+                var index = error.evidence.substring(start).search(/.\b/);
+                if (index > -1) {
+                  end += index;
+                }
+              }
+    
+              annotations.push({
+                message: error.reason,
+                severity: severity,
+                from: CodeMirror.Pos(error.line - 1, start),
+                to: CodeMirror.Pos(error.line - 1, end)
+              });
+            }
+          }
+        }
+        return annotations;
+      }, []));
+      current = null;
+    }
+  }
+
+  CodeMirror.registerHelper("lint", "javascript", function(text, options) {
+    return new Promise(function(callback) {
+      options = options.jshint || {}; // SIMPL.JS: scope to jshint
+      if (!options.indent) // JSHint error.character actually is a column index, this fixes underlining on lines using tabs for indentation
+        options.indent = 1; // JSHint default value is 4
+
+      if (!text) return callback([]);
+  
+      var op = {text: '('+text+'());', options: options, callback: callback};
+  
+      if (!current) {
+        current = op;
+        worker.postMessage({command: 'lint', text: current.text, options: current.options});
+      } else {
+        if (next) next.callback([]);
+        next = op;
+      }
+    });
+  });
+
+}());
+
+(function() {
+  "use strict";
+
+  CodeMirror.defineExtension("annotateScrollbar", function(options) {
+    if (typeof options == "string") options = {className: options};
+    return new Annotation(this, options);
+  });
+
+  CodeMirror.defineOption("scrollButtonHeight", 0);
+
+  function Annotation(cm, options) {
+    this.cm = cm;
+    this.options = options;
+    this.buttonHeight = options.scrollButtonHeight || cm.getOption("scrollButtonHeight");
+    this.annotations = [];
+    this.doRedraw = this.doUpdate = null;
+    this.div = cm.getWrapperElement().appendChild(document.createElement("div"));
+    this.div.style.cssText = "position: absolute; right: 0; top: 0; z-index: 7; pointer-events: none";
+    this.computeScale();
+
+    function scheduleRedraw(delay) {
+      clearTimeout(self.doRedraw);
+      self.doRedraw = setTimeout(function() { self.redraw(); }, delay);
+    }
+
+    var self = this;
+    cm.on("refresh", this.resizeHandler = function() {
+      clearTimeout(self.doUpdate);
+      self.doUpdate = setTimeout(function() {
+        if (self.computeScale()) scheduleRedraw(20);
+      }, 100);
+    });
+    cm.on("markerAdded", this.resizeHandler);
+    cm.on("markerCleared", this.resizeHandler);
+    if (options.listenForChanges !== false)
+      cm.on("change", this.changeHandler = function() {
+        scheduleRedraw(250);
+      });
+  }
+
+  Annotation.prototype.computeScale = function() {
+    var cm = this.cm;
+    var hScale = (cm.getWrapperElement().clientHeight - cm.display.barHeight - this.buttonHeight * 2) /
+      cm.getScrollerElement().scrollHeight
+    if (hScale != this.hScale) {
+      this.hScale = hScale;
+      return true;
+    }
+  };
+
+  Annotation.prototype.update = function(annotations) {
+    this.annotations = annotations;
+    this.redraw();
+  };
+
+  Annotation.prototype.redraw = function(compute) {
+    if (compute !== false) this.computeScale();
+    var cm = this.cm, hScale = this.hScale;
+
+    var frag = document.createDocumentFragment(), anns = this.annotations;
+
+    var wrapping = cm.getOption("lineWrapping");
+    var singleLineH = wrapping && cm.defaultTextHeight() * 1.5;
+    var curLine = null, curLineObj = null;
+    function getY(pos, top) {
+      if (curLine != pos.line) {
+        curLine = pos.line;
+        curLineObj = cm.getLineHandle(curLine);
+      }
+      if ((curLineObj.widgets && curLineObj.widgets.length) ||
+          (wrapping && curLineObj.height > singleLineH))
+        return cm.charCoords(pos, "local")[top ? "top" : "bottom"];
+      var topY = cm.heightAtLine(curLineObj, "local");
+      return topY + (top ? 0 : curLineObj.height);
+    }
+
+    var lastLine = cm.lastLine()
+    if (cm.display.barWidth) for (var i = 0, nextTop; i < anns.length; i++) {
+      var ann = anns[i];
+      if (ann.to.line > lastLine) continue;
+      var top = nextTop || getY(ann.from, true) * hScale;
+      var bottom = getY(ann.to, false) * hScale;
+      while (i < anns.length - 1) {
+        if (anns[i + 1].to.line > lastLine) break;
+        nextTop = getY(anns[i + 1].from, true) * hScale;
+        if (nextTop > bottom + .9) break;
+        ann = anns[++i];
+        bottom = getY(ann.to, false) * hScale;
+      }
+      if (bottom == top) continue;
+      var height = Math.max(bottom - top, 3);
+
+      var elt = frag.appendChild(document.createElement("div"));
+      elt.style.cssText = "position: absolute; right: 0px; width: " + Math.max(cm.display.barWidth - 1, 2) + "px; top: "
+        + (top + this.buttonHeight) + "px; height: " + height + "px";
+      elt.className = this.options.className;
+      if (ann.id) {
+        elt.setAttribute("annotation-id", ann.id);
+      }
+    }
+    this.div.textContent = "";
+    this.div.appendChild(frag);
+  };
+
+  Annotation.prototype.clear = function() {
+    this.cm.off("refresh", this.resizeHandler);
+    this.cm.off("markerAdded", this.resizeHandler);
+    this.cm.off("markerCleared", this.resizeHandler);
+    if (this.changeHandler) this.cm.off("change", this.changeHandler);
+    this.div.parentNode.removeChild(this.div);
+  };
 }());

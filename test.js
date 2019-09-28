@@ -139,6 +139,8 @@ function(modules) {
             load('/modules/database/1'),
             send('Runtime.evaluate', {expression:
               "document.querySelector('nav > ul:nth-of-type(2) li:nth-child(2) .name').click();"+
+              "document.querySelector('nav > ul:nth-of-type(2) li:nth-child(2) .view').click();"+
+              "document.querySelector('nav > ul:nth-of-type(2) li:nth-child(2) .view').click();"+
               "document.querySelector('nav .toggle').click();"})
           ]).then(function() {
             return send('Page.captureScreenshot').then(function(result) {

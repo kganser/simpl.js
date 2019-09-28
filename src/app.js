@@ -157,6 +157,7 @@ simpl.add('app', function(o) {
                 if (/[\[{] \/\/-$/.test(line)) code.foldCode(CodeMirror.Pos(i, 0), null, 'fold');
               });
             }
+            code.performLint();
           }
           if (ln != null) {
             code.scrollIntoView({line: ln-1, ch: 0});
@@ -307,12 +308,14 @@ simpl.add('app', function(o) {
       {nav: [
         {div: {
           className: user ? 'user' : 'home',
-          onclick: function() { navigate(); },
+          onclick: function(e) {
+            if (!{a:1,svg:1}[e.target.tagName.toLowerCase()])
+              navigate();
+          },
           children: [
             {div: {className: 'controls', children: {a: user
               ? {id: 'logout', href: '/logout', title: 'Log Out', children: icons.logout}
               : {id: 'login', href: '/login', title: 'Log In or Register', children: icons.login, onclick: function(e) {
-                  e.stopPropagation();
                   e.preventDefault();
                   login.open();
                 }}}}},
@@ -607,12 +610,20 @@ simpl.add('app', function(o) {
             value: selected && selected.entry.doc || '',
             rulers: [120],
             lineNumbers: true,
+            lint: {
+              jshint: {esversion: 9},
+              annotateScrollbar: true
+            },
             matchBrackets: true,
             styleActiveLine: true,
-            highlightSelectionMatches: {minChars: 1},
+            scrollbarStyle: 'simple',
+            highlightSelectionMatches: {
+              annotateScrollbar: true,
+              minChars: 1
+            },
             foldGutter: true,
             foldOptions: {widget: '\u27f7', minFoldSize: 1},
-            gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
+            gutters: ['CodeMirror-lint-markers', 'CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
             extraKeys: {Tab: 'indentMore', 'Shift-Tab': 'indentLess'}
           });
           code.on('changes', function() {
