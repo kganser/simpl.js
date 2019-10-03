@@ -3,7 +3,7 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
   var server, loader, lines, workspace,
       db = o.database.open('simpl'),
       encode = o.string.base64FromBuffer,
-      baseSiteUrl = 'https://simpljs.com', // 'http://dev.simpljs.com:1080',
+      baseSiteUrl = 'https://simpljs.com',
       baseApiUrl = baseSiteUrl.replace('://', '://api.'),
       apps = {}, logs = {}, clients = {}, logins = {},
       csrf, ping, localApiPort, debug;
@@ -14,20 +14,18 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
   ).filter(Boolean).join('&');
 
   const api = async (path, config) => {
-    console.log(new Error('api call').stack);
     const {method, body, headers, token} = config || {};
-    const response = await fetch(baseApiUrl+path, {
+    const response = await fetch(baseApiUrl + path, {
       method,
       headers: {
         ...headers,
-        ...(token && {Authorization: 'Bearer '+token}),
+        ...(token && {Authorization: 'Bearer ' + token}),
       },
       body
     });
-    return {
-      response,
-      data: await response.json()
-    };
+    const data = await response.json();
+    if (!response.ok) throw new Error(data && data.error || response.statusText);
+    return data;
   };
   var restore = function(callback, scope, sparse) {
     if (!scope)
@@ -102,39 +100,29 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
     const id = [user, name, version].join('@');
     if (apps[id]) return;
     try {
-      const app = await new Promise(resolve => {
-        (user
-          ? api('/apps/' + encodeURIComponent(name) + '/' + version, {token})
-          : db.get('apps/' + encodeURIComponent(name) + '/versions/' + (version - 1))
-        ).then(resolve);
-      });
-      if (!app || app.error)
-        throw new Error(app ? app.error : 'App not found');
+      const {code, config, dependencies} = await (user
+        ? api('/apps/' + encodeURIComponent(name) + '/' + version, {token})
+        : new Promise(resolve => db.get('apps/' + encodeURIComponent(name) + '/versions/' + (version - 1)).then(resolve)));
       logs[id] = [];
       apps[id] = proxy(null, [
-        loader + 'var config = ' + JSON.stringify(app.config),
+        loader + 'var config = ' + JSON.stringify(config),
         'simpl.user=' + JSON.stringify(user),
-        'simpl.use(' + JSON.stringify(app.dependencies) + ',' + app.code + ',' + JSON.stringify(name.split('@')[1]) + ');'
+        'simpl.use(' + JSON.stringify(dependencies) + ',' + code + ',' + JSON.stringify(name.split('@')[1]) + ');'
       ].join(';'), async (module, callback) => {
         let v = module.version;
         const current = v < 1;
         if (current) v = 1 - v;
         try {
-          let record = await new Promise(resolve => {
-            (user
-              ? api('/modules/' + encodeURIComponent(module.name) + '/' + v, {token})
-              : db.get('modules/' + encodeURIComponent(module.name) + '/versions/' + (v - 1))
-            ).then(resolve);
-          });
-          if (!record || record.error)
-            throw new Error(record ? 'Module ' + module.name + ': ' + record.error : 'Module ' + module.name + ' not found');
-          if (!current) record = record.published.pop();
-          callback(wrap(module.name, record.code, module.version, record.dependencies));
+          const data = await (user
+            ? api('/modules/' + encodeURIComponent(module.name) + '/' + v, {token})
+            : new Promise(resolve => db.get('modules/' + encodeURIComponent(module.name) + '/versions/' + (v - 1)).then(resolve)));
+          const {code, dependencies} = current ? data : data.published.pop();
+          callback(wrap(module.name, code, module.version, dependencies));
         } catch (e) {
           if (!apps[id]) return;
           apps[id].terminate();
           delete apps[id];
-          const data = {app: name, version, message: e.message};
+          const data = {app: name, version, message: 'Module ' + module.name + ': ' + e.message};
           logs[id].push({fatal: data});
           broadcast('error', data, user);
         }
@@ -227,110 +215,110 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
     '/modules/:name/:version/settings',
     '/modules/:name/:version/docs'
   ], async (req, res) => {
-    const {user, servers, workspace} = await new Promise(async resolve => {
-      const {token} = req.cookie;
-      if (token) {
-        try {
-          const [user, workspace] = await Promise.all([ // TODO: consolidate
-            api('/user', {token}),
-            api('/workspace', {token})
-          ]);
-          if (!user.response.ok)
-            throw new Error(user.data.error);
-          const servers = user.data.plan == 'pro' // TODO
-            ? await api('/servers', {token})
-            : {data: {servers: []}};
-          return resolve({
-            user: user.data,
-            servers: servers.data.servers,
-            workspace: workspace.data
-          });
-        } catch (e) {
-          console.error(e);
+    const {token} = req.cookie;
+    try {
+      const {user, servers, workspace} = await new Promise(async (resolve, reject) => {
+        if (token) {
+          try {
+            const [user, workspace] = await Promise.all([ // TODO: consolidate
+              api('/user', {token}),
+              api('/workspace', {token})
+            ]);
+            const {servers} = user.plan == 'pro' // TODO
+              ? await api('/servers', {token})
+              : {servers: []};
+            return resolve({user, servers, workspace});
+          } catch (e) {
+            reject(e);
+          }
         }
-      }
-      db.get('', false, function(path) {
-        // apps,modules,sessions/<name>/versions/<#>/code,config,dependencies,published/<#>
-        return [
-          function(key) { if (key != 'apps' && key != 'modules') return 'skip'; },
-          true, true, true,
-          function(key) { if (key != 'published') return 'skip'; },
-          true
-        ][path.length] || false;
-      }).then(function(data) {
-        resolve({
-          workspace: Object.entries(data || {}).reduce((groups, [name, group]) => ({
-            ...groups,
-            [name]: Object.entries(group).reduce((entries, [name, entry]) => ({
-              ...entries,
-              [name]: {
-                versions: entry.versions.map(
-                  version => ({minor: version.published.length - 1})
-                )
-              }
+        db.get('', false, function(path) {
+          // apps,modules/<name>/versions/<#>/code,config,dependencies,published/<#>
+          return [
+            key => key == 'apps' || key == 'modules' || 'skip',
+            true, true, true,
+            key => key == 'published' || 'skip',
+            true
+          ][path.length] || false;
+        }).then(function(data) {
+          resolve({
+            workspace: Object.entries(data || {}).reduce((groups, [name, group]) => ({
+              ...groups,
+              [name]: Object.entries(group).reduce((entries, [name, entry]) => ({
+                ...entries,
+                [name]: {
+                  versions: entry.versions.map(
+                    version => version.published.length
+                  )
+                }
+              }), {})
             }), {})
-          }), {})
+          });
         });
       });
-    });
-    res.end(o.html.markup([
-      {'!doctype': {html: null}},
-      {html: [
-        {head: [
-          {title: 'Simpl.js'},
-          {meta: {charset: 'utf-8'}},
-          {meta: {name: 'viewport', content: 'width=device-width, initial-scale=1.0, user-scalable=no'}},
-          {link: {rel: 'stylesheet', href: '/codemirror.css'}},
-          {link: {rel: 'stylesheet', href: '/console.css'}},
-          {link: {rel: 'stylesheet', href: '/jsonv.css'}}
-        ]},
-        {body: {class: 'console', children: [
-          {div: {id: 'root'}},
-          {script: {src: '/react.js'}},
-          {script: {src: '/codemirror.js'}},
-          {script: {src: '/jsonv.js'}},
-          {script: {src: '/jshint.js'}},
-          {script: {src: '/console.js'}},
-          {script: Object.assign(function(props) {
-            Object.keys(components).forEach(function(name) {
-              var component = components[name],
-                  render = component.render;
-              component.render = function() {
-                return function jsx(node) {
-                  if (!Array.isArray(node)) return node;
-                  var type = node[0], props, children;
-                  if (!type || Array.isArray(type)) {
-                    type = React.Fragment;
-                    children = node;
-                  } else if (typeof node[1] == 'object' && !Array.isArray(node[1])) {
-                    props = node[1];
-                    children = node.slice(2);
-                  } else {
-                    children = node.slice(1);
-                  }
-                  return React.createElement.apply(null, [type, props].concat(children.map(jsx)));
-                }(render.call(this));
-              };
-              components[name] = createReactClass(component);
-            });
-            ReactDOM.render(
-              React.createElement(components.console, props),
-              document.getElementById('root')
-            );
-          }, {
-            args: [{
-              token: req.cookie.token || csrf,
-              login: user,
-              loginUrl: '/login',
-              baseApiUrl,
-              local: true,
-              servers,
-              workspace,
-            }]
-          })}
-        ]}}
-      ]}
-    ]), 'html');
+      res.end(o.html.markup([
+        {'!doctype': {html: null}},
+        {html: [
+          {head: [
+            {title: 'Simpl.js'},
+            {meta: {charset: 'utf-8'}},
+            {meta: {name: 'viewport', content: 'width=device-width, initial-scale=1.0, user-scalable=no'}},
+            {link: {rel: 'stylesheet', href: '/codemirror.css'}},
+            {link: {rel: 'stylesheet', href: '/console.css'}},
+            {link: {rel: 'stylesheet', href: '/jsonv.css'}}
+          ]},
+          {body: {class: 'console', children: [
+            {div: {id: 'root'}},
+            {script: {src: '/react.js'}},
+            {script: {src: '/codemirror.js'}},
+            {script: {src: '/jsonv.js'}},
+            {script: {src: '/jshint.js'}},
+            {script: {src: '/console.js'}},
+            {script: Object.assign(function(props) {
+              Object.keys(components).forEach(function(name) {
+                var component = components[name],
+                    render = component.render;
+                component.render = function() {
+                  return function jsx(node) {
+                    if (!Array.isArray(node)) return node;
+                    var type = node[0], props, children;
+                    if (!type || Array.isArray(type)) {
+                      type = React.Fragment;
+                      children = node;
+                    } else if (typeof node[1] == 'object' && !Array.isArray(node[1])) {
+                      props = node[1];
+                      children = node.slice(2);
+                    } else {
+                      children = node.slice(1);
+                    }
+                    return React.createElement.apply(null, [type, props].concat(children.map(jsx)));
+                  }(render.call(this));
+                };
+                components[name] = createReactClass(component);
+              });
+              ReactDOM.render(
+                React.createElement(components.console, props),
+                document.getElementById('root')
+              );
+            }, {
+              args: [{
+                token: token || csrf,
+                login: user,
+                loginUrl: '/login',
+                baseApiUrl,
+                local: true,
+                servers,
+                workspace,
+              }]
+            })}
+          ]}}
+        ]}
+      ]), 'html');
+    } catch (e) {
+      return token
+        ? res.generic(302, {'Set-Cookie': 'token=; Expires=' + new Date().toUTCString(), Location: '/'})
+        : res.end('Error: ' + e.message, 500);
+    }
   });
 
   app.get(['/console.css', '/jsonv.css'], async (req, res) => {
@@ -462,12 +450,10 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
   }, {bodyFormat: 'utf8', bodyMaxLength: 1048576});
 
   // delete module
-  app.delete(['/apps/:name/:version', '/modules/:name/:version'], (req, res) => {
+  app.delete(['/apps/:name', '/modules/:name'], (req, res) => {
     const type = req.path.split('/')[1];
-    const {name, version} = req.params;
-    if (version != '1') return res.error('Only unpublished modules can be deleted');
+    const {name} = req.params;
     db.delete([type, name]).then(function() {
-      // Delete only possible on local workspace for unpublished module
       if (type == 'apps') delete logs[stop('', name, 1)];
       res.ok();
     });
@@ -536,7 +522,7 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
     if (!session) return res.generic(400);
     delete logins[state];
     try {
-      const {data} = await api('/token', {
+      const data = await api('/token', {
         method: 'post',
         body: query({
           client_id: 'simpljs',
@@ -550,9 +536,7 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
         {'!doctype': {html: null}},
         {script: Object.assign(function(response) {
           if (parent) parent.postMessage(response, location.origin);
-        }, {
-          args: [data]
-        })}
+        }, {args: [data]})}
       ]), 'html');
     } catch (e) {
       res.generic(500);
@@ -577,7 +561,7 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
     const {token, body: {command, app, version}} = req;
     if (!token) return res.generic(401);
     try {
-      const user = token == csrf ? '' : (await api('/user', {token})).data.username;
+      const user = token == csrf ? '' : (await api('/user', {token})).username;
       if (command == 'stop' || command == 'restart')
         stop(user, app, version);
       if (command == 'run' || command == 'restart')
@@ -601,10 +585,7 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
       if (!token) return connection.close(4001, 'Forbidden');
       const id = res.socket.socketId;
       let user;
-      (token == csrf
-        ? Promise.resolve({data: {}})
-        : api('/user', {token})
-      ).then(({data: {username, plan}}) => {
+      (token == csrf ? Promise.resolve({}) : api('/user', {token})).then(({username, plan}) => {
         if (plan == 'pro') { // TODO: boolean for connection support instead of plan string
           const remote = new WebSocket(baseApiUrl.replace(/^http/, 'ws')+'/connect?access_token='+token);
           remote.onmessage = e => {
@@ -625,7 +606,7 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
       return function(data) {
         if (user == null) return; // client should not issue a command until 'connect' event is sent
         try {
-          const {command, app, version, token} = JSON.parse(data) || {};
+          const {command, app, version} = JSON.parse(data) || {};
           if (command == 'connect') {
             clients[id] = {connection, user};
             connection.socket.onDisconnect = () => delete clients[id];

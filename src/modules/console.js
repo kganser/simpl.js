@@ -568,6 +568,7 @@ simpl.add('console', function(modules) {
           '.jsonv': {
             display: 'inline-block',
             verticalAlign: 'top',
+            color: 'black'
           }
         },
         '#settings': { //-
@@ -939,7 +940,7 @@ simpl.add('console', function(modules) {
         }
       }
     },
-    component: function() {
+    component: function(site) {
       const capital = str => str[0].toUpperCase() + str.substr(1);
       const diff = function() { //-
         var buildValues = (components, newString, oldString) => {
@@ -1336,11 +1337,16 @@ simpl.add('console', function(modules) {
           });
         };
       }();
-      const url = ({app, id, version}) => [
+      const url = ({app, id, version, query}, ...rest) => [
         app ? '/apps' : '/modules',
         encodeURIComponent(id),
-        ...(version ? [version] : [])
-      ].join('/');
+        ...(version ? [version] : []),
+        ...rest.map(encodeURIComponent)
+      ].join('/') + (
+        '?' + Object.entries(query || {}).map(
+          (name, value) => name + '=' + encodeURIComponent(value)
+        ).join('&')
+      ).replace(/\?$/, '');
       return {
         getInitialState: function() { //-
           const {login, token, workspace: {apps, modules}} = this.props;
@@ -1352,10 +1358,10 @@ simpl.add('console', function(modules) {
               entry.id = id;
               entry.name = name;
               entry.source = source;
-              entry.versions = Object.entries(entry.versions).reduce((versions, [major, version]) => ({
+              entry.versions = Object.entries(entry.versions).reduce((versions, [major, published]) => ({
                 ...versions,
                 [owned ? +major + 1 : major]: {
-                  ...version,
+                  minor: published - 1,
                   ...(entries == modules ? {} : {log: []})
                 }
               }), {});
@@ -1374,6 +1380,7 @@ simpl.add('console', function(modules) {
           };
         },
         componentDidMount: function() {
+          if (!self.components) self.components = site.components;
           this.connect();
           window.addEventListener('beforeunload', e => {
             if (this.dirty() && !this.unloading)
@@ -1456,17 +1463,18 @@ simpl.add('console', function(modules) {
                 this.setStatus('error', error_description || error);
                 this.processLogin = this.abortLogin = this.pendinglogin = null;
               } else {
-                const {username} = this.state.login || {};
+                const {user} = this.state.login || {};
                 // TODO: fetch /user server-side from callback endpoint
                 const login = await fetch(this.props.baseApiUrl + '/user', {
                   headers: {Authorization: 'Bearer ' + token}
                 }).then(response => response.json());
                 this.processLogin = this.abortLogin = this.pendinglogin = null;
                 document.cookie = 'token=' + token + '; Path=/';
-                if (username == login.username) {
+                if (user == login.username) {
                   this.setState({login, modal: null, token}, () => resolve(token));
                 } else {
                   if (!this.dirty() || confirm('You have unsaved changes. Continue logging in as ' + login.username + '?')) {
+                    // TODO: update without reloading
                     this.unloading = true;
                     return location.reload();
                   }
@@ -1679,9 +1687,10 @@ simpl.add('console', function(modules) {
           this.updateVersion(current, {publishing: true});
           this.setStatus('info', 'Publishing...');
           try {
-            await this.request(upgrade
-              ? url({app, id}) + '?source=' + version
-              : url(current), {method: 'POST'});
+            await this.request(
+              url(upgrade ? {app, id, query: {source: version}} : current),
+              {method: 'post'}
+            );
             this.setStatus('success', 'Published');
             if (upgrade) {
               let newVersion;
@@ -1731,7 +1740,7 @@ simpl.add('console', function(modules) {
           if (!name) throw new Error('Aborted');
           this.setStatus('info', 'Copying linked ' + type + '...');
           // TODO: use pegged minor version
-          await this.request(url(current) + '?name=' + encodeURIComponent(name), {method: 'POST'});
+          await this.request(url({...current, query: {name}}), {method: 'post'});
           this.setStatus('success', 'Copied successfully');
           return new Promise(resolve =>
             this.setState({
@@ -1770,7 +1779,7 @@ simpl.add('console', function(modules) {
           this.setStatus('info', 'Deleting ' + type + '...');
           try {
             // TODO: only unpublished modules can be deleted (if owned) -- no version number
-            await this.request(url(current), {method: 'DELETE'});
+            await this.request(url(id.includes('@') ? current : {app, id}), {method: 'delete'});
             this.setStatus('success', 'Deleted');
             this.setState(state => {
               const {[id]: entry, ...group} = state[type + 's'];
@@ -1819,8 +1828,10 @@ simpl.add('console', function(modules) {
         },
         navigate: function(item, panel, line) { //-
           return new Promise(resolve => {
+            const baseUrl = this.props.baseUrl || '';
             if (!item) {
-              if (location.pathname != '/') window.history.pushState(null, null, '/');
+              const homeUrl = baseUrl || '/';
+              if (location.pathname != homeUrl) window.history.pushState(null, null, homeUrl);
               document.title = 'Simpl.js';
               return this.setState({current: null, panel: null}, resolve);
             }
@@ -1884,7 +1895,7 @@ simpl.add('console', function(modules) {
                 } else if (panel == 'log') {
                   this.scrollLogs();
                 }
-                const path = url(item) + '/' + panel;
+                const path = baseUrl + url(item, panel);
                 if (location.pathname != path) window.history.pushState(null, null, path);
                 document.title = entry.name;
               }
@@ -2046,7 +2057,7 @@ simpl.add('console', function(modules) {
               const current = await this.fork();
               this.setStatus('info', 'Saving...');
               const code = editor.getValue();
-              await this.request(url(current), {method: 'PUT', body: code});
+              await this.request(url(current), {method: 'put', body: code});
               this.setStatus('success', 'Saved');
               this.updateVersion(current, {code, dirty: false});
             } catch (e) {
@@ -2075,6 +2086,7 @@ simpl.add('console', function(modules) {
             modal
           } = this.state;
 
+          const baseUrl = this.props.baseUrl || '';
           const {current, entry, version} = this.getCurrent();
           const {loading, hidden, code} = version || {};
           const {app, id, version: major} = current || {};
@@ -2122,17 +2134,17 @@ simpl.add('console', function(modules) {
                 servers.length == 1
                   ? servers[0].name
                   : ['div', {className: 'select'},
-                    ['select', {
-                      value: server,
-                      onChange: e => this.setState({
-                        server: e.target.value,
-                        // TODO: remove disconnected server after switching off of it
-                        servers: this.state.servers.filter(server => !server.disabled)
-                      }, () => this.send('connect'))
-                    }, ...servers.map(({id, name, disabled}) =>
-                      ['option', {value: id, disabled}, name]
-                    )]
-                  ]
+                      ['select', {
+                        value: server,
+                        onChange: e => this.setState({
+                          server: e.target.value,
+                          // TODO: remove disconnected server after switching off of it
+                          servers: this.state.servers.filter(server => !server.disabled)
+                        }, () => this.send('connect'))
+                      }, ...servers.map(({id, name, disabled}) =>
+                        ['option', {value: id, disabled}, name]
+                      )]
+                    ]
               ],
               connection.message && ['div', {id: 'connection', className: connection.status},
                 ['span', connection.message],
@@ -2257,7 +2269,7 @@ simpl.add('console', function(modules) {
                             ['a', {
                               className: 'name',
                               title: versionLabel ? name + ' ' + versionLabel : name,
-                              href: url(item) + (app ? '/code' : '/docs'),
+                              href: baseUrl + url(item, app ? 'code' : 'docs'),
                               onClick: e => {
                                 if (e.which > 1 || e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) return;
                                 e.preventDefault();
@@ -2383,12 +2395,12 @@ simpl.add('console', function(modules) {
                     moduleSearch && ['ul', {className: 'suggest'},
                       ...Object.values(modules).reduce((results, {id, name, source, versions}) => { //-
                         if (name.toLowerCase().includes(moduleSearch.toLowerCase()) && (app || id != current.id)) {
-                          const installedVersion = (version.dependencies || {})[id];
-                          Object.keys(versions).forEach(version => {
-                            if (!source && installedVersion != 1 - version)
-                              results.push({name: id, version: 1 - version}); // current
-                            if (versions[version].minor >= 0 && installedVersion != version)
-                              results.push({name: id, version: +version}); // published
+                          const installedVersion = version.dependencies[id];
+                          Object.entries(versions).forEach(([major, {minor}]) => {
+                            if (!source && installedVersion != 1 - major)
+                              results.push({name: id, version: 1 - major}); // current
+                            if (minor >= 0 && installedVersion != major)
+                              results.push({name: id, version: +major}); // published
                           });
                         }
                         return results;
@@ -2400,8 +2412,8 @@ simpl.add('console', function(modules) {
                               this.setState({moduleSearch: ''});
                               try {
                                 const current = await this.fork();
-                                await this.request(url(current) + '/dependencies', {
-                                  method: 'POST',
+                                await this.request(url(current, 'dependencies'), {
+                                  method: 'post',
                                   body: JSON.stringify({name, version})
                                 });
                                 this.updateVersion(current, ({dependencies}) => ({
@@ -2431,8 +2443,8 @@ simpl.add('console', function(modules) {
                             // TODO: disable button
                             try {
                               const current = await this.fork();
-                              await this.request(url(current) + '/dependencies/' + encodeURIComponent(id), {
-                                method: 'DELETE'
+                              await this.request(url(current, 'dependencies', id), {
+                                method: 'delete'
                               });
                               this.updateVersion(current, ({dependencies}) => ({
                                 dependencies: Object.keys(dependencies).reduce((dependencies, key) => ({
@@ -2448,11 +2460,8 @@ simpl.add('console', function(modules) {
                         ['span', {className: 'name'},
                           name,
                           ['span', {className: 'version'},
-                            ...(version ?
-                              version > 0 ?
-                                source ? [this.icon('link'), source + ' v' + version] : ['v' + version]
-                                : ['v' + (1 - version) + ' current']
-                              : [])
+                            ...(source ? [this.icon('link'), source + ' '] : []),
+                            this.dependencyVersionLabel(name, version)
                           ]
                         ]
                       ];
@@ -2470,8 +2479,8 @@ simpl.add('console', function(modules) {
                         const config = instance.update(type, path, value);
                         this.updateVersion(current, {config});
                         try {
-                          await this.request(url(current) + '/config', {
-                            method: 'PUT',
+                          await this.request(url(current, 'config'), {
+                            method: 'put',
                             body: JSON.stringify(config)
                           });
                         } catch (e) {
@@ -2513,7 +2522,7 @@ simpl.add('console', function(modules) {
                             });
                             let data = {};
                             try {
-                              data = await this.request(url(current) + '/' + minor);
+                              data = await this.request(url(current, minor));
                             } catch (e) {
                               this.setStatus('error', e.message);
                             }
@@ -2538,7 +2547,7 @@ simpl.add('console', function(modules) {
                       ['h3', 'Dependencies'],
                       this.renderDiff('dependencies', diffEntries.map(version =>
                         Object.entries(version.dependencies).map(
-                          ([name, version]) => name + this.dependencyVersionLabel(name, version)
+                          ([name, version]) => name + ' ' + this.dependencyVersionLabel(name, version)
                         ).join('\n')
                       )),
                       app && [
@@ -2552,7 +2561,7 @@ simpl.add('console', function(modules) {
                     ]
                 ]
               ],
-              app && ['pre', {id: 'log'},
+              app ? ['pre', {id: 'log'},
                 ...version.log.map(({level, message, module, version, line}) =>
                   ['div', {className: 'entry ' + (level == 'log' ? 'debug' : level)},
                     ['div', {
@@ -2593,10 +2602,9 @@ simpl.add('console', function(modules) {
                     ]
                   ]
                 )
-              ],
-              ['div', {id: 'docs'},
+              ] : ['div', {id: 'docs'},
                 ['h1', entry && entry.name],
-                ...(app || !code ? [] : this.renderDocs(code))
+                ...(code ? this.renderDocs(code) : [])
               ],
               status && ['div', {id: 'status', className: status.type}, status.message],
               modal && ['div', {
