@@ -1,3 +1,4 @@
+/* global simpl, chrome, components, React, ReactDOM, createReactClass */
 simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, string: 0, system: 0, webapp:0, websocket: 0}, function(o, proxy) {
 
   var server, loader, lines, workspace,
@@ -163,11 +164,6 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
     loader = values.join('');
     lines = loader.match(/\n/g).length;
   });
-  fetch('/icons.json').then(function(r) { return r.json(); }).then(function(r) {
-    icons = Object.keys(r).map(function(name) {
-      return {symbol: {id: 'icon-'+name, viewBox: '0 0 20 20', children: {path: {d: r[name]}}}};
-    });
-  });
   fetch('/workspace.json').then(function(r) { return r.json(); }).then(function(r) {
     workspace = r;
     restore(function() {});
@@ -183,28 +179,8 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
           return handler(req, res);
         res.generic(401);
       }, method, options);
-    }
+    };
   }(app.request);
-
-  const updateConsole = () => !debug || o.console.exp > Date.now() ||
-    (o.console.next = o.console.next || new Promise(resolve => {
-      console.log('fetching updated console module');
-      const items = {console: 1, jsonv: 1};
-      simpl = {
-        add: (name, mod) => {
-          if (name in items) {
-            o[name] = {...mod(), exp: Date.now()+1000};
-            items[name]();
-          }
-        }
-      };
-      Promise.all(Object.keys(items).map(name => new Promise(resolve => {
-        const script = document.createElement('script');
-        script.src = '/modules/' + name + '.js';
-        document.head.appendChild(script);
-        items[name] = resolve;
-      }))).then(resolve);
-    }));
 
   app.get([
     '/',
@@ -217,20 +193,17 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
   ], async (req, res) => {
     const {token} = req.cookie;
     try {
-      const {user, servers, workspace} = await new Promise(async (resolve, reject) => {
+      const {user, servers, workspace} = await new Promise((resolve, reject) => {
         if (token) {
-          try {
-            const [user, workspace] = await Promise.all([ // TODO: consolidate
-              api('/user', {token}),
-              api('/workspace', {token})
-            ]);
-            const {servers} = user.plan == 'pro' // TODO
-              ? await api('/servers', {token})
-              : {servers: []};
-            return resolve({user, servers, workspace});
-          } catch (e) {
-            reject(e);
-          }
+          return Promise.all([ // TODO: consolidate
+            api('/user', {token}),
+            api('/workspace', {token})
+          ]).then(
+            ([user, workspace]) =>
+              user.plan == 'pro'
+                ? api('/servers', {token}).then(({servers}) => ({user, workspace, servers}))
+                : {user, workspace, servers: []}
+          ).then(resolve, reject);
         }
         db.get('', false, function(path) {
           // apps,modules/<name>/versions/<#>/code,config,dependencies,published/<#>
@@ -323,13 +296,11 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
 
   app.get(['/console.css', '/jsonv.css'], async (req, res) => {
     const name = req.path.substr(1).split('.')[0];
-    if (name == 'console') await updateConsole();
     res.end(o.html.css(o[name].style), 'css');
   });
 
   app.get(['/console.js', '/jsonv.js'], async (req, res) => {
     const name = req.path.substr(1).split('.')[0];
-    if (name == 'console') await updateConsole();
     res.end('(components = window.components || {}).' + name + ' = ' + o[name].component + '();', 'js');
   });
 
@@ -345,7 +316,7 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
       if (module && !current) module = module.published.pop();
       if (!module) return res.generic(404);
       res.end(wrap(name, module.code, version, module.dependencies), 'js');
-    })
+    });
   });
 
   // publish major
