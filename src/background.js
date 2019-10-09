@@ -1,13 +1,14 @@
 /* global simpl, chrome, components, React, ReactDOM, createReactClass */
-simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, string: 0, system: 0, webapp:0, websocket: 0}, function(o, proxy) {
+simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, string: 0, system: 0, webapp:0, websocket: 0}, (o, proxy) => {
 
-  var server, loader, lines, workspace,
-      db = o.database.open('simpl'),
-      encode = o.string.base64FromBuffer,
-      baseSiteUrl = 'https://simpljs.com',
-      baseApiUrl = baseSiteUrl.replace('://', '://api.'),
-      apps = {}, logs = {}, clients = {}, logins = {},
-      csrf, ping, localApiPort, debug;
+  const db = o.database.open('simpl');
+  const encode = o.string.base64FromBuffer;
+  const baseSiteUrl = 'https://simpljs.com';
+  const baseApiUrl = baseSiteUrl.replace('://', '://api.');
+  const apps = {}, logs = {}, logins = {};
+
+  let server, loader, lines, workspace, csrf, ping, localApiPort, debug;
+  let clients = {};
 
   const query = o => Object.entries(o).map(([key, value]) =>
     value !== undefined &&
@@ -28,82 +29,82 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
     if (!response.ok) throw new Error(data && data.error || response.statusText);
     return data;
   };
-  var restore = function(callback, scope, sparse) {
+  const restore = async (scope, sparse) => {
     if (!scope)
-      return db.get('apps', false, 'shallow').get('modules', 'shallow').then(function(apps, mods) {
-        if (apps && mods) return callback();
-        restore(callback, apps ? 'modules' : mods ? 'apps' : 'both');
-      });
-    var data = {apps: {}, mods: {}}, pending = 0;
-    workspace.forEach(function(item) {
-      if (scope != 'both' && scope == 'apps' == !item.file) return;
-      pending++;
-      fetch((item.file ? '/apps/'+item.file : '/modules/'+item.name)+'.js').then(function(r) { return r.text(); }).then(function(code) {
-        if (item.file) {
-          data.apps[item.name] = {versions: [{
-            code: code,
-            config: item.config || {},
-            dependencies: item.dependencies || {},
+      return new Promise(resolve =>
+        db.get('apps', false, 'shallow').get('modules', 'shallow').then((apps, mods) => {
+          if (apps && mods) return resolve();
+          restore(apps ? 'modules' : mods ? 'apps' : 'both').then(resolve);
+        })
+      );
+    const items = await Promise.all(workspace.filter(
+      item => scope == 'both' || !item.file == (scope == 'modules')
+    ).map(({file, name, config = {}, dependencies, proxy}) =>
+      fetch((file ? '/apps/' + file : '/modules/' + name) + '.js')
+        .then(r => r.text())
+        .then(code => ({
+          app: !!file,
+          name,
+          versions: [{
+            code: file ? code
+              : 'function(modules' + (proxy ? ', proxy' : '') + ') {\n' + code.trim().split(/\n/).slice(1, -1).join('\n') + '\n}',
+            ...(file && {config}),
+            dependencies,
             published: []
-          }]};
-        } else {
-          data.mods[item.name] = {versions: [{
-            code: 'function(modules'+(item.proxy ? ', proxy' : '')+') {\n'+code.trim().split(/\n/).slice(1, -1).join('\n')+'\n}',
-            dependencies: item.dependencies || {},
-            published: []
-          }]};
-        }
-        if (!--pending) {
-          var trans = db;
-          if (scope != 'modules') {
-            Object.keys(apps).forEach(function(id) { stop.apply(null, id.split('@')); });
-            trans = sparse
-              ? Object.keys(data.apps).reduce(function(t, name) { return t.put('apps/'+encodeURIComponent(name), data.apps[name]); }, trans)
-              : trans.put('apps', data.apps);
-          }
-          if (scope != 'apps')
-            trans = sparse
-              ? Object.keys(data.mods).reduce(function(t, name) { return t.put('modules/'+encodeURIComponent(name), data.mods[name]); }, trans)
-              : trans.put('modules', data.mods);
-          trans.then(callback);
-        }
-      });
+          }]
+        }))
+    ));
+    return new Promise(resolve => {
+      let txn = db;
+      if (sparse) {
+        items.forEach(({app, name, versions}) => {
+          txn = txn.put([app ? 'apps' : 'modules', name], {versions});
+        });
+      } else {
+        if (scope != 'modules')
+          txn = txn.put('apps', items.filter(item => item.app).reduce((data, {name, versions}) => ({
+            ...data,
+            [name]: {versions}
+          }), {}));
+        if (scope != 'apps')
+          txn = txn.put('modules', items.filter(item => !item.app).reduce((data, {name, versions}) => ({
+            ...data,
+            [name]: {versions}
+          }), {}));
+      }
+      txn.then(resolve);
     });
   };
-  var wrap = function(name, code, version, dependencies) {
-    return 'simpl.add(' + [JSON.stringify(name), code, version, JSON.stringify(dependencies)] + ');';
-  };
-  var send = function(connection, event, data) {
-    connection.send(JSON.stringify({event: event, data: data}), function(info) {
+  const wrap = (name, code, version, dependencies) =>
+    'simpl.add(' + [JSON.stringify(name), code, version, JSON.stringify(dependencies)] + ');';
+  const send = (connection, event, data) =>
+    connection.send(JSON.stringify({event: event, data: data}), info => {
       if (info.error) delete clients[connection.socket.socketId];
     });
-  };
-  var broadcast = function(event, data, user) {
-    if (debug) console.log(event+' '+JSON.stringify(data));
-    Object.keys(clients).forEach(function(socketId) {
-      var client = clients[socketId];
+  const broadcast = (event, data, user) => {
+    if (debug) console.log(event + ' ' + JSON.stringify(data));
+    Object.values(clients).forEach(client => {
       if (client.user == user) send(client.connection, event, data);
     });
   };
-  var state = function(user, connection) {
-    send(connection, 'state', Object.keys(apps).reduce(function(apps, id) {
-      var i = id.indexOf('@');
-      if (id.substr(0, i) == user) apps.push(id.substr(i+1));
-      return apps;
+  const state = (user, connection) => {
+    send(connection, 'state', Object.keys(apps).reduce((apps, id) => {
+      const i = id.indexOf('@');
+      return id.substr(0, i) == user ? [...apps, id.substr(i + 1)] : apps;
     }, []));
-    Object.keys(logs).forEach(function(id) {
-      if (id.split('@', 1)[0] == user) logs[id].forEach(function(e) {
-        send(connection, e.fatal ? 'error' : 'log', e.fatal ? e.fatal : e);
-      });
+    Object.keys(logs).forEach(id => {
+      if (id.split('@')[0] == user) logs[id].forEach(e =>
+        send(connection, e.fatal ? 'error' : 'log', e.fatal ? e.fatal : e)
+      );
     });
   };
-  var run = async function(user, name, version, token) {
+  const run = async (user, name, version, token) => {
     const id = [user, name, version].join('@');
-    if (apps[id]) return;
     try {
       const {code, config, dependencies} = await (user
         ? api('/apps/' + encodeURIComponent(name) + '/' + version, {token})
-        : new Promise(resolve => db.get('apps/' + encodeURIComponent(name) + '/versions/' + (version - 1)).then(resolve)));
+        : new Promise(resolve => db.get(['apps', name, 'versions', version - 1]).then(resolve)));
+      if (apps[id]) return;
       logs[id] = [];
       apps[id] = proxy(null, [
         loader + 'var config = ' + JSON.stringify(config),
@@ -142,15 +143,16 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
       broadcast('error', {app: name, version, message: e.message}, user);
     }
   };
-  var stop = function(user, name, version) {
-    var id = [user, name, version].join('@');
-    if (!apps[id]) return id;
-    apps[id].terminate();
-    broadcast('stop', {app: name, version: version}, user);
-    delete apps[id];
+  const stop = (user, name, version) => {
+    const id = [user, name, version].join('@');
+    if (apps[id]) {
+      apps[id].terminate();
+      broadcast('stop', {app: name, version}, user);
+      delete apps[id];
+    }
     return id;
   };
-  var shutdown = function() {
+  const shutdown = () => {
     if (!server) return;
     server.disconnect();
     clients = {};
@@ -158,28 +160,27 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
     clearInterval(ping);
   };
   
-  Promise.all(['/simpl.js', '/loader.js'].map(function(file) {
-    return fetch(file).then(function(r) { return r.text(); });
-  })).then(function(values) {
+  Promise.all(['/simpl.js', '/loader.js'].map(file =>
+    fetch(file).then(r => r.text())
+  )).then(values => {
     loader = values.join('');
     lines = loader.match(/\n/g).length;
   });
-  fetch('/workspace.json').then(function(r) { return r.json(); }).then(function(r) {
-    workspace = r;
-    restore(function() {});
+  fetch('/workspace.json').then(r => r.json()).then(data => {
+    workspace = data;
+    restore(); // restore db if empty
   });
 
   const app = o.webapp();
 
   app.request = function(request) {
-    return (path, handler, method, options) => {
-      return request(path, (req, res) => {
+    return (path, handler, method, options) =>
+      request(path, (req, res) => {
         req.token = (req.headers.Authorization || '').replace(/^Bearer /i, '');
         if (method == 'GET' || options && options.auth == false || req.token == csrf)
           return handler(req, res);
         res.generic(401);
       }, method, options);
-    };
   }(app.request);
 
   app.get([
@@ -205,15 +206,13 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
                 : {user, workspace, servers: []}
           ).then(resolve, reject);
         }
-        db.get('', false, function(path) {
+        db.get('', false, path => [
           // apps,modules/<name>/versions/<#>/code,config,dependencies,published/<#>
-          return [
-            key => key == 'apps' || key == 'modules' || 'skip',
-            true, true, true,
-            key => key == 'published' || 'skip',
-            true
-          ][path.length] || false;
-        }).then(function(data) {
+          key => key == 'apps' || key == 'modules' || 'skip',
+          true, true, true,
+          key => key == 'published' || 'skip',
+          true
+        ][path.length] || false).then(data => {
           resolve({
             workspace: Object.entries(data || {}).reduce((groups, [name, group]) => ({
               ...groups,
@@ -362,7 +361,7 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
   app.post(['/apps/:name/:version', '/modules/:name/:version'], (req, res) => {
     const type = req.path.split('/')[1];
     const {name, version} = req.params;
-    const path = [type, name, 'versions', +version-1];
+    const path = [type, name, 'versions', +version - 1];
     db.get(path, true).then(function(version) {
       if (!version) return res.error('Version does not exist', 404);
       const {code, config, dependencies} = version;
@@ -384,7 +383,7 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
   app.get(['/apps/:name/:version', '/modules/:name/:version'], (req, res) => {
     const type = req.path.split('/')[1];
     const {name, version} = req.params;
-    db.get([type, name, 'versions', +version-1]).then(function(data) {
+    db.get([type, name, 'versions', +version - 1]).then(data => {
       if (!data) return res.error('Not found', 404);
       // TODO: change to {code, dependencies, config?, published: {minor, code, dependencies, config?}}
       data.published.slice(0, -1).forEach(version => {
@@ -398,7 +397,7 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
   app.get(['/apps/:name/:version/:minor', '/modules/:name/:version/:minor'], (req, res) => {
     const type = req.path.split('/')[1];
     const {name, version, minor} = req.params;
-    db.get([type, name, 'versions', +version - 1, 'published', +minor]).then(function(data) {
+    db.get([type, name, 'versions', +version - 1, 'published', +minor]).then(data => {
       if (!data) return res.error('Not found', 404);
       res.json(data);
     });
@@ -411,7 +410,7 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
     const version = +req.params.version || 0;
     const code = req.body;
     if (version <= 0 || version % 1) return res.error('Not found', 404);
-    db.put([type, name, 'versions', version-1, 'code'], code).then(function(error) { // TODO: check If-Match header
+    db.put([type, name, 'versions', version - 1, 'code'], code).then(function(error) { // TODO: check If-Match header
       if (!error) return res.ok();
       if (version > 1) return res.error('Module does not exist');
       const record = {code, dependencies: {}, published: []};
@@ -424,7 +423,7 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
   app.delete(['/apps/:name', '/modules/:name'], (req, res) => {
     const type = req.path.split('/')[1];
     const {name} = req.params;
-    db.delete([type, name]).then(function() {
+    db.delete([type, name]).then(() => {
       if (type == 'apps') delete logs[stop('', name, 1)];
       res.ok();
     });
@@ -461,9 +460,9 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
   });
 
   app.get('/login', async (req, res) => {
-    var verifier = crypto.getRandomValues(new Uint8Array(24)),
-        state = encode(crypto.getRandomValues(new Uint8Array(24)), true),
-        now = Date.now();
+    const verifier = crypto.getRandomValues(new Uint8Array(24));
+    const state = encode(crypto.getRandomValues(new Uint8Array(24)), true);
+    const now = Date.now();
     // clean up expired sessions
     Object.entries(logins).forEach(([state, login]) => {
       if (login.exp > now) delete logins[state];
@@ -474,15 +473,15 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
     };
     const hash = await crypto.subtle.digest('sha-256', verifier);
     res.generic(302, {
-      'Set-Cookie': 'state='+state+'; Path=/',
-      Location: baseSiteUrl+'/authorize?'+query({
+      'Set-Cookie': 'state=' + state + '; Path=/',
+      Location: baseSiteUrl + '/authorize?' + query({
         response_type: 'code',
         client_id: 'simpljs',
-        redirect_uri: 'http://localhost:'+port+'/auth',
+        redirect_uri: 'http://localhost:' + port + '/auth',
         state: state,
         code_challenge: encode(hash, true),
         code_challenge_method: 'S256'
-      })+'#confirm'
+      }) + '#confirm'
     });
   });
 
@@ -498,7 +497,7 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
         body: query({
           client_id: 'simpljs',
           grant_type: 'authorization_code',
-          redirect_uri: 'http://localhost:'+port+'/auth',
+          redirect_uri: 'http://localhost:' + port + '/auth',
           code_verifier: session.verifier,
           code
         })
@@ -516,16 +515,17 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
 
   app.get('/logout', (req, res) => {
     res.generic(302, {
-      'Set-Cookie': 'token=; Expires='+new Date().toUTCString(),
+      'Set-Cookie': 'token=; Expires=' + new Date().toUTCString(),
       Location: '/'
     });
   });
 
   app.get('/token', (req, res) => res.end(csrf));
 
-  app.post('/restore', (req, res) => {
+  app.post('/restore', async (req, res) => {
     const full = req.body.scope == 'full';
-    restore(res.ok, full ? 'both' : 'modules', !full);
+    await restore(full ? 'both' : 'modules', !full);
+    res.ok();
   }, {bodyFormat: 'url'});
 
   app.post('/action', async (req, res) => {
@@ -551,14 +551,14 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
   app.get('/connect', (req, res) => {
     // Simpl.js service can run apps on this instance scoped to a user account;
     // user-scoped state is returned from ws connection initiated by the instance
-    o.websocket.accept(req, res, function(connection) {
+    o.websocket.accept(req, res, connection => {
       const token = req.query.access_token;
       if (!token) return connection.close(4001, 'Forbidden');
       const id = res.socket.socketId;
       let user;
       (token == csrf ? Promise.resolve({}) : api('/user', {token})).then(({username, plan}) => {
         if (plan == 'pro') { // TODO: boolean for connection support instead of plan string
-          const remote = new WebSocket(baseApiUrl.replace(/^http/, 'ws')+'/connect?access_token='+token);
+          const remote = new WebSocket(baseApiUrl.replace(/^http/, 'ws') + '/connect?access_token=' + token);
           remote.onmessage = e => {
             if (typeof e.data == 'string' && e.data != 'ping')
               connection.send(e.data);
@@ -607,15 +607,15 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
   
   chrome.runtime.onSuspend.addListener(shutdown);
   
-  chrome.runtime.onConnect.addListener(function(launcher) {
-    launcher.onMessage.addListener(function(command) {
+  chrome.runtime.onConnect.addListener(launcher => {
+    launcher.onMessage.addListener(command => {
       if (command.action == 'stop') {
         shutdown();
         return launcher.postMessage({action: 'stop'});
       }
       
       csrf = encode(crypto.getRandomValues(new Uint8Array(24)), true);
-      o.http.serve({port: command.port}, function(req, res) {
+      o.http.serve({port: command.port}, (req, res) => {
 
         res.json = (data, status) => res.end(JSON.stringify(data), 'json', status);
         res.ok = () => res.json({status: 'success'});
@@ -631,17 +631,17 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
         
         return app.route(req, res) || res.generic(404);
         
-      }, function(error, s) {
+      }, (error, s) => {
         if (!error) {
           server = s;
           port = command.port;
-          ping = setInterval(function() {
-            Object.keys(clients).forEach(function(id) {
-              clients[id].connection.send('ping');
-            });
+          ping = setInterval(() => {
+            Object.values(clients).forEach(client =>
+              client.connection.send('ping')
+            );
           }, 30000);
         }
-        console.log('Simpl.js server - port '+command.port+' - '+(error ? error : 'running'));
+        console.log('Simpl.js server - port ' + command.port + ' - ' + (error ? error : 'running'));
         launcher.postMessage({error: error, action: 'start', port: port, path: path});
         path = '';
       });
@@ -653,30 +653,28 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
     }
   });
   
-  var ws, port, path = '', launcher = false;
+  let ws, port, path = '', launcher = false;
 
-  chrome.app.runtime.onLaunched.addListener(function(source) {
-    console.log('Simpl.js launched '+JSON.stringify(source));
-    var url = (source.url || '').match(/^https:\/\/simpljs\.com\/launch(\/.*)?/);
-    var onLauncher = function(callback, loaded) {
-      return function(x, fn) {
-        if (fn && loaded) fn();
-        else if (fn) callback = fn;
-        else if (callback) callback();
-        else loaded = true;
-      };
-    }();
-    var launch = function(args) {
-      if (!args) args = {};
-      var token = args.token,
-          user = args.user,
-          port = Math.max(+args.port, 0),
-          app = args.app && args.app.split('@'), // name@version
-          connections, client, retries = 0;
-      console.log('Simpl.js: launch '+JSON.stringify(args));
+  chrome.app.runtime.onLaunched.addListener(source => {
+    console.log('Simpl.js launched ' + JSON.stringify(source));
+    const url = (source.url || '').match(/^https:\/\/simpljs\.com\/launch(\/.*)?/);
+
+    let onLauncherLoad;
+    const launcherLoaded = new Promise(resolve => {
+      onLauncherLoad = resolve;
+    });
+
+    const launch = args => {
+      const {token, user} = args;
+      const port = Math.max(+args.port, 0);
+      const app = args.app && args.app.split('@'); // name@version
+      let connections, client, retries = 0;
       debug = 'debug' in args;
-      if (port && !server) onLauncher(null, function() {
-        var doc = launcher.contentWindow.document;
+
+      console.log('Simpl.js: launch ' + JSON.stringify(args));
+
+      if (port && !server) launcherLoaded.then(() => {
+        const doc = launcher.contentWindow.document;
         doc.getElementById('port').value = port;
         doc.launcher.onsubmit();
       });
@@ -684,16 +682,17 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
       if (token && user) {
         localApiPort = +args.localApiPort;
         (function connect() {
-          console.log('Simpl.js: attempting headless connection '+retries);
-          ws = new WebSocket((localApiPort ? 'ws://localhost:'+localApiPort : 'wss://'+baseApiUrl)+'/connect?access_token='+token);
-          ws.onopen = function() {
+          console.log('Simpl.js: attempting headless connection ' + retries);
+          ws = new WebSocket((localApiPort ? 'ws://localhost:' + localApiPort : 'wss://' + baseApiUrl) + '/connect?access_token=' + token);
+          ws.onopen = () => {
             console.log('Simpl.js: headless connection opened');
             connections = retries = 0;
             client = {user: user, connection: ws};
           };
-          ws.onmessage = function(e) {
-            try { var message = JSON.parse(e.data); } catch (e) { return; }
-            var command = message.command;
+          ws.onmessage = e => {
+            let message;
+            try { message = JSON.parse(e.data); } catch (e) { return; }
+            const {app, command, version} = message || {};
             if (command == 'connect') {
               if (!connections++)
                 clients[-1] = client;
@@ -705,11 +704,11 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
               return;
             }
             if (command == 'stop' || command == 'restart')
-              stop(user, message.app, message.version);
+              stop(user, app, version);
             if (command == 'run' || command == 'restart')
-              run(user, message.app, message.version, token);
+              run(user, app, version, token);
           };
-          ws.onclose = function() {
+          ws.onclose = () => {
             console.log('Simpl.js: headless connection closed');
             delete clients[-1];
             if (retries < 6) setTimeout(connect, (1 << retries++) * 1000);
@@ -721,15 +720,15 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
     };
     if (source.source != 'file_handler' && source.source != 'load_and_launch') {
       // TODO: restore login site -> app
-      path = url ? '/login?redirect='+encodeURIComponent(url[1] || '') : '';
+      path = url ? '/login?redirect=' + encodeURIComponent(url[1] || '') : '';
       if (launcher.focus) {
         if (!server) return launcher.focus();
-        chrome.browser.openTab({url: 'http://localhost:'+port+path});
+        chrome.browser.openTab({url: 'http://localhost:' + port + path});
         return path = '';
       }
     } else if (!ws && typeof require == 'function') {
       ws = true;
-      launch(require('nw.gui').App.argv.reduce(function(args, flag) {
+      launch(require('nw.gui').App.argv.reduce((args, flag) => {
         flag = flag.split('=');
         args[flag[0].replace(/^--?/, '')] = flag[1] || flag[1] == null;
         return args;
@@ -740,10 +739,10 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
       id: 'simpl',
       resizable: false,
       innerBounds: {width: 300, height: 100}
-    }, function(window) {
+    }, window => {
       launcher = window;
-      launcher.contentWindow.onload = onLauncher;
-      launcher.onClosed.addListener(function() {
+      launcher.contentWindow.onload = onLauncherLoad;
+      launcher.onClosed.addListener(() => {
         launcher = false;
       });
     });
