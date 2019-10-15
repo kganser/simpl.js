@@ -9,12 +9,13 @@ const WebSocket = require('ws');
 const platform = os.platform();
 const debuggerPort = 8122;
 const port = 8123;
-const base = 'http://localhost:' + port;
+const baseDir = __dirname + '/..';
+const baseUrl = 'http://localhost:' + port;
 
 const xvfb = platform != 'darwin' &&
   spawn('Xvfb', [':99', '-ac', '-screen', '0', '1280x720x16', '-nolisten', 'tcp']);
 
-const app = spawn(__dirname + '/../build/' + (
+const app = spawn(baseDir + '/build/' + (
   platform == 'darwin' ? 'macos/Simpl.js.app/Contents/MacOS/nwjs' : 'linux/Simpl.js/nw'
 ), [
   '--remote-debugging-port=' + debuggerPort,
@@ -62,7 +63,7 @@ getToken(5).then(async token => {
   if (!page) return;
 
   const request = (path, options) =>
-    fetch(base + path, {headers: {Authorization: 'Bearer ' + token}, timeout, ...options});
+    fetch(baseUrl + path, {headers: {Authorization: 'Bearer ' + token}, timeout, ...options});
 
   await request('/restore', {method: 'post', body: 'scope=full'}).then(response => {
     assert(response.ok, 'Reset workspace', 'Returned ' + response.status);
@@ -102,7 +103,7 @@ getToken(5).then(async token => {
 
   const load = url => {
     return next('Network.requestWillBeSent', result =>
-      result.request.url.split('?')[0] == base + url
+      result.request.url.split('?')[0] == baseUrl + url
     ).then(req =>
       next('Network.loadingFinished', result => result.requestId == req.requestId)
     );
@@ -117,7 +118,7 @@ getToken(5).then(async token => {
 
     const [last, next] = await Promise.all([
       new Promise((resolve, reject) =>
-        fs.createReadStream(__dirname + '/' + lastFile)
+        fs.createReadStream(baseDir + '/test/' + lastFile)
           .on('error', err => {
             if (err.code == 'ENOENT') {
               resolve();
@@ -151,20 +152,20 @@ getToken(5).then(async token => {
         assert(false, description, 'Comparing ' + lastFile + ' to ' + nextFile, [lastFile, nextFile]);
         return new Promise((resolve, reject) =>
           next.pack()
-            .pipe(fs.createWriteStream(__dirname + '/' + nextFile))
+            .pipe(fs.createWriteStream(baseDir + '/test/' + nextFile))
             .on('finish', resolve)
             .on('error', err => reject('Error writing to ' + nextFile + ': ' + err.code))
         );
       }
     } else if (next) {
       await new Promise((resolve, reject) =>
-        fs.mkdir(__dirname + '/snapshots', {recursive: true}, err => {
+        fs.mkdir(baseDir + '/test/snapshots', {recursive: true}, err => {
           if (!err || err.code == 'EEXIST') return resolve();
           reject('Error creating screenshots dir: ' + err.code);
         }));
       return new Promise((resolve, reject) =>
         next.pack()
-          .pipe(fs.createWriteStream(__dirname + '/' + lastFile))
+          .pipe(fs.createWriteStream(baseDir + '/test/' + lastFile))
           .on('error', err => reject('Error writing to ' + lastFile + ': ' + err.code))
           .on('finish', resolve)
       ).then(() => {
@@ -214,13 +215,13 @@ getToken(5).then(async token => {
     send('Network.enable')
   ]);
   await Promise.all([
-    send('Page.navigate', {url: base}),
+    send('Page.navigate', {url: baseUrl}),
     send('Emulation.setDeviceMetricsOverride', {width, height, deviceScaleFactor: 0, mobile: false}),
     send('Emulation.setVisibleSize', {width, height})
   ]);
   await next('Page.loadEventFired');
   await send('Runtime.evaluate', {expression: 'location.href'}).then(result => {
-    assert(result.result.value == base + '/', 'Page loaded');
+    assert(result.result.value == baseUrl + '/', 'Page loaded');
   });
 
   await next('Network.webSocketFrameReceived', result =>
@@ -330,7 +331,7 @@ getToken(5).then(async token => {
       ).then(response => {
         if (!response.ok) throw 'Update web server code: ' + response.status;
       });
-    await send('Page.navigate', {url: base + '/apps/Web%20Server/1/settings'});
+    await send('Page.navigate', {url: baseUrl + '/apps/Web%20Server/1/settings'});
     await load('/apps/Web%20Server/1');
     await send('Runtime.evaluate', {
       expression:
@@ -357,7 +358,7 @@ getToken(5).then(async token => {
   app.kill();
   if (xvfb) xvfb.kill();
 
-  fs.writeFile(__dirname + '/results.html',
+  fs.writeFile(baseDir + '/test/results.html',
     '<!doctype html>' +
     '<title>Simpl.js Test Results</title>' +
     '<style>' +
