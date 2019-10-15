@@ -19,7 +19,7 @@
   },
   "overrides": [
     {
-      "files": ["background.js"],
+      "files": ["src/background.js"],
       "globals": {
         "simpl": "readonly",
         "chrome": "readonly",
@@ -30,7 +30,7 @@
       }
     },
     {
-      "files": ["test/index.js"],
+      "files": ["bin/test.js"],
       "globals": {
         "__dirname": "readonly",
         "Buffer": "readonly",

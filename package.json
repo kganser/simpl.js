@@ -5,7 +5,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "test": "bin/test.js",
-    "lint": "eslint src/background.js test/index.js"
+    "lint": "eslint src/background.js bin/test.js"
   },
   "repository": {
     "type": "git",

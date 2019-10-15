@@ -11,15 +11,17 @@ const debuggerPort = 8122;
 const port = 8123;
 const base = 'http://localhost:' + port;
 
-const app = spawn(
-  platform == 'darwin' ? __dirname + '/../build/macos/Simpl.js.app/Contents/MacOS/nwjs'
-    : 'xvfb-run linux/Simpl.js/nw',
-  [
-    '--remote-debugging-port=' + debuggerPort,
-    '--port=' + port
-  ],
-  {shell: platform != 'darwin'}
-);
+const xvfb = platform != 'darwin' &&
+  spawn('Xvfb', [':99', '-ac', '-screen', '0', '1280x720x16', '-nolisten', 'tcp']);
+
+const app = spawn(__dirname + '/../build/' + (
+  platform == 'darwin' ? 'macos/Simpl.js.app/Contents/MacOS/nwjs' : 'linux/Simpl.js/nw'
+), [
+  '--remote-debugging-port=' + debuggerPort,
+  '--port=' + port
+], platform == 'darwin' ? undefined : {
+  env: {DISPLAY: ':99'}
+});
 
 const tests = [];
 const log = [];
@@ -351,7 +353,9 @@ getToken(5).then(async token => {
   const summary = tests.length + '/' + total + ' ran, ' + failures + ' failed';
   assert(pass, 'Tests passed', summary);
   process.exitCode = pass ? 0 : 1;
+
   app.kill();
+  if (xvfb) xvfb.kill();
 
   fs.writeFile(__dirname + '/results.html',
     '<!doctype html>' +
