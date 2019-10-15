@@ -36,7 +36,7 @@ app.on('error', console.error);
 const getToken = async i => {
   await new Promise(resolve => setTimeout(resolve, 1000));
   try {
-    const response = await fetch(base + '/token', {timeout});
+    const response = await fetch(baseUrl + '/token', {timeout});
     if (response.ok) return response.text();
   } catch (e) {
     // continue
