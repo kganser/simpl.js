@@ -1,4 +1,3 @@
-/* global simpl, chrome, components, React, ReactDOM, createReactClass */
 simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, string: 0, system: 0, webapp:0, websocket: 0}, (o, proxy) => {
 
   const db = o.database.open('simpl');
@@ -246,6 +245,7 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
             {script: {src: '/jsonv.js'}},
             {script: {src: '/jshint.js'}},
             {script: {src: '/console.js'}},
+            /* eslint-disable prefer-arrow-callback, no-var */
             {script: Object.assign(function(props) {
               Object.keys(components).forEach(function(name) {
                 var component = components[name],
@@ -283,6 +283,7 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
                 workspace,
               }]
             })}
+            /* eslint-enable */
           ]}}
         ]}
       ]), 'html');
@@ -365,7 +366,7 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
     db.get(path, true).then(function(version) {
       if (!version) return res.error('Version does not exist', 404);
       const {code, config, dependencies} = version;
-      if (Object.keys(dependencies).some(name => dependencies[name] < 1))
+      if (Object.values(dependencies || {}).some(version => version < 1))
         return res.error('All dependencies must be published modules');
       const published = version.published.pop();
       if (published && code == published.code &&
@@ -446,7 +447,8 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
     const d = req.body || {};
     if (version <= 0 || version % 1) return res.error('Not found', 404);
     if (!d.name || typeof d.version != 'number' || d.version % 1) return res.error('Invalid dependency');
-    db.get(['modules', d.name, 'versions', Math.abs(d.version)], true, 'shallow').then(function(exists) {
+    // -1 => v2 current [1], 0 => v1 current/unpublished [0], 1 => v1 published [0], 2 => v2 published [1]
+    db.get(['modules', d.name, 'versions', d.version > 0 ? d.version - 1 : -d.version], true, 'shallow').then(function(exists) {
       if (!exists) return res.error('Module not found');
       this.put([type, name, 'versions', version - 1, 'dependencies', d.name], d.version).then(res.ok);
     });
@@ -504,6 +506,7 @@ simpl.use({console: 0, crypto: 0, database: 0, html: 0, http: 0, jsonv: 0, strin
       });
       res.end(o.html.markup([
         {'!doctype': {html: null}},
+        // eslint-disable-next-line prefer-arrow-callback
         {script: Object.assign(function(response) {
           if (parent) parent.postMessage(response, location.origin);
         }, {args: [data]})}

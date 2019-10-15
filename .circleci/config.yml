@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: circleci/buildpack-deps:stable-curl
+      - image: circleci/node:10-stretch
     steps:
       - checkout
       - restore_cache:
@@ -18,9 +18,9 @@ jobs:
             - tmp
       - run:
           name: Run tests
-          command: make test
+          command: npm install && npm run test
       - store_test_results:
-          path: reports
+          path: test
       - store_artifacts:
-          path: reports
-          destination: reports
+          path: test
+          destination: test

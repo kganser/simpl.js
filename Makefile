@@ -1,4 +1,4 @@
-nwver := v0.33.4
+nwver := v0.41.2
 nwurl := https://dl.nwjs.io/$(nwver)
 
 all: chrome linux macos windows
@@ -38,11 +38,7 @@ windows:
 docker: build/linux/Simpl.js
 	cp -p docker/launch.sh build/linux/Simpl.js/
 	docker build -t kganser/simpljs:`sed -n 's/^ *"version": "\([^"]*\)", */\1/p' build/linux/Simpl.js/package.nw/manifest.json` -f docker/Dockerfile build/linux
-test:
-	if [ `uname` = 'Darwin' ]; then ./test.sh build/macos/Simpl.js.app/Contents/MacOS/nwjs; \
-	else xvfb-run ./test.sh build/linux/Simpl.js/nw; fi
-	test -f reports/test.js/junit.xml
 clean:
 	rm -rf build tmp
 
-.PHONY: all chrome linux macos windows docker test
+.PHONY: all chrome linux macos windows docker

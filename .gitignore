@@ -1,4 +1,6 @@
 .DS_Store
 build/
-reports/
+test/screenshots/*.new.png
+test/results.html
 tmp/
+node_modules/

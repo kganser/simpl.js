@@ -676,7 +676,6 @@ simpl.add('console', function(modules) {
         },
         '#config .jsonv': { //-
           padding: '4px 10px',
-          minHeight: '174px',
           overflowX: 'auto'
         },
         '.timeline': { //-

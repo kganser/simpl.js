@@ -1,0 +1,24 @@
+{
+  "name": "simpljs",
+  "version": "0.0.0",
+  "description": "Simpl.js",
+  "license": "UNLICENSED",
+  "scripts": {
+    "test": "bin/test.js",
+    "lint": "eslint src/background.js test/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kganser/simpl.js.git"
+  },
+  "engines": {
+    "node": ">=6.6.0"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "eslint": "^6.5.1",
+    "node-fetch": "^2.6.0",
+    "pngjs": "^3.4.0",
+    "ws": "^7.1.2"
+  }
+}

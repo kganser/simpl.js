@@ -5,6 +5,7 @@ function(modules) {
       passed++;
       console.log('✓ '+description);
     } else {
+      failed++;
       console.error('✗ '+description);
     }
     return test;
@@ -19,7 +20,7 @@ function(modules) {
     return compare(ka, Object.keys(b)) && !ka.some(function(k) { return !compare(a[k], b[k]); });
   };
   
-  var passed = 0, start = Date.now();
+  var passed = 0, failed = 0;
   
   new Promise(function(resolve) {
     var utf8 = modules.string.toUTF8Buffer,
@@ -498,6 +499,6 @@ function(modules) {
       });
     });
   }).then(function() {
-    assert(passed == 100, 'tests complete ('+passed+'/100 in '+(Date.now()-start)+'ms)');
+    assert(!failed && passed == 100, 'tests complete ('+passed+'/100, '+failed+' failed)');
   });
 }

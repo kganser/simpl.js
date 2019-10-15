@@ -1,0 +1,41 @@
+{
+  "env": {
+    "browser": true,
+    "commonjs": true,
+    "es6": true
+  },
+  "extends": "eslint:recommended",
+  "globals": {},
+  "parserOptions": {
+    "ecmaVersion": 2018
+  },
+  "rules": {
+    "no-var": "error",
+    "prefer-arrow-callback": "error",
+    "prefer-const": "error",
+    "quotes": ["error", "single"],
+    "semi": "error",
+    "space-infix-ops": "error"
+  },
+  "overrides": [
+    {
+      "files": ["background.js"],
+      "globals": {
+        "simpl": "readonly",
+        "chrome": "readonly",
+        "components": "writable",
+        "React": "readonly",
+        "ReactDOM": "readonly",
+        "createReactClass": "readonly"
+      }
+    },
+    {
+      "files": ["test/index.js"],
+      "globals": {
+        "__dirname": "readonly",
+        "Buffer": "readonly",
+        "process": "readonly"
+      }
+    }
+  ]
+}
