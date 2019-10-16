@@ -1,6 +1,7 @@
 .DS_Store
 build/
-test/screenshots/*.new.png
+test/snapshots/*.new.png
 test/results.html
+test/results.xml
 tmp/
 node_modules/

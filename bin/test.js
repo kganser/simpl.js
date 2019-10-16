@@ -31,6 +31,8 @@ const timeout = 10000;
 
 // TODO: code coverage
 // TODO: record app output
+// TODO: handle early app crash, ws disconnect
+
 app.on('error', console.error);
 
 const getToken = async i => {
@@ -47,7 +49,7 @@ const getToken = async i => {
 const assert = (pass, name, detail, images) => {
   console.log(pass ? '\x1b[32m✓\x1b[0m ' + name : '\x1b[31m✗\x1b[0m ' + name + '\n  ' + detail);
   log.push(pass ? '✓ ' + name : '✗ ' + name + '\n  ' + detail);
-  tests.push({name, pass, detail, images});
+  tests.push({name, pass: !!pass, detail, images});
 };
 
 getToken(5).then(async token => {
@@ -358,29 +360,72 @@ getToken(5).then(async token => {
   app.kill();
   if (xvfb) xvfb.kill();
 
+  const selfClosing = new Set(
+    'area base br col command embed hr img input keygen link meta param source track wbr'
+      .split(' '));
+  const escape = value =>
+    String(value).replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+  const markup = node => {
+    if (typeof node == 'string') return node;
+    if (!Array.isArray(node)) return '';
+    const [tag, ...children] = node;
+    if (Array.isArray(tag)) return node.map(markup).join('');
+    const attrs = (children[0] || '').constructor == Object
+      ? children.shift() : {};
+    return '<' + tag +
+      Object.entries(attrs).map(([name, value]) =>
+        value !== undefined && ' ' + name + (value == null ? ''
+          : '="' + value + '"')
+      ).filter(Boolean).join('') + '>' + (
+        selfClosing.has(tag) ? ''
+        : children.map(markup).join('') + '</' + tag + '>'
+      );
+  };
+  const css = styles =>
+    Object.entries(styles).map(([selector, props]) =>
+      selector + '{' + Object.entries(props).map(([name, value]) =>
+        name.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase() + ':' + value
+      ).join(';') + '}'
+    ).join('');
+
   fs.writeFile(baseDir + '/test/results.html',
-    '<!doctype html>' +
-    '<title>Simpl.js Test Results</title>' +
-    '<style>' +
-      '.test { padding-left: 1.5em }' +
-      '.test:before { display: inline-block; margin-left: -1.5em; width: 1.5em }' +
-      '.pass:before { content: "✓"; color: green }' +
-      '.fail:before { content: "✗"; color: red }' +
-      '.test img { width: 100%; max-width: 400px; margin: 10px 0 }' +
-    '</style>' +
-    '<h1>Simpl.js</h1>' +
-    '<h2>Tests</h2>' +
-    '<p>' + summary + '</p>' +
-    tests.map(({name, pass, detail, images}) =>
-      '<div class="test ' + (pass ? 'pass' : 'fail') + '">' + name +
-        (!pass && detail ? '<div class="detail">' + detail + '</div>' : '') +
-        '<div>' + (images || []).map(url => '<img src="' + url + '">').join(' ') + '</div>' +
-      '</div>').join('') +
-    '<hr><details><summary>Log</summary><pre>' +
-      log.join('\n\n') +
-    '</pre></details>',
+    '<!doctype html>' + markup([
+      ['title', 'Simpl.js Test Results'],
+      ['style', css({
+        '.test': {paddingLeft: '1.5em'},
+        '.test:before': {display: 'inline-block', marginLeft: '-1.5em', width: '1.5em'},
+        '.pass:before': {content: '"✓"', color: 'green'},
+        '.fail:before': {content: '"✗"', color: 'red'},
+        '.test img': {width: '100%', maxWidth: '400px', margin: '10px 0'}
+      })],
+      ['h1', 'Simpl.js'],
+      ['h2', 'Tests'],
+      ['p', summary],
+      ...tests.map(({name, pass, detail, images}) =>
+        ['div', {class: 'test ' + (pass ? 'pass' : 'fail')},
+          name,
+          !pass && detail && ['div', {class: 'detail'}, detail],
+          images && ['div', images.map(src => ['img', {src}])]
+        ],
+      ),
+      ['hr'],
+      ['details',
+        ['summary', 'Log'],
+        ['pre', escape(log.join('\n\n'))]
+      ]
+    ]),
     err => {
       if (err) console.error('Error writing to results.html: ' + err.code);
-      else console.log('Output to results.html');
+    });
+  fs.writeFile(baseDir + '/test/results.xml',
+    '<?xml version="1.0" encoding="UTF-8"?>' + markup([
+      ['testsuite', {tests: total},
+        ...tests.map(({name, pass, detail}) =>
+          ['testcase', {name}, pass || ['failure', {message: detail}]]
+        )
+      ]
+    ]),
+    err => {
+      if (err) console.error('Error writing to results.xml: ' + err.code);
     });
 });
