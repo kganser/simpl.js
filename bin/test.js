@@ -2,6 +2,7 @@
 const {spawn} = require('child_process');
 const os = require('os');
 const fs = require('fs');
+const readline = require('readline');
 const {PNG} = require('pngjs');
 const fetch = require('node-fetch');
 const WebSocket = require('ws');
@@ -20,8 +21,15 @@ const app = spawn(baseDir + '/build/' + (
 ), [
   '--remote-debugging-port=' + debuggerPort,
   '--port=' + port
-], platform == 'darwin' ? undefined : {
-  env: {DISPLAY: ':99'}
+], {
+  encoding: 'utf8',
+  env: platform == 'darwin' ? undefined : {DISPLAY: ':99'}
+});
+
+[app.stdout, app.stderr].forEach(input => {
+  readline.createInterface({input}).on('line', line => {
+    if (line) log.push((input == app.stdout ? '[CHROME OUT] ' : '[CHROME ERR] ') + line);
+  });
 });
 
 const tests = [];
@@ -30,31 +38,31 @@ const listeners = {};
 const timeout = 10000;
 
 // TODO: code coverage
-// TODO: record app output
 // TODO: handle early app crash, ws disconnect
 
 app.on('error', console.error);
 
-const getToken = async i => {
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  try {
-    const response = await fetch(baseUrl + '/token', {timeout});
-    if (response.ok) return response.text();
-  } catch (e) {
-    // continue
-  }
-  return i && getToken(i - 1);
-};
-
 const assert = (pass, name, detail, images) => {
   console.log(pass ? '\x1b[32m✓\x1b[0m ' + name : '\x1b[31m✗\x1b[0m ' + name + '\n  ' + detail);
-  log.push(pass ? '✓ ' + name : '✗ ' + name + '\n  ' + detail);
+  log.push('[TEST] ' + (pass ? '✓ ' : '✗ ') + name + '\n  ' + detail);
   tests.push({name, pass: !!pass, detail, images});
 };
 
-getToken(5).then(async token => {
+(async () => {
 
-  assert(token, 'Get token', 'Made up to 5 requests to /token');
+  const token = await (async retries => {
+    while (retries--) {
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      try {
+        const response = await fetch(baseUrl + '/token', {timeout});
+        if (response.ok) return response.text();
+      } catch (e) {
+        // continue
+      }
+    }
+  })(5);
+
+  assert(token, 'Get token', token);
   if (!token) return;
 
   const page = await fetch('http://localhost:' + debuggerPort + '/json')
@@ -76,7 +84,7 @@ getToken(5).then(async token => {
   let id = 1;
   const send = (method, params) => {
     const message = JSON.stringify({id, method, params});
-    log.push('> ' + message);
+    log.push('[TEST] ' + message);
     socket.send(message);
     return new Promise((resolve, reject) => {
       const i = id++;
@@ -90,7 +98,7 @@ getToken(5).then(async token => {
   };
 
   const next = (method, test) => {
-    log.push('> wait for ' + method);
+    log.push('[TEST] wait for ' + method);
     return new Promise((resolve, reject) => {
       listeners[method] = resolve;
       setTimeout(() => {
@@ -196,11 +204,11 @@ getToken(5).then(async token => {
         listener(result || params);
       }
     } catch (e) {
-      log.push('Error parsing ws message: ' + e);
+      log.push('[ERROR] ws message: ' + e);
     }
   });
 
-  socket.on('error', console.error);
+  socket.on('error', e => log.push('[ERROR] ' + e));
   // TODO: socket.on('close')
 
   await new Promise((resolve, reject) => {
@@ -345,9 +353,9 @@ getToken(5).then(async token => {
   } catch (e) {
     assert(false, 'Config snapshot', e);
   }
-})
+})()
 .catch(e => {
-  assert(false, 'Unhandled exception', e);
+  assert(false, e && e.message || e, e && e.stack);
 })
 .finally(() => {
   const total = 14;
